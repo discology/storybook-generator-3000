@@ -1,0 +1,14 @@
+{
+    // Run → Start Debugging (F5): starts the app (see tasks.json), then opens it in Chrome.
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "type": "chrome",
+            "request": "launch",
+            "name": "Open Storybook Generator",
+            "url": "http://localhost:5174",
+            "webRoot": "${workspaceFolder}",
+            "preLaunchTask": "Start Storybook app"
+        }
+    ]
+}

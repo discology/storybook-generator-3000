@@ -1,0 +1,11 @@
+node_modules
+dist
+.env
+.DS_Store
+/src/generated/prisma
+prisma/dev.db
+
+# Family voice recordings, exports and generated illustrations: private user data
+uploads/
+
+/src/generated/prisma

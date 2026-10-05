@@ -1,0 +1,302 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String    @id @default(cuid())
+  phone       String?   @unique
+  email       String?   @unique
+  name        String?
+  contributors Contributor[]
+  sessions    Session[]
+  ownedHouseholds Household[]
+  createdAt   DateTime  @default(now())
+}
+
+model Session {
+  id         String   @id @default(cuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token      String   @unique
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+}
+
+model OtpCode {
+  id         String   @id @default(cuid())
+  phone      String
+  code       String
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime @default(now())
+}
+
+model Household {
+  id          String       @id @default(cuid())
+  name        String?
+  ownerUserId String?
+  owner       User?        @relation(fields: [ownerUserId], references: [id])
+  contributors Contributor[]
+  children    Child[]
+  invitations Invitation[]
+  createdAt   DateTime     @default(now())
+}
+
+model Contributor {
+  id          String    @id @default(cuid())
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  userId      String?
+  user        User?     @relation(fields: [userId], references: [id])
+  name        String
+  phone       String?
+  email       String?
+  relationship String?  // e.g. "Mom", "Dad", "Grandma"
+  role        String    @default("owner") // owner | contributor
+  inviteStatus String   @default("joined") // joined | pending | revoked
+  memories    Memory[]
+  chapterAccess ChapterAccess[]
+  createdAt   DateTime  @default(now())
+}
+
+model Invitation {
+  id              String    @id @default(cuid())
+  householdId     String
+  household       Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  contributorId   String    @unique
+  invitedByName   String?
+  contact         String
+  relationship    String?
+  token           String    @unique
+  status          String    @default("pending") // pending | accepted | revoked | expired
+  createdAt       DateTime  @default(now())
+  respondedAt     DateTime?
+}
+
+model Prompt {
+  id             String   @id @default(cuid())
+  question       String
+  supportingText String?
+  category       String   @default("General")
+  audience       String   @default("Everyone")
+  childStage     String   @default("All stages")
+  cardColor      String   @default("purple")
+  status         String   @default("published") // draft | published | archived
+  sortOrder      Int      @default(0)
+  createdAt      DateTime @default(now())
+}
+
+model ChapterAccess {
+  chapterId     String
+  contributorId String
+  chapter       Chapter     @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  contributor   Contributor @relation(fields: [contributorId], references: [id], onDelete: Cascade)
+
+  @@id([chapterId, contributorId])
+}
+
+model GuardianFinding {
+  id         String   @id @default(cuid())
+  chapterId  String
+  chapter    Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  category   String   // continuity | reader_fit | private_details | fidelity | tone
+  status     String   @default("needs_revision") // needs_revision | ok
+  note       String
+  createdAt  DateTime @default(now())
+}
+
+model ExportRequest {
+  id          String    @id @default(cuid())
+  storybookId String
+  storybook   Storybook @relation(fields: [storybookId], references: [id], onDelete: Cascade)
+  status      String    @default("preparing") // preparing | ready | failed | expired
+  filePath    String?
+  createdAt   DateTime  @default(now())
+  expiresAt   DateTime?
+}
+
+model Child {
+  id          String    @id @default(cuid())
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  displayName String
+  stage       String    @default("born") // "expecting" | "born"
+  birthDate   DateTime?
+  dueDate     DateTime?
+  storybooks  Storybook[]
+  createdAt   DateTime  @default(now())
+}
+
+model Storybook {
+  id            String    @id @default(cuid())
+  childId       String
+  child         Child     @relation(fields: [childId], references: [id], onDelete: Cascade)
+  title         String
+  readerAgeBand String    @default("0-3") // explicit reading-level setting, separate from child's actual age
+  growWithChild Boolean   @default(true) // if true, readerAgeBand advances automatically as the child ages
+  language      String    @default("English")
+  status        String    @default("active") // active | paused | archived
+  reminderFrequency String @default("weekly") // weekly | daily
+  reminderDay      String @default("Sunday")
+  reminderTime     String @default("19:00")
+  reminderTimezone String @default("Pacific Time")
+  reminderChannel  String @default("SMS")
+  remindersPaused  Boolean @default(false)
+  defaultVisibility String @default("contributor_only") // contributor_only | household
+  defaultStoryUse   Boolean @default(true)
+  memories      Memory[]
+  chapters      Chapter[]
+  exportRequests ExportRequest[]
+  createdAt     DateTime  @default(now())
+}
+
+model Memory {
+  id               String    @id @default(cuid())
+  storybookId      String
+  storybook        Storybook @relation(fields: [storybookId], references: [id], onDelete: Cascade)
+  contributorId    String
+  contributor      Contributor @relation(fields: [contributorId], references: [id])
+  title            String?
+  eventDate        DateTime?
+  recordedAt       DateTime  @default(now())
+  audioUrl         String?
+  durationSec      Int?
+  visibility       String    @default("contributor_only") // contributor_only | household | story
+  storyUseConsent  Boolean   @default(false)
+  status           String    @default("recorded") // recorded | transcribing | transcribed | interpreted | ready | failed
+  transcripts      TranscriptVersion[]
+  interpretation   MemoryInterpretation?
+  chapterSources   ChapterSource[]
+  createdAt        DateTime  @default(now())
+}
+
+model TranscriptVersion {
+  id         String   @id @default(cuid())
+  memoryId   String
+  memory     Memory   @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+  source     String   // "machine" | "corrected"
+  text       String
+  createdAt  DateTime @default(now())
+}
+
+model MemoryInterpretation {
+  id          String   @id @default(cuid())
+  memoryId    String   @unique
+  memory      Memory   @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+  events      String? // short description of what happened
+  emotions    String? // comma-separated or free text
+  themes      String? // comma-separated or free text
+  isMock      Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model Chapter {
+  id          String   @id @default(cuid())
+  storybookId String
+  storybook   Storybook @relation(fields: [storybookId], references: [id], onDelete: Cascade)
+  sequence    Int
+  title       String
+  content     String
+  status      String   @default("draft") // draft | guardian_review | published
+  guardianStatus String @default("not_reviewed") // not_reviewed | needs_revision | approved
+  revisionRequested Boolean @default(false)
+  isMock      Boolean  @default(false)
+  sources     ChapterSource[]
+  findings    GuardianFinding[]
+  access      ChapterAccess[]
+  pages       StoryPage[]
+  // Page generation (empty for chapters created before illustrated pages existed).
+  ruleSetVersion     Int?
+  generationSnapshot String? // JSON: rules, reading profile and AI instructions used
+  characterSheet     String? // JSON: [{ name, appearance }] reused in every illustration
+  characterSheetImage String? // character reference picture used for every page's illustration
+  pagesStatus        String  @default("none") // none | illustrating | ready | needs_attention
+  createdAt   DateTime @default(now())
+}
+
+model ChapterSource {
+  chapterId String
+  memoryId  String
+  chapter   Chapter @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  memory    Memory  @relation(fields: [memoryId], references: [id], onDelete: Cascade)
+
+  @@id([chapterId, memoryId])
+}
+
+// Admin-editable wording for outgoing text messages. Which types exist and which
+// variables each supports is defined in server/messageTemplates.ts.
+model MessageTemplate {
+  key       String   @id // welcome | invite | reminder | chapter_ready
+  body      String
+  enabled   Boolean  @default(true)
+  updatedAt DateTime @updatedAt
+}
+
+// Admin-editable instructions sent to the AI at each step. Which steps exist and
+// which variables each supports is defined in server/aiInstructions.ts.
+model AiInstruction {
+  key       String   @id // interpret | chapter | guardian
+  body      String
+  model     String? // OpenAI model override; null uses OPENAI_MODEL
+  updatedAt DateTime @updatedAt
+}
+
+// Each save of the page rules in the admin panel creates a new version; chapters
+// record the version they were generated with, so rule changes never alter them.
+model GenerationRuleSet {
+  id        String   @id @default(cuid())
+  version   Int      @unique
+  rules     String // JSON, see server/pageRules.ts
+  createdAt DateTime @default(now())
+}
+
+model StoryPage {
+  id                 String      @id @default(cuid())
+  chapterId          String
+  chapter            Chapter     @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  pageNumber         Int
+  storyMoment        String
+  characters         String // JSON string[]
+  setting            String
+  visibleAction      String
+  emotionalTone      String
+  continuity         String
+  shot               String? // JSON: { type, angle, focus }
+  text               String // exact words shown beneath the illustration
+  interpretationNote String
+  sourceMemoryId     String?
+  sourceQuote        String?
+  checkStatus        String      @default("unchecked") // unchecked | ok | flagged
+  checkNotes         String? // JSON string[]
+  approvedAt         DateTime?
+  assets             PageAsset[]
+  createdAt          DateTime    @default(now())
+  updatedAt          DateTime    @updatedAt
+
+  @@unique([chapterId, pageNumber])
+}
+
+// Every illustration attempt for a page; the newest ready one is shown.
+model PageAsset {
+  id          String    @id @default(cuid())
+  pageId      String
+  page        StoryPage @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  version     Int
+  status      String // generating | ready | failed
+  imagePath   String?
+  prompt      String
+  model       String?
+  error       String?
+  checkStatus String    @default("unchecked") // unchecked | ok | flagged
+  checkNote   String?
+  createdAt   DateTime  @default(now())
+}

@@ -1,0 +1,22 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+        {
+            // Runs `npm run dev` in the terminal panel: web app on :5174, API on :3002.
+            "label": "Start Storybook app",
+            "type": "npm",
+            "script": "dev",
+            "isBackground": true,
+            "problemMatcher": {
+                "owner": "storybook-dev",
+                "pattern": { "regexp": "^__never_matches__$" },
+                "background": {
+                    "activeBegins": true,
+                    "beginsPattern": "^__never_matches__$",
+                    // Ready once the API is listening; EADDRINUSE means it's already running elsewhere.
+                    "endsPattern": "backend listening on|EADDRINUSE"
+                }
+            }
+        }
+    ]
+}
