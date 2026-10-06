@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { flushSync } from "react-dom";
 import { apiGet, apiSend, ApiError } from "../../lib/api";
 import { IconImage, IconInfo, IconMenu, IconMic, IconSparkle, IconTrash, IconUpload } from "../../components/icons";
 import { Chev, Field, Select } from "../../components/ui";
-import { CARD_ART, PromptArt } from "./AdminPromptLibrary";
+import { CARD_ART, PromptArt, PromptText } from "./AdminPromptLibrary";
+import { PROMPT_VARIABLES, unknownPromptVariables } from "../../lib/promptVariables";
 import PromptArtworkDialog, { type ArtworkTab } from "./PromptArtworkDialog";
 import type { Prompt } from "../../types";
 
@@ -32,6 +34,9 @@ export default function AdminPromptEdit() {
   const [error, setError] = useState<string | null>(null);
   const [artDialog, setArtDialog] = useState<ArtworkTab | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
+  const questionRef = useRef<HTMLInputElement | null>(null);
+  const supportingRef = useRef<HTMLInputElement | null>(null);
+  const [lastField, setLastField] = useState<"question" | "supportingText">("question");
 
   useEffect(() => {
     apiGet(`/api/prompts/${id}`).then((p: Prompt) => {
@@ -48,10 +53,30 @@ export default function AdminPromptEdit() {
 
   const set = <K extends keyof Prompt>(key: K, value: Prompt[K]) => setForm((f) => (f ? { ...f, [key]: value } : f));
 
+  const unknown = form ? [...new Set([...unknownPromptVariables(form.question), ...unknownPromptVariables(form.supportingText)])] : [];
+
+  // Inserts a variable at the cursor in the field last edited, then puts the
+  // cursor after it (committed first, so typing straight away lands there).
+  const insertVariable = (name: string) => {
+    const input = lastField === "question" ? questionRef.current : supportingRef.current;
+    if (!input) return;
+    const value = input.value;
+    const start = input.selectionStart ?? value.length;
+    const end = input.selectionEnd ?? value.length;
+    const token = `<${name}>`;
+    flushSync(() => set(lastField, value.slice(0, start) + token + value.slice(end)));
+    input.focus();
+    input.setSelectionRange(start + token.length, start + token.length);
+  };
+
   const save = async (status: Prompt["status"]) => {
     if (!form) return;
     if (!form.question.trim()) {
       setError("The question can't be empty.");
+      return;
+    }
+    if (unknown.length) {
+      setError("Fix the unknown variables first.");
       return;
     }
     setBusy(status);
@@ -116,10 +141,10 @@ export default function AdminPromptEdit() {
         <div className="hstack">
           {dirty && <span className="pill-status pill-status--held">Unpublished changes</span>}
           {form.status === "archived" && !dirty && <span className="pill-status pill-status--archived">Archived</span>}
-          <button className="btn btn--soft btn--sm btn--auto" onClick={() => void save("draft")} disabled={busy !== null}>
+          <button className="btn btn--soft btn--sm btn--auto" onClick={() => void save("draft")} disabled={busy !== null || unknown.length > 0}>
             {busy === "draft" ? "Saving…" : "Save draft"}
           </button>
-          <button className="btn btn--lime btn--sm btn--auto" onClick={() => void save("published")} disabled={busy !== null}>
+          <button className="btn btn--lime btn--sm btn--auto" onClick={() => void save("published")} disabled={busy !== null || unknown.length > 0}>
             {busy === "published" ? "Publishing…" : "Publish changes"}
           </button>
         </div>
@@ -128,11 +153,53 @@ export default function AdminPromptEdit() {
       <div className="adm-grid" style={{ gridTemplateColumns: "minmax(0, 1fr) 320px" }}>
         <section>
           <Field label="Question" htmlFor="question">
-            <input id="question" className="input" value={form.question} onChange={(e) => set("question", e.target.value)} maxLength={90} />
+            <input
+              id="question"
+              ref={questionRef}
+              className="input"
+              value={form.question}
+              onChange={(e) => set("question", e.target.value)}
+              onFocus={() => setLastField("question")}
+              maxLength={90}
+            />
           </Field>
           <Field label="Supporting text" htmlFor="supporting">
-            <input id="supporting" className="input" value={form.supportingText ?? ""} onChange={(e) => set("supportingText", e.target.value)} placeholder="Tell it in your own words." maxLength={120} />
+            <input
+              id="supporting"
+              ref={supportingRef}
+              className="input"
+              value={form.supportingText ?? ""}
+              onChange={(e) => set("supportingText", e.target.value)}
+              onFocus={() => setLastField("supportingText")}
+              placeholder="Tell it in your own words."
+              maxLength={120}
+            />
           </Field>
+          <div className="field">
+            <span className="field__label">Variables</span>
+            <div className="var-chips">
+              {PROMPT_VARIABLES.map((v) => (
+                <button
+                  key={v.name}
+                  type="button"
+                  className="var-chip"
+                  title={`${v.description}. Example: ${v.sample}`}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => insertVariable(v.name)}
+                >
+                  {v.label} <code>&lt;{v.name}&gt;</code>
+                </button>
+              ))}
+            </div>
+            <p className="field__hint">
+              Click to add one to the {lastField === "question" ? "question" : "supporting text"} at the cursor. Each family sees their own: “What is something you'd like to tell Mia in the future?”
+            </p>
+            {unknown.length > 0 && (
+              <p className="error-text" role="alert" style={{ marginTop: 6 }}>
+                {unknown.map((n) => `<${n}>`).join(", ")} isn't a card variable. Use one from the list above.
+              </p>
+            )}
+          </div>
           <div className="form-grid">
             <Field label="Category" htmlFor="category">
               {newCategory || !categories.includes(form.category) ? (
@@ -251,7 +318,7 @@ export default function AdminPromptEdit() {
             </div>
             <div className={`prompt-card prompt-card--${form.cardColor}`}>
               <span className={`badge badge--caps badge--sm prompt-card__badge ${form.cardColor === "purple" ? "badge--pink" : "badge--purple"}`}>{form.category || "Category"}</span>
-              <span className="prompt-card__q">{form.question || "Your question"}</span>
+              <span className="prompt-card__q">{form.question ? <PromptText text={form.question} samples onCard /> : "Your question"}</span>
               <PromptArt prompt={form} index={index} className="prompt-card__art" style={{ background: "none", borderRadius: form.artworkPath ? 16 : 0, aspectRatio: "1" }} />
             </div>
             <div className="deck-dots" aria-hidden="true">

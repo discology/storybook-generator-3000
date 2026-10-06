@@ -10,6 +10,7 @@ import { useStorybookData } from "../hooks/useStorybookData";
 import { apiGet } from "../lib/api";
 import { formatDuration, possessive } from "../lib/format";
 import { ageInYears } from "../lib/stages";
+import { fillPrompt, promptValues } from "../lib/promptVariables";
 import type { Prompt, StorybookView } from "../types";
 
 type Stage = "deck" | "requesting" | "mic-blocked" | "recording" | "paused" | "review" | "uploading" | "upload-error" | "saved";
@@ -43,10 +44,12 @@ function childStageFor(storybook: StorybookView) {
   return age < 1 ? "Newborn" : age < 4 ? "Toddler" : null;
 }
 
-const toCard = (p: Prompt): DeckCard => ({
+// Cards can use variables like <child_name>; they're filled in for the person
+// recording, and the memory keeps the question as they saw it.
+const toCard = (p: Prompt, values: Record<string, string>): DeckCard => ({
   id: p.id,
-  question: p.question,
-  supportingText: p.supportingText || "Tell it in your own words.",
+  question: fillPrompt(p.question, values),
+  supportingText: fillPrompt(p.supportingText || "Tell it in your own words.", values),
   category: p.category,
   color: p.cardColor,
   art: p.artworkPath,
@@ -123,7 +126,12 @@ export default function Recorder() {
     const fitting = prompts.filter(
       (p) => (p.audience === "Everyone" || p.audience === audience) && (p.childStage === "All stages" || p.childStage === childStage)
     );
-    const list = fitting.filter((p) => category === "All" || p.category === category).map(toCard);
+    const values = promptValues({
+      child: storybook.child,
+      me: storybook.me,
+      parentName: storybook.family.find((f) => f.role === "owner")?.name ?? null,
+    });
+    const list = fitting.filter((p) => category === "All" || p.category === category).map((p) => toCard(p, values));
     const asked = params.get("q");
     return asked && category === "All" ? [{ ...FREEFORM, question: asked, category: "Sample prompt" }, ...list] : list;
   }, [prompts, storybook, category, params]);

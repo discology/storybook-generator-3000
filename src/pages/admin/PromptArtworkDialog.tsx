@@ -4,6 +4,7 @@ import { IconClose, IconSparkle, IconSpinner } from "../../components/icons";
 import { Field, Mascot } from "../../components/ui";
 import type { Prompt } from "../../types";
 import type { MascotName } from "../../components/ui";
+import { PromptText } from "./AdminPromptLibrary";
 
 // Picks a prompt card's artwork: draw new pictures from the question, or reuse
 // Baby Vambie's card poses or any picture made for a card (server/promptArt.ts).
@@ -101,7 +102,11 @@ export default function PromptArtworkDialog({
           title={p.label}
         >
           <img src={`/${p.path}`} alt={p.label} loading="lazy" />
-          {captions && <span className="art-tile__label">{p.label}</span>}
+          {captions && (
+            <span className="art-tile__label">
+              <PromptText text={p.label} />
+            </span>
+          )}
         </button>
       ))}
     </div>
@@ -133,7 +138,7 @@ export default function PromptArtworkDialog({
             {tab === "generate" && (
               <>
                 <p className="t-body" style={{ marginTop: 0 }}>
-                  Draws {library?.perClick ?? 2} pictures of Baby Vambie, in the style of the card poses, for “{card.question || "this card's question"}”
+                  Draws {library?.perClick ?? 2} pictures of Baby Vambie, in the style of the card poses, for “{card.question ? <PromptText text={card.question} /> : "this card's question"}”
                 </p>
                 <Field label="Picture idea (optional)" htmlFor="art-idea" hint="Leave it empty to let the AI choose from the question.">
                   <textarea
@@ -193,7 +198,7 @@ export default function PromptArtworkDialog({
           <aside className="adm-modal__side">
             <div className={`prompt-card prompt-card--${card.cardColor} art-preview`}>
               <span className={`badge badge--caps badge--sm prompt-card__badge ${card.cardColor === "purple" ? "badge--pink" : "badge--purple"}`}>{card.category || "Category"}</span>
-              <span className="prompt-card__q">{card.question || "Your question"}</span>
+              <span className="prompt-card__q">{card.question ? <PromptText text={card.question} samples onCard /> : "Your question"}</span>
               {selected ? (
                 <img src={`/${selected}`} alt="" className="prompt-card__art" style={{ borderRadius: 16, aspectRatio: "1", objectFit: "cover" }} />
               ) : (

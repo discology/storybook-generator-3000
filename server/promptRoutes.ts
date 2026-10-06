@@ -2,6 +2,7 @@ import express, { Router } from "express";
 import multer from "multer";
 import { prisma } from "./db";
 import { PICTURES_PER_CLICK, cardPoses, generatePromptArt, isLibraryPicture, madeForCards, savePromptArt } from "./promptArt";
+import { unknownPromptVariables } from "./promptVariables";
 
 // Prompt cards for the recorder. Reading is open; changes need an admin
 // (enforced in server.ts). A card's artwork comes from the artwork library
@@ -11,6 +12,12 @@ const IMAGE_TYPES: Record<string, string> = { "image/png": ".png", "image/jpeg":
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
 
 const router: Router = express.Router();
+
+// Questions and supporting text may only use the card variables (server/promptVariables.ts).
+const variableError = (...texts: unknown[]) => {
+  const unknown = texts.flatMap((t) => (typeof t === "string" ? unknownPromptVariables(t) : []));
+  return unknown.length ? `Cards can't use ${unknown.map((n) => `<${n}>`).join(", ")}. Pick a variable from the list.` : null;
+};
 
 router.get("/prompts", async (req, res) => {
   const { status } = req.query as { status?: string };
@@ -30,6 +37,8 @@ router.get("/prompts/:id", async (req, res) => {
 router.post("/prompts", async (req, res) => {
   const { question, supportingText, category, audience, childStage, cardColor, status } = req.body ?? {};
   if (!question || !String(question).trim()) return res.status(400).json({ error: "question is required" });
+  const badVariables = variableError(question, supportingText);
+  if (badVariables) return res.status(400).json({ error: badVariables });
 
   const count = await prisma.prompt.count();
   const prompt = await prisma.prompt.create({
@@ -59,6 +68,8 @@ router.put("/prompts/:id", async (req, res) => {
   if (!existing) return res.status(404).json({ error: "Not found" });
 
   const { question, supportingText, category, audience, childStage, cardColor, status, artworkPath } = req.body ?? {};
+  const badVariables = variableError(question, supportingText);
+  if (badVariables) return res.status(400).json({ error: badVariables });
   if (typeof artworkPath === "string" && !(await isLibraryPicture(artworkPath))) {
     return res.status(400).json({ error: "Pick artwork from the library." });
   }

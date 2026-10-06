@@ -5,6 +5,7 @@ import { prisma } from "./db";
 import { getOpenAI } from "./openaiClient";
 import { withImageRateLimit } from "./imageQueue";
 import { recordImage } from "./aiUsage";
+import { fillPrompt, neutralPromptValues } from "./promptVariables";
 
 // Prompt card artwork: the library admins pick from (Baby Vambie's card poses
 // and every picture made for a card), and new pictures drawn from a card's
@@ -84,12 +85,15 @@ export async function generatePromptArt(input: { question: string; supportingTex
   if (!client) throw new Error("Drawing pictures needs an OpenAI API key (OPENAI_API_KEY).");
   const question = input.question.trim();
   if (!question) throw new Error("Write the question first.");
+  // No family is known here, so variables become neutral words ("the child").
+  const asked = fillPrompt(question, neutralPromptValues);
+  const supporting = fillPrompt(input.supportingText?.trim() ?? "", neutralPromptValues);
   const idea = input.idea?.trim() || null;
   const color = CARD_COLORS[input.cardColor ?? ""] ?? "purple";
 
   const prompt = [
     CHARACTER,
-    `This picture goes on a memory prompt card in a family storybook app. The card asks: "${question}"${input.supportingText?.trim() ? ` (${input.supportingText.trim()})` : ""}.`,
+    `This picture goes on a memory prompt card in a family storybook app. The card asks: "${asked}"${supporting ? ` (${supporting})` : ""}.`,
     idea
       ? `Picture: ${idea}`
       : "Show Baby Vambie in a pose, with an expression and one or two simple props, that makes the question easy to understand at a glance. Keep it warm and gentle, and clear at a small size.",

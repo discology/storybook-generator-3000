@@ -4294,6 +4294,63 @@ button.btn-small,
   background: #1d1830 url("/art/night-wide.webp") center / cover;
 }
 
+/* Prompt card variables */
+.pvar {
+  display: inline;
+  background: var(--purple-soft);
+  color: var(--purple-ink);
+  border-radius: 6px;
+  padding: 0 5px;
+  font-weight: inherit;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+
+.pvar--card {
+  background: rgba(255, 255, 255, 0.28);
+  color: inherit;
+  /* Highlight without shifting the words: the padding is taken back by the margin. */
+  padding: 0 3px;
+  margin: 0 -3px;
+}
+
+.pvar--bad {
+  background: var(--red-soft);
+  color: var(--red);
+}
+
+.var-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.var-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 38px;
+  padding: 0 12px;
+  border-radius: 999px;
+  border: 1.5px solid var(--purple-line);
+  background: var(--purple-soft);
+  color: var(--purple-ink);
+  font-family: var(--font-body);
+  font-size: 15px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.var-chip:hover {
+  border-color: var(--purple);
+}
+
+.var-chip code {
+  font-size: 12px;
+  font-weight: 500;
+  opacity: 0.75;
+}
+
 .art-actions {
   display: flex;
   flex-wrap: wrap;

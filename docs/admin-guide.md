@@ -38,6 +38,17 @@ Prompt cards are the questions families see when they record.
 ### Editing a card
 
 - **Question** (up to 90 characters) and **supporting text** (up to 120 characters).
+- **Variables** make a card personal: each family sees their own names. Click a variable to add it at the cursor in the question or supporting text. The phone preview shows samples, and the Prompt Library list shows variables highlighted.
+
+  | Variable | Shows | If it's unknown |
+  | --- | --- | --- |
+  | `<child_name>` | The child's name or nickname, as the family entered it (Mia) | — |
+  | `<child_age>` | The child's age in words (8 months old, 2 years old), or "on the way" while expecting | "young" |
+  | `<your_name>` | First name of the person recording (Rose, or "Grandma Rose" when the name starts with a family title) | "you" |
+  | `<your_relationship>` | How the person recording is related to the child, in lowercase (grandparent, auntie) | "family member" |
+  | `<parent_name>` | First name of the parent who started the storybook (Anna) | "their parent" |
+
+  For example, "What is something you'd like to tell `<child_name>` in the future?" reads "…tell Mia in the future?" for Mia's family. A recorded memory keeps the question as the family saw it. A misspelled variable (like `<childname>`) is flagged, and the card can't be saved until it's fixed. When drawing card art, variables become neutral words ("the child").
 - **Category:** pick an existing category or create a new one. Categories become the filter chips on the recording screen.
 - **Audience** decides who sees the card: all contributors, parents (the Parent and Guardian relationships) or grandparents.
 - **Child stage** shows the card at every age, or only while the family is expecting, for newborns (under 1) or for toddlers (1 to 3).

@@ -61,6 +61,7 @@ docs/                 these guides
 | `aiService.ts`, `aiInstructions.ts` | Calling the AI provider; each AI step's instructions and reply format |
 | `imageQueue.ts` | Pacing image requests to the OpenAI account's per-minute limit |
 | `promptArt.ts` | The prompt card artwork library, and drawing card pictures from a question |
+| `promptVariables.ts` | Prompt card variables (`<child_name>` and the rest): checking, filling in and samples. Shared with the web app through `src/lib/promptVariables.ts` |
 | `aiUsage.ts`, `costRoutes.ts` | Recording what each AI call costs (prices per model), and the admin Costs page |
 | `messageTemplates.ts` | Text message types, variables and wording |
 

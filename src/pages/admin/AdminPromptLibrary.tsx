@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiGet, apiSend } from "../../lib/api";
 import { IconArchive, IconEdit, IconGrip, IconPlus, IconRefresh, IconSearch, IconTrash } from "../../components/icons";
 import { Mascot, Select, type MascotName } from "../../components/ui";
 import { AdminDots } from "./AdminReviewQueue";
 import type { Prompt } from "../../types";
+import { PROMPT_VARIABLES, promptParts, samplePromptValues } from "../../lib/promptVariables";
 
 type Tab = "published" | "draft" | "archived";
 const TABS: { key: Tab; label: string }[] = [
@@ -15,6 +16,26 @@ const TABS: { key: Tab; label: string }[] = [
 // The Baby Vambie art a card shows when it has no artwork of its own (same as the recorder).
 export const CARD_ART: MascotName[] = ["star", "book", "open-book", "hug-book", "envelope-happy", "closedbook"];
 export const AUDIENCE_LABEL: Record<string, string> = { Everyone: "Everyone", Parents: "Parents", Grandparents: "Grandparents" };
+
+const VARIABLE_LABEL: Record<string, string> = Object.fromEntries(PROMPT_VARIABLES.map((v) => [v.name, v.label]));
+
+// A card's question with its variables highlighted: as labels ("Child's name"),
+// or filled with sample values the way a family would see them.
+export function PromptText({ text, samples = false, onCard = false }: { text: string; samples?: boolean; onCard?: boolean }) {
+  return (
+    <>
+      {promptParts(text).map((part, i) =>
+        part.variable ? (
+          <span key={i} className={`pvar ${onCard ? "pvar--card" : ""} ${part.known ? "" : "pvar--bad"}`} title={part.known ? `<${part.variable}>` : `Unknown variable <${part.variable}>`}>
+            {!part.known ? part.text : samples ? samplePromptValues[part.variable] : VARIABLE_LABEL[part.variable]}
+          </span>
+        ) : (
+          <Fragment key={i}>{part.text}</Fragment>
+        )
+      )}
+    </>
+  );
+}
 
 export function PromptArt({ prompt, index, className, style }: { prompt: Pick<Prompt, "artworkPath">; index: number; className?: string; style?: React.CSSProperties }) {
   return prompt.artworkPath ? (
@@ -145,7 +166,9 @@ export default function AdminPromptLibrary() {
                 <td>
                   <div className="hstack" style={{ gap: 14 }}>
                     <PromptArt prompt={p} index={Math.max(0, index)} className="adm-thumb" />
-                    <span className="adm-cell-title" style={{ fontSize: 18 }}>{p.question}</span>
+                    <span className="adm-cell-title" style={{ fontSize: 18 }}>
+                      <PromptText text={p.question} />
+                    </span>
                   </div>
                 </td>
                 <td>{p.category}</td>
@@ -201,7 +224,9 @@ export default function AdminPromptLibrary() {
         {published.map((p, i) => (
           <div key={p.id} className={`deck-preview__card prompt-card--${p.cardColor}`}>
             <span className={`badge badge--caps badge--sm ${p.cardColor === "purple" ? "badge--pink" : "badge--purple"}`}>{p.category}</span>
-            <div className="deck-preview__q">{p.question}</div>
+            <div className="deck-preview__q">
+              <PromptText text={p.question} samples onCard />
+            </div>
             <PromptArt prompt={p} index={i} className="deck-preview__art" style={{ background: "none", borderRadius: p.artworkPath ? 14 : 0 }} />
           </div>
         ))}
