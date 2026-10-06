@@ -57,7 +57,7 @@ Open http://localhost:5174. Without Twilio settings, the sign-in code appears on
 
 ## Status
 
-This is a working prototype, hosted on Fly.io and invite-only for now: see [Deployment](docs/deployment.md). Not built yet:
+This is a working prototype, hosted on Fly.io: see [Deployment](docs/deployment.md). Not built yet:
 
 - **Sending text messages.** Sign-in codes are texted through Twilio Verify. Invites, reminders, chapter links and "your chapter is ready" alerts aren't sent yet; the app shows the message for the person to share themselves.
 - **Other languages.** Stories are written in English only.

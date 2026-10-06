@@ -11,6 +11,7 @@ The app is hosted on [Fly.io](https://fly.io) at **https://vambie-storybook.fly.
 | Disk | The `vambie_data` volume (3 GB, encrypted), mounted at `/data`. It holds the database (`/data/storybook.db`) and every saved file (`/data/uploads`). |
 | Backups | Fly takes a snapshot of the disk every day and keeps the last 5. |
 | Address | HTTPS at `vambie-storybook.fly.dev`. Plain HTTP is redirected to HTTPS. |
+| Sign-up | Open: anyone can sign up and start a storybook (`OPEN_SIGNUP=on`) |
 | Cost | About $6 a month for the machine and disk, plus OpenAI and Twilio usage |
 
 The [Dockerfile](../Dockerfile) installs the dependencies and builds the web app and the database client. When the machine starts, [deploy/start.sh](../deploy/start.sh):
@@ -26,7 +27,7 @@ The server runs with `NODE_ENV=production`, which changes a few things:
 
 - **Sign-in codes are only texted,** through Twilio Verify. The development mode that shows the code on screen is off, because it would let anyone sign in as anyone.
 - **The admin panel is closed** unless your number is in `ADMIN_PHONES`.
-- **Starting a storybook is invite-only,** so strangers can't run up AI costs. Admins and the numbers in `ALLOWED_PHONES` can start one. Everyone else joins a family through an invitation link, and sees "Vambie is invite-only for now" if they try to start their own. Set `OPEN_SIGNUP=on` to let anyone start a storybook.
+- **Starting a storybook is invite-only by default,** so strangers can't run up AI costs. Admins and the numbers in `ALLOWED_PHONES` can start one. Everyone else joins a family through an invitation link, and sees "Vambie is invite-only for now" if they try to start their own. `OPEN_SIGNUP=on` lets anyone start a storybook; the hosted app has it on. To go back to invite-only, run `fly secrets unset OPEN_SIGNUP`.
 - **Weekly chapters are made here.** A development copy only makes them with `WEEKLY_CHAPTERS=on`, so the hosted app and a local copy never both spend money on the same chapter.
 - **Session cookies are HTTPS-only,** and the server sends basic security headers.
 
