@@ -1,30 +1,57 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
-import Vambie from "../components/Vambie";
+import { Chev, Field, Masthead, Note, Select, Sheet } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
+
+const COUNTRY_CODES = [
+  { value: "+1", label: "+1" },
+  { value: "+44", label: "+44" },
+  { value: "+61", label: "+61" },
+  { value: "+64", label: "+64" },
+  { value: "+353", label: "+353" },
+  { value: "+49", label: "+49" },
+  { value: "+33", label: "+33" },
+  { value: "+34", label: "+34" },
+  { value: "+52", label: "+52" },
+  { value: "+91", label: "+91" },
+  { value: "+65", label: "+65" },
+  { value: "+81", label: "+81" },
+];
+const RESEND_SECONDS = 30;
 
 export default function SignIn() {
   const [step, setStep] = useState<"phone" | "code">("phone");
-  const [phone, setPhone] = useState("");
-  const [code, setCode] = useState("");
+  const [country, setCountry] = useState("+1");
+  const [number, setNumber] = useState("");
+  const [digits, setDigits] = useState(["", "", "", "", "", ""]);
   const [devCode, setDevCode] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [resendIn, setResendIn] = useState(0);
+  const boxes = useRef<(HTMLInputElement | null)[]>([]);
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { refresh } = useAuth();
 
-  const sendCode = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!phone.trim()) return;
+  const phone = number.trim().startsWith("+") ? number.trim() : `${country}${number.replace(/\D/g, "")}`;
+
+  useEffect(() => {
+    if (resendIn <= 0) return;
+    const t = setTimeout(() => setResendIn((s) => s - 1), 1000);
+    return () => clearTimeout(t);
+  }, [resendIn]);
+
+  const sendCode = async (e?: React.FormEvent) => {
+    e?.preventDefault();
+    if (!number.trim()) return;
     setBusy(true);
     setError(null);
     try {
       const res = await fetch("/api/auth/send-code", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: phone.trim() }),
+        body: JSON.stringify({ phone }),
       });
       const data = await res.json();
       if (!res.ok) {
@@ -32,110 +59,186 @@ export default function SignIn() {
         return;
       }
       setDevCode(data.devCode ?? null);
+      setDigits(["", "", "", "", "", ""]);
       setStep("code");
+      setResendIn(RESEND_SECONDS);
+      setTimeout(() => boxes.current[0]?.focus(), 50);
+    } catch {
+      setError("We couldn't reach Vambie. Check your connection and try again.");
     } finally {
       setBusy(false);
     }
   };
 
-  const verify = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!code.trim()) return;
+  const verify = async (code: string) => {
     setBusy(true);
     setError(null);
     try {
       const res = await fetch("/api/auth/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: phone.trim(), code: code.trim() }),
+        body: JSON.stringify({ phone, code }),
       });
       if (!res.ok) {
         const data = await res.json();
         setError(data.error || "That code didn't match. Check it and try again.");
+        setDigits(["", "", "", "", "", ""]);
+        boxes.current[0]?.focus();
         return;
       }
       refresh();
-      navigate(params.get("next") || "/");
+      navigate(params.get("next") || "/", { replace: true });
     } finally {
       setBusy(false);
     }
   };
 
-  return (
-    <div>
-      <TopBar wordmark />
-      <div className="hero">
-        <div className="hero-mascot-stage">
-          <Vambie mood={step === "phone" ? "happy" : "curious"} size={90} />
-          {step === "phone" ? (
-            <>
-              <h1 className="display" style={{ fontSize: "1.9rem" }}>
-                Your family's
-                <br />
-                story starts here.
-              </h1>
-              <p className="subtitle" style={{ marginBottom: 0 }}>
-                Same little moments. A lifetime of stories.
-              </p>
-            </>
-          ) : (
-            <>
-              <h1 className="display" style={{ fontSize: "1.9rem" }}>
-                Check your phone.
-              </h1>
-              <p className="subtitle" style={{ marginBottom: 0 }}>
-                Enter the 6-digit code sent to your phone.
-              </p>
-            </>
-          )}
-        </div>
-      </div>
+  const setDigit = (index: number, value: string) => {
+    const clean = value.replace(/\D/g, "");
+    if (clean.length > 1) {
+      // Pasted or autofilled code
+      const next = clean.slice(0, 6).split("");
+      const filled = [...next, ...Array(6 - next.length).fill("")];
+      setDigits(filled);
+      boxes.current[Math.min(next.length, 5)]?.focus();
+      if (next.length === 6) void verify(next.join(""));
+      return;
+    }
+    const next = [...digits];
+    next[index] = clean;
+    setDigits(next);
+    if (clean && index < 5) boxes.current[index + 1]?.focus();
+    if (next.every(Boolean)) void verify(next.join(""));
+  };
 
-      <div className="screen-pad">
-        {step === "phone" ? (
-          <form className="card" onSubmit={sendCode}>
-            <label htmlFor="phone">Mobile number</label>
-            <input
-              id="phone"
-              required
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
-              placeholder="+1 555 123 4567"
-            />
-            <p className="status-line">We'll text you a sign-in code.</p>
-            {error && <p className="status-line" style={{ color: "#d94c4c" }}>{error}</p>}
-            <button className="btn-primary chevron" type="submit" disabled={busy}>
-              {busy ? "Sending…" : "Send code"}
-            </button>
-            <p className="center-note">By continuing, you agree to our Terms and Privacy Policy.</p>
-          </form>
-        ) : (
-          <form className="card" onSubmit={verify}>
-            <label htmlFor="code">6-digit code</label>
-            <input
-              id="code"
-              required
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              placeholder="••••••"
-              maxLength={6}
-            />
+  const onKeyDown = (index: number, e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Backspace" && !digits[index] && index > 0) boxes.current[index - 1]?.focus();
+  };
+
+  if (step === "code") {
+    return (
+      <div className="page">
+        <TopBar back={() => setStep("phone")} wordmark />
+        <Masthead
+          plate="tall"
+          title={
+            <>
+              Check
+              <br />
+              your phone.
+            </>
+          }
+          sub="Enter the 6-digit code sent to your phone."
+          art="key"
+          artMode="corner"
+          style={{ minHeight: 300 }}
+        />
+        <Sheet grow>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (digits.every(Boolean)) void verify(digits.join(""));
+            }}
+          >
+            <div className="otp" role="group" aria-label="6-digit code">
+              {digits.map((d, i) => (
+                <input
+                  key={i}
+                  ref={(el) => (boxes.current[i] = el)}
+                  value={d}
+                  inputMode="numeric"
+                  autoComplete={i === 0 ? "one-time-code" : "off"}
+                  aria-label={`Digit ${i + 1}`}
+                  maxLength={i === 0 ? 6 : 1}
+                  onChange={(e) => setDigit(i, e.target.value)}
+                  onKeyDown={(e) => onKeyDown(i, e)}
+                />
+              ))}
+            </div>
+            <p className="t-center" style={{ margin: "16px 0 0" }}>
+              <button type="button" className="tlink" onClick={() => setStep("phone")}>
+                Change phone number
+              </button>
+            </p>
             {devCode && (
-              <div className="banner info">
-                <strong style={{ fontWeight: 800 }}>Dev mode:</strong>&nbsp;no SMS provider configured — your code
-                is <strong>{devCode}</strong>.
-              </div>
+              <Note kind="info" style={{ marginTop: 16 }}>
+                Dev mode: no SMS provider is set up, so your code is <strong>{devCode}</strong>.
+              </Note>
             )}
-            {error && <p className="status-line" style={{ color: "#d94c4c" }}>{error}</p>}
-            <button className="btn-primary chevron" type="submit" disabled={busy}>
-              {busy ? "Verifying…" : "Verify and continue"}
+            {error && <p className="error-text">{error}</p>}
+            <button className="btn btn--lime btn--caps" type="submit" disabled={busy || !digits.every(Boolean)} style={{ marginTop: 20 }}>
+              {busy ? "Checking…" : "Verify and continue"} <Chev />
             </button>
-            <button type="button" className="btn-link" style={{ marginTop: "0.75rem" }} onClick={() => setStep("phone")}>
-              Change phone number
-            </button>
+            <p className="t-center t-small t-muted" style={{ marginTop: 16 }}>
+              {resendIn > 0 ? (
+                `Resend code in 00:${String(resendIn).padStart(2, "0")}`
+              ) : (
+                <button type="button" className="tlink" onClick={() => void sendCode()} disabled={busy}>
+                  Resend code
+                </button>
+              )}
+            </p>
           </form>
-        )}
+        </Sheet>
       </div>
+    );
+  }
+
+  return (
+    <div className="page">
+      <TopBar wordmark />
+      <Masthead
+        plate="tall"
+        title={
+          <>
+            Your
+            <br />
+            family's
+            <br />
+            story
+            <br />
+            starts here.
+          </>
+        }
+        sub={
+          <>
+            Same little moments.
+            <br />A lifetime of stories.
+          </>
+        }
+        art="book"
+        artMode="corner"
+      />
+      <Sheet grow>
+        <form onSubmit={sendCode}>
+          <h2 className="h-title" style={{ marginBottom: 16 }}>
+            Sign in or create an account
+          </h2>
+          <Field label="Mobile number" htmlFor="phone" hint="We'll text you a sign-in code.">
+            <div className="phone-field">
+              <Select value={country} onChange={setCountry} options={COUNTRY_CODES} ariaLabel="Country code" />
+              <input
+                id="phone"
+                className="input"
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel-national"
+                value={number}
+                onChange={(e) => setNumber(e.target.value)}
+                placeholder="Phone number"
+                required
+              />
+            </div>
+          </Field>
+          {error && <p className="error-text">{error}</p>}
+          <button className="btn btn--lime btn--caps" type="submit" disabled={busy || !number.trim()} style={{ marginTop: 20 }}>
+            {busy ? "Sending…" : "Send code"} <Chev />
+          </button>
+          <p className="t-center t-xs t-muted" style={{ marginTop: 18 }}>
+            By continuing, you agree to our Terms and Privacy Policy.
+          </p>
+        </form>
+      </Sheet>
     </div>
   );
 }

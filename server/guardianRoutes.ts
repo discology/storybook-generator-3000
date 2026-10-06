@@ -73,7 +73,7 @@ router.post("/admin/chapters/:id/run-guardian", async (req, res) => {
 
   await prisma.guardianFinding.deleteMany({ where: { chapterId: chapter.id } });
   await prisma.guardianFinding.createMany({
-    data: result.findings.map((f) => ({ chapterId: chapter.id, category: f.category, status: f.status, note: f.note })),
+    data: result.findings.map((f) => ({ chapterId: chapter.id, category: f.category, status: f.status, note: f.note, quote: f.status === "needs_revision" && f.quote ? String(f.quote) : null })),
   });
 
   const hasIssues = result.findings.some((f) => f.status === "needs_revision");

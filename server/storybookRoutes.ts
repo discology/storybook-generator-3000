@@ -3,10 +3,14 @@ import fs from "fs";
 import multer from "multer";
 import path from "path";
 import { prisma } from "./db";
-import { transcribeAudio, interpretMemory } from "./aiService";
 import { createPagedChapter, recordedBy } from "./storyPages";
 import { getCurrentUser } from "./session";
 import { normalizePhone } from "./sms";
+import { appUrl, renderMessage } from "./messageTemplates";
+import { audioSrc, canSeeChapter, canSeeMemory, isOwner, memberForChapter, memberForMemory, parseIds, requireMember } from "./access";
+import { interpret, processMemory } from "./memoryPipeline";
+import { STAGE_KEYS, ageInYears, effectiveStage, stageForAge, vambieName } from "./readingStages";
+import { eligibleMemories, isGenerating, lastBatchError, makeWeeklyChapter, nextScheduledBatch, TIMEZONES } from "./weeklyChapters";
 
 const UPLOAD_DIR = path.join(process.cwd(), "uploads", "memories");
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -22,19 +26,30 @@ const upload = multer({ storage, limits: { fileSize: 25 * 1024 * 1024 } });
 
 const router: Router = express.Router();
 
-// --- Onboarding: create Household + Child + Contributor + Storybook in one go ---
+
+const countJson = (json: string | null) => {
+  try {
+    const value = JSON.parse(json ?? "[]");
+    return Array.isArray(value) ? value.length : 0;
+  } catch {
+    return 0;
+  }
+};
+const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+// --- Onboarding: household, child, the parent as owner, and the storybook ---
 router.post("/storybooks", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return res.status(401).json({ error: "Sign in first" });
 
-  const { childName, stage, birthDate, dueDate, readerAgeBand, parentName, parentPhone, relationship, title } =
-    req.body ?? {};
-
-  if (!childName || !parentName || !relationship) {
-    return res.status(400).json({ error: "Child's name, your name and your relationship are required." });
+  const b = req.body ?? {};
+  const childName = String(b.childName ?? "").trim();
+  const parentName = String(b.parentName ?? "").trim();
+  if (!childName || !parentName || !b.relationship) {
+    return res.status(400).json({ error: "Add the child's name, your name and your relationship to them." });
   }
-  // Required: reminder links are texted to this number.
-  const phone = normalizePhone(String(parentPhone ?? ""));
+  // Reminder links are texted to this number; it defaults to the one they signed in with.
+  const phone = normalizePhone(String(b.parentPhone || user.phone || ""));
   if (!phone) return res.status(400).json({ error: "Enter a full mobile number, like +1 555 123 4567. We text your reminder links there." });
 
   const household = await prisma.household.create({ data: { ownerUserId: user.id } });
@@ -42,31 +57,47 @@ router.post("/storybooks", async (req, res) => {
     data: {
       householdId: household.id,
       displayName: childName,
-      stage: stage || "born",
-      birthDate: birthDate ? new Date(birthDate) : null,
-      dueDate: dueDate ? new Date(dueDate) : null,
+      stage: b.stage === "expecting" ? "expecting" : "born",
+      birthDate: b.birthDate ? new Date(b.birthDate) : null,
+      dueDate: b.dueDate ? new Date(b.dueDate) : null,
     },
   });
   const contributor = await prisma.contributor.create({
-    data: {
-      householdId: household.id,
-      userId: user.id,
-      name: parentName,
-      phone,
-      relationship,
-      role: "owner",
-      inviteStatus: "joined",
-    },
+    data: { householdId: household.id, userId: user.id, name: parentName, phone, relationship: b.relationship, role: "owner", inviteStatus: "joined" },
   });
+  if (!user.name) await prisma.user.update({ where: { id: user.id }, data: { name: parentName } });
+
+  const remindersOff = b.reminderFrequency === "off";
   const storybook = await prisma.storybook.create({
     data: {
       childId: child.id,
-      title: title || `${childName}'s Story`,
-      readerAgeBand: readerAgeBand || "0-3",
+      title: String(b.title ?? "").trim() || `${childName}'s growing story`,
+      // Growing with the child: the stored stage is where they start; new chapters follow their age.
+      readerAgeBand:
+        b.growWithChild === false && STAGE_KEYS.includes(b.readerAgeBand)
+          ? b.readerAgeBand
+          : stageForAge(b.stage === "expecting" ? null : ageInYears(b.birthDate)),
+      growWithChild: b.growWithChild !== false,
+      keepRecordings: b.keepRecordings !== false,
+      defaultStoryUse: b.defaultStoryUse !== false,
+      reminderFrequency: b.reminderFrequency === "daily" ? "daily" : "weekly",
+      reminderDay: DAYS.includes(b.reminderDay) ? b.reminderDay : "Sunday",
+      reminderTime: /^\d{2}:\d{2}$/.test(b.reminderTime ?? "") ? b.reminderTime : "19:00",
+      reminderTimezone: b.reminderTimezone in TIMEZONES ? b.reminderTimezone : "Pacific Time",
+      reminderChannel: "SMS",
+      remindersPaused: remindersOff || b.smsConsent === false,
+      lastBatchAt: new Date(),
     },
   });
 
-  res.status(201).json({ storybook, child, contributor, household });
+  const welcome = await renderMessage("welcome", {
+    parent_name: parentName,
+    child_name: childName,
+    storybook_title: storybook.title,
+    storybook_url: appUrl(`/storybooks/${storybook.id}`),
+    record_url: appUrl(`/storybooks/${storybook.id}/record`),
+  });
+  res.status(201).json({ storybook, child, contributor, household, welcomeMessage: welcome });
 });
 
 router.get("/storybooks", async (req, res) => {
@@ -74,173 +105,159 @@ router.get("/storybooks", async (req, res) => {
   if (!user) return res.status(401).json({ error: "Sign in first" });
 
   const storybooks = await prisma.storybook.findMany({
-    where: { child: { household: { contributors: { some: { userId: user.id } } } } },
+    where: { child: { household: { contributors: { some: { userId: user.id, inviteStatus: { not: "revoked" } } } } } },
     include: { child: true, _count: { select: { memories: true, chapters: true } } },
     orderBy: { createdAt: "desc" },
   });
   res.json(storybooks);
 });
 
+// The storybook as the signed-in family member may see it.
 router.get("/storybooks/:id", async (req, res) => {
-  const user = await getCurrentUser(req);
-  if (!user) return res.status(401).json({ error: "Sign in first" });
+  const member = await requireMember(req, res, req.params.id);
+  if (!member) return;
+  const { me } = member;
 
-  const storybook = await prisma.storybook.findUnique({
+  const storybook = await prisma.storybook.findUniqueOrThrow({
     where: { id: req.params.id },
     include: {
-      child: { include: { household: { include: { contributors: true } } } },
-      memories: { include: { transcripts: true, interpretation: true, contributor: true }, orderBy: { recordedAt: "desc" } },
+      child: true,
+      memories: { include: { contributor: true, chapterSources: true, transcripts: { orderBy: { createdAt: "desc" }, take: 1 } }, orderBy: { recordedAt: "desc" } },
       chapters: {
         include: {
-          sources: true,
+          access: true,
+          marks: { where: { contributorId: me.id } },
           pages: {
             orderBy: { pageNumber: "asc" },
-            include: { assets: { where: { status: "ready" }, orderBy: { version: "desc" }, take: 1 } },
+            select: { approvedAt: true, assets: { where: { status: "ready" }, orderBy: { version: "desc" }, take: 1, select: { imagePath: true } } },
           },
         },
         orderBy: { sequence: "asc" },
       },
     },
   });
-  if (!storybook) return res.status(404).json({ error: "Storybook not found" });
 
-  const myContributor = storybook.child.household.contributors.find((c) => c.userId === user.id);
-  if (!myContributor) return res.status(403).json({ error: "access_denied" });
+  const memories = storybook.memories
+    .filter((m) => canSeeMemory(m, me))
+    .map(({ transcripts, chapterSources, contributor, audioUrl, favoritedBy, ...m }) => ({
+      ...m,
+      audioSrc: audioSrc({ id: m.id, audioUrl }),
+      contributor: { id: contributor.id, name: contributor.name, relationship: contributor.relationship },
+      mine: m.contributorId === me.id,
+      favorite: parseIds(favoritedBy).includes(me.id),
+      excerpt: transcripts[0]?.text.slice(0, 220) ?? null,
+      chapterIds: chapterSources.map((s) => s.chapterId),
+    }));
 
-  res.json({ ...storybook, defaultContributorId: myContributor.id, myRole: myContributor.role });
-});
+  const chapters = storybook.chapters
+    .filter((c) => canSeeChapter(c, me))
+    .map(({ pages, marks, access, generationSnapshot, characterSheet, content, ...c }) => ({
+      ...c,
+      pageCount: pages.length,
+      approvedPages: pages.filter((p) => p.approvedAt).length,
+      cover: pages.find((p) => p.assets[0])?.assets[0]?.imagePath ?? null,
+      favorite: marks[0]?.favorite ?? false,
+      readAt: marks[0]?.readAt ?? null,
+      unresolvedCount: countJson(c.unresolvedPeople),
+      accessCount: access.length,
+      excerpt: content.slice(0, 240),
+    }));
 
-// --- Memory capture ---
-router.post("/storybooks/:id/memories", async (req, res) => {
-  const storybook = await prisma.storybook.findUnique({ where: { id: req.params.id } });
-  if (!storybook) return res.status(404).json({ error: "Storybook not found" });
-
-  const { contributorId, title, eventDate, visibility, storyUseConsent } = req.body ?? {};
-  if (!contributorId) return res.status(400).json({ error: "contributorId is required" });
-
-  const memory = await prisma.memory.create({
-    data: {
-      storybookId: storybook.id,
-      contributorId,
-      title: title || null,
-      eventDate: eventDate ? new Date(eventDate) : null,
-      visibility: visibility || storybook.defaultVisibility,
-      storyUseConsent: storyUseConsent !== undefined ? Boolean(storyUseConsent) : storybook.defaultStoryUse,
-    },
+  const { memories: _m, chapters: _c, pendingCastKeys, ...settings } = storybook;
+  res.json({
+    ...settings,
+    memories,
+    chapters,
+    pendingCastKeys: parseIds(pendingCastKeys),
+    currentStage: effectiveStage(storybook),
+    vambieName: vambieName(storybook),
+    me: { contributorId: me.id, role: me.role, name: me.name, relationship: me.relationship },
+    family: member.storybook.child.household.contributors
+      .filter((c) => c.inviteStatus !== "revoked")
+      .map((c) => ({ id: c.id, name: c.name, relationship: c.relationship, role: c.role, inviteStatus: c.inviteStatus })),
+    nextChapterAt: nextScheduledBatch(storybook),
+    generating: isGenerating(storybook.id),
+    batchError: lastBatchError(storybook.id),
+    // Older screens:
+    defaultContributorId: me.id,
+    myRole: me.role,
   });
-  res.status(201).json(memory);
 });
 
-router.post("/memories/:id/audio", upload.single("audio"), async (req, res) => {
-  const memory = await prisma.memory.findUnique({ where: { id: req.params.id } });
-  if (!memory) return res.status(404).json({ error: "Memory not found" });
-  if (!req.file) return res.status(400).json({ error: "No audio uploaded" });
-
-  const audioUrl = `/uploads/memories/${req.file.filename}`;
-  const updated = await prisma.memory.update({
-    where: { id: memory.id },
-    data: { audioUrl, status: "recorded" },
+// --- This week's chapter ---
+router.get("/storybooks/:id/this-week", async (req, res) => {
+  const member = await requireMember(req, res, req.params.id);
+  if (!member) return;
+  const storybook = member.storybook;
+  const since = storybook.lastBatchAt ?? storybook.createdAt;
+  const recent = await prisma.memory.findMany({
+    where: { storybookId: storybook.id, chapterSources: { none: {} }, OR: [{ recordedAt: { gte: since } }, { status: { in: ["recorded", "transcribing", "transcribed", "interpreted", "failed"] } }] },
+    include: { contributor: true },
+    orderBy: { recordedAt: "desc" },
   });
-  res.json(updated);
-});
-
-// --- Transcription: attempt AI transcription, or accept a manual transcript ---
-router.post("/memories/:id/transcribe", async (req, res) => {
-  const memory = await prisma.memory.findUnique({ where: { id: req.params.id } });
-  if (!memory) return res.status(404).json({ error: "Memory not found" });
-  if (!memory.audioUrl) return res.status(400).json({ error: "Memory has no audio yet" });
-
-  const filePath = path.join(process.cwd(), memory.audioUrl.replace(/^\//, ""));
-  const mimeType = req.body?.mimeType || "audio/webm";
-  const result = await transcribeAudio(filePath, mimeType);
-
-  if (result.text) {
-    await prisma.transcriptVersion.create({
-      data: { memoryId: memory.id, source: "machine", text: result.text },
-    });
-    await prisma.memory.update({ where: { id: memory.id }, data: { status: "transcribed" } });
-  }
-
-  res.json({ text: result.text, isMock: result.isMock, reason: result.reason });
-});
-
-// Manually set/correct the transcript (used when no AI key is configured, or to fix mistakes)
-router.put("/memories/:id/transcript", async (req, res) => {
-  const memory = await prisma.memory.findUnique({ where: { id: req.params.id } });
-  if (!memory) return res.status(404).json({ error: "Memory not found" });
-  const { text } = req.body ?? {};
-  if (!text || !String(text).trim()) return res.status(400).json({ error: "text is required" });
-
-  await prisma.transcriptVersion.create({
-    data: { memoryId: memory.id, source: "corrected", text: String(text).trim() },
+  const eligible = await eligibleMemories(storybook.id);
+  const inProgress = await prisma.chapter.findFirst({
+    where: { storybookId: storybook.id, status: { not: "published" } },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, title: true, pagesStatus: true, sequence: true, createdAt: true },
   });
-  const updated = await prisma.memory.update({ where: { id: memory.id }, data: { status: "transcribed" } });
-  res.json(updated);
+  res.json({
+    nextChapterAt: nextScheduledBatch(storybook),
+    generating: isGenerating(storybook.id),
+    error: lastBatchError(storybook.id),
+    readyCount: eligible.length,
+    memories: recent
+      .filter((m) => canSeeMemory(m, member.me))
+      .map((m) => ({
+        id: m.id,
+        title: m.title,
+        status: m.status,
+        processingError: m.processingError,
+        storyUseConsent: m.storyUseConsent,
+        recordedAt: m.recordedAt,
+        durationSec: m.durationSec,
+        contributor: { name: m.contributor.name },
+        mine: m.contributorId === member.me.id,
+      })),
+    otherCount: recent.filter((m) => !canSeeMemory(m, member.me) && m.storyUseConsent).length,
+    chapterInProgress: isOwner(member.me) ? inProgress : null,
+  });
 });
 
-// --- Interpretation ---
-router.post("/memories/:id/interpret", async (req, res) => {
-  const memory = await prisma.memory.findUnique({
-    where: { id: req.params.id },
-    include: { transcripts: { orderBy: { createdAt: "desc" }, take: 1 } },
-  });
-  if (!memory) return res.status(404).json({ error: "Memory not found" });
-  const latestTranscript = memory.transcripts[0];
-  if (!latestTranscript) return res.status(400).json({ error: "Memory has no transcript yet" });
-
-  const result = await interpretMemory(latestTranscript.text);
-  const interpretation = await prisma.memoryInterpretation.upsert({
-    where: { memoryId: memory.id },
-    update: { events: result.events, emotions: result.emotions, themes: result.themes, isMock: result.isMock },
-    create: {
-      memoryId: memory.id,
-      events: result.events,
-      emotions: result.emotions,
-      themes: result.themes,
-      isMock: result.isMock,
-    },
-  });
-  await prisma.memory.update({ where: { id: memory.id }, data: { status: "interpreted" } });
-  res.json(interpretation);
+router.post("/storybooks/:id/chapters/weekly", async (req, res) => {
+  const member = await requireMember(req, res, req.params.id, { owner: true });
+  if (!member) return;
+  if (isGenerating(member.storybook.id)) return res.status(202).json({ started: false, generating: true });
+  const ready = await eligibleMemories(member.storybook.id);
+  if (ready.length === 0) return res.status(400).json({ error: "No memories are ready for a chapter yet." });
+  void makeWeeklyChapter(member.storybook.id).catch(() => undefined);
+  res.status(202).json({ started: true });
 });
 
-// Toggle whether a memory may be used to inform the shared story (separate from recording privacy)
-router.put("/memories/:id/story-use", async (req, res) => {
-  const { storyUseConsent } = req.body ?? {};
-  const updated = await prisma.memory.update({
-    where: { id: req.params.id },
-    data: { storyUseConsent: Boolean(storyUseConsent) },
-  });
-  res.json(updated);
+router.put("/storybooks/:id/next-cast", async (req, res) => {
+  const member = await requireMember(req, res, req.params.id, { owner: true });
+  if (!member) return;
+  const keys = Array.isArray(req.body?.castKeys) ? req.body.castKeys.map(String) : [];
+  await prisma.storybook.update({ where: { id: member.storybook.id }, data: { pendingCastKeys: JSON.stringify(keys) } });
+  res.json({ castKeys: keys });
 });
 
-// --- Chapter generation ---
+// Makes a chapter from hand-picked memories (kept for testing and the admin).
 router.post("/storybooks/:id/chapters", async (req, res) => {
-  const storybook = await prisma.storybook.findUnique({
-    where: { id: req.params.id },
-    include: { child: true, chapters: true },
-  });
-  if (!storybook) return res.status(404).json({ error: "Storybook not found" });
-
+  const member = await requireMember(req, res, req.params.id, { owner: true });
+  if (!member) return;
   const { memoryIds, castKeys } = req.body ?? {};
-  if (!Array.isArray(memoryIds) || memoryIds.length === 0) {
-    return res.status(400).json({ error: "memoryIds (non-empty array) is required" });
-  }
+  if (!Array.isArray(memoryIds) || memoryIds.length === 0) return res.status(400).json({ error: "memoryIds (non-empty array) is required" });
 
   const memories = await prisma.memory.findMany({
-    where: { id: { in: memoryIds }, storybookId: storybook.id },
+    where: { id: { in: memoryIds }, storybookId: member.storybook.id },
     include: { transcripts: { orderBy: { createdAt: "desc" }, take: 1 }, interpretation: true, contributor: true },
   });
+  if (memories.some((m) => !m.storyUseConsent)) return res.status(400).json({ error: "All selected memories must be allowed in stories first." });
 
-  const missingUseConsent = memories.filter((m) => !m.storyUseConsent);
-  if (missingUseConsent.length > 0) {
-    return res.status(400).json({ error: "All selected memories must have storyUseConsent granted first." });
-  }
-
-  let chapter;
   try {
-    chapter = await createPagedChapter({
-      storybookId: storybook.id,
+    const chapter = await createPagedChapter({
+      storybookId: member.storybook.id,
       castKeys: Array.isArray(castKeys) ? castKeys.map(String) : [],
       memories: memories.map((m) => ({
         id: m.id,
@@ -251,53 +268,268 @@ router.post("/storybooks/:id/chapters", async (req, res) => {
         recordedBy: recordedBy(m.contributor),
       })),
     });
+    await prisma.memory.updateMany({ where: { id: { in: memoryIds } }, data: { status: "ready" } });
+    res.status(201).json(chapter);
   } catch (error: any) {
-    return res.status(502).json({ error: `Couldn't write the chapter: ${error?.message ?? "unknown error"}` });
+    res.status(502).json({ error: `Couldn't write the chapter: ${error?.message ?? "unknown error"}` });
   }
-  await prisma.memory.updateMany({ where: { id: { in: memoryIds } }, data: { status: "ready" } });
-  res.status(201).json(chapter);
+});
+
+// --- Memories ---
+router.post("/storybooks/:id/memories", async (req, res) => {
+  const member = await requireMember(req, res, req.params.id);
+  if (!member) return;
+  const { storybook, me } = member;
+  const b = req.body ?? {};
+  const memory = await prisma.memory.create({
+    data: {
+      storybookId: storybook.id,
+      contributorId: me.id,
+      title: b.title ? String(b.title).slice(0, 80) : null,
+      eventDate: b.eventDate ? new Date(b.eventDate) : null,
+      visibility: b.visibility === "household" ? "household" : b.visibility === "contributor_only" ? "contributor_only" : storybook.defaultVisibility,
+      storyUseConsent: b.storyUseConsent !== undefined ? Boolean(b.storyUseConsent) : storybook.defaultStoryUse,
+      durationSec: Number.isFinite(Number(b.durationSec)) ? Math.round(Number(b.durationSec)) : null,
+      promptId: b.promptId ? String(b.promptId) : null,
+      promptText: b.promptText ? String(b.promptText) : null,
+    },
+  });
+  res.status(201).json(memory);
+});
+
+router.post("/memories/:id/audio", upload.single("audio"), async (req, res) => {
+  const member = await memberForMemory(req, res, req.params.id);
+  if (!member) return;
+  if (member.memory.contributorId !== member.me.id) return res.status(403).json({ error: "access_denied" });
+  if (!req.file) return res.status(400).json({ error: "No audio uploaded" });
+
+  const updated = await prisma.memory.update({
+    where: { id: member.memory.id },
+    data: { audioUrl: `/uploads/memories/${req.file.filename}`, status: "recorded", processingError: null },
+  });
+  void processMemory(updated.id);
+  res.json({ ...updated, audioSrc: audioSrc(updated) });
+});
+
+router.get("/memories/:id/audio", async (req, res) => {
+  const member = await memberForMemory(req, res, req.params.id);
+  if (!member) return;
+  if (!member.memory.audioUrl) return res.status(404).json({ error: "This recording wasn't kept." });
+  res.sendFile(path.join(process.cwd(), member.memory.audioUrl.replace(/^\//, "")));
+});
+
+router.get("/memories/:id", async (req, res) => {
+  const member = await memberForMemory(req, res, req.params.id);
+  if (!member) return;
+  const memory = await prisma.memory.findUniqueOrThrow({
+    where: { id: member.memory.id },
+    include: {
+      contributor: true,
+      transcripts: { orderBy: { createdAt: "desc" }, take: 1 },
+      interpretation: true,
+      chapterSources: { include: { chapter: { include: { access: true, pages: { orderBy: { pageNumber: "asc" }, take: 1, include: { assets: { where: { status: "ready" }, orderBy: { version: "desc" }, take: 1 } } } } } } },
+    },
+  });
+  const { audioUrl, favoritedBy, chapterSources, contributor, transcripts, ...rest } = memory;
+  res.json({
+    ...rest,
+    audioSrc: audioSrc(memory),
+    hadRecording: Boolean(audioUrl) || !member.storybook.keepRecordings,
+    favorite: parseIds(favoritedBy).includes(member.me.id),
+    mine: memory.contributorId === member.me.id,
+    contributor: { id: contributor.id, name: contributor.name, relationship: contributor.relationship },
+    transcript: transcripts[0] ?? null,
+    chapters: chapterSources
+      .map((s) => s.chapter)
+      .filter((c) => canSeeChapter(c, member.me))
+      .map((c) => ({ id: c.id, title: c.title, sequence: c.sequence, status: c.status, cover: c.pages[0]?.assets[0]?.imagePath ?? null })),
+    storybook: { id: member.storybook.id, title: member.storybook.title, childName: member.storybook.child.displayName },
+  });
+});
+
+router.put("/memories/:id", async (req, res) => {
+  const member = await memberForMemory(req, res, req.params.id);
+  if (!member) return;
+  if (member.memory.contributorId !== member.me.id) return res.status(403).json({ error: "Only the person who recorded this memory can change it." });
+  const b = req.body ?? {};
+  const updated = await prisma.memory.update({
+    where: { id: member.memory.id },
+    data: {
+      ...(typeof b.title === "string" && b.title.trim() ? { title: b.title.trim().slice(0, 80) } : {}),
+      ...(b.visibility === "household" || b.visibility === "contributor_only" ? { visibility: b.visibility } : {}),
+      ...(typeof b.storyUseConsent === "boolean" ? { storyUseConsent: b.storyUseConsent } : {}),
+      ...(b.eventDate !== undefined ? { eventDate: b.eventDate ? new Date(b.eventDate) : null } : {}),
+    },
+  });
+  res.json(updated);
+});
+
+router.put("/memories/:id/favorite", async (req, res) => {
+  const member = await memberForMemory(req, res, req.params.id);
+  if (!member) return;
+  const ids = new Set(parseIds(member.memory.favoritedBy));
+  if (req.body?.favorite) ids.add(member.me.id);
+  else ids.delete(member.me.id);
+  await prisma.memory.update({ where: { id: member.memory.id }, data: { favoritedBy: JSON.stringify([...ids]) } });
+  res.json({ favorite: ids.has(member.me.id) });
+});
+
+// Retries transcription and interpretation after a failure.
+router.post("/memories/:id/process", async (req, res) => {
+  const member = await memberForMemory(req, res, req.params.id);
+  if (!member) return;
+  void processMemory(member.memory.id);
+  res.status(202).json({ started: true });
+});
+
+// The recorder corrects what was heard; the memory is interpreted again.
+router.put("/memories/:id/transcript", async (req, res) => {
+  const member = await memberForMemory(req, res, req.params.id);
+  if (!member) return;
+  if (member.memory.contributorId !== member.me.id) return res.status(403).json({ error: "Only the person who recorded this memory can edit its words." });
+  const text = String(req.body?.text ?? "").trim();
+  if (!text) return res.status(400).json({ error: "The transcript can't be empty." });
+
+  await prisma.transcriptVersion.create({ data: { memoryId: member.memory.id, source: "corrected", text } });
+  await prisma.memory.update({ where: { id: member.memory.id }, data: { status: "transcribed", processingError: null } });
+  void interpret(member.memory.id, text, !member.memory.title).catch(() => undefined);
+  res.json({ ok: true });
+});
+
+// --- Chapters ---
+router.get("/chapters/:id/read", async (req, res) => {
+  const member = await memberForChapter(req, res, req.params.id);
+  if (!member) return;
+  const chapter = await prisma.chapter.findUniqueOrThrow({
+    where: { id: member.chapter.id },
+    include: {
+      pages: { orderBy: { pageNumber: "asc" }, include: { assets: { where: { status: "ready" }, orderBy: { version: "desc" }, take: 1 } } },
+      marks: { where: { contributorId: member.me.id } },
+      storybook: { include: { chapters: { where: { status: "published" }, select: { id: true, sequence: true, shareMode: true, status: true, access: true } } } },
+    },
+  });
+  const readable = chapter.storybook.chapters.filter((c) => canSeeChapter(c, member.me)).sort((a, b) => a.sequence - b.sequence);
+  const index = readable.findIndex((c) => c.id === chapter.id);
+  res.json({
+    id: chapter.id,
+    title: chapter.title,
+    sequence: chapter.sequence,
+    status: chapter.status,
+    content: chapter.content,
+    publishedAt: chapter.publishedAt,
+    pages: chapter.pages.map((p) => ({ id: p.id, pageNumber: p.pageNumber, text: p.text, pictureSize: p.pictureSize, visibleAction: p.visibleAction, image: p.assets[0]?.imagePath ?? null })),
+    mark: chapter.marks[0] ?? null,
+    storybook: { id: chapter.storybookId, title: chapter.storybook.title, childName: member.storybook.child.displayName },
+    nextChapterId: index >= 0 ? readable[index + 1]?.id ?? null : null,
+    previousChapterId: index > 0 ? readable[index - 1].id : null,
+    canShare: isOwner(member.me),
+  });
+});
+
+router.put("/chapters/:id/mark", async (req, res) => {
+  const member = await memberForChapter(req, res, req.params.id);
+  if (!member) return;
+  const b = req.body ?? {};
+  const where = { chapterId_contributorId: { chapterId: member.chapter.id, contributorId: member.me.id } };
+  const existing = await prisma.chapterMark.findUnique({ where });
+  const data = {
+    ...(typeof b.favorite === "boolean" ? { favorite: b.favorite } : {}),
+    ...(Number.isInteger(b.lastPage) ? { lastPage: b.lastPage } : {}),
+    ...(b.opened && !existing?.readAt ? { readAt: new Date() } : {}),
+    ...(b.finished ? { finishedAt: new Date() } : {}),
+  };
+  const mark = existing
+    ? await prisma.chapterMark.update({ where, data })
+    : await prisma.chapterMark.create({ data: { chapterId: member.chapter.id, contributorId: member.me.id, ...data } });
+  res.json(mark);
+});
+
+const FEEDBACK_REASONS = ["missed_meaning", "too_private", "reading_level", "wrong_detail"];
+
+router.post("/chapters/:id/feedback", async (req, res) => {
+  const member = await memberForChapter(req, res, req.params.id);
+  if (!member) return;
+  const reason = String(req.body?.reason ?? "");
+  if (!FEEDBACK_REASONS.includes(reason)) return res.status(400).json({ error: "Pick what needs attention." });
+  const feedback = await prisma.storyFeedback.create({
+    data: { chapterId: member.chapter.id, contributorId: member.me.id, reason, note: String(req.body?.note ?? "").slice(0, 1000) },
+  });
+  res.status(201).json(feedback);
 });
 
 router.put("/chapters/:id/publish", async (req, res) => {
-  const chapter = await prisma.chapter.findUnique({ where: { id: req.params.id } });
-  if (!chapter) return res.status(404).json({ error: "Not found" });
-  if (chapter.guardianStatus !== "approved") {
-    return res.status(400).json({ error: "This chapter needs Guardian approval before it can be published." });
-  }
+  const member = await memberForChapter(req, res, req.params.id, { owner: true });
+  if (!member) return;
+  const chapter = member.chapter;
+  if (chapter.guardianStatus !== "approved") return res.status(400).json({ error: "This chapter is still being reviewed by the Vambie team." });
   const unapproved = await prisma.storyPage.count({ where: { chapterId: chapter.id, approvedAt: null } });
-  if (unapproved > 0) {
-    return res.status(400).json({ error: `Approve every page first (${unapproved} still need approval).` });
-  }
-  const updated = await prisma.chapter.update({ where: { id: req.params.id }, data: { status: "published" } });
+  if (unapproved > 0) return res.status(400).json({ error: `Approve every page first (${unapproved} still need approval).` });
+  const updated = await prisma.chapter.update({ where: { id: chapter.id }, data: { status: "published", publishedAt: new Date() } });
   res.json(updated);
 });
 
 // --- Chapter sharing ---
 router.get("/chapters/:id/access", async (req, res) => {
-  const chapter = await prisma.chapter.findUnique({
-    where: { id: req.params.id },
-    include: {
-      storybook: { include: { child: { include: { household: { include: { contributors: true } } } } } },
-      access: true,
-    },
+  const member = await memberForChapter(req, res, req.params.id, { owner: true });
+  if (!member) return;
+  const chapter = await prisma.chapter.findUniqueOrThrow({
+    where: { id: member.chapter.id },
+    include: { pages: { orderBy: { pageNumber: "asc" }, take: 1, include: { assets: { where: { status: "ready" }, orderBy: { version: "desc" }, take: 1 } } } },
   });
-  if (!chapter) return res.status(404).json({ error: "Not found" });
   res.json({
-    contributors: chapter.storybook.child.household.contributors,
-    allowedContributorIds: chapter.access.map((a) => a.contributorId),
-    restricted: chapter.access.length > 0,
+    chapter: { id: chapter.id, title: chapter.title, sequence: chapter.sequence, status: chapter.status, publishedAt: chapter.publishedAt, cover: chapter.pages[0]?.assets[0]?.imagePath ?? null },
+    shareMode: chapter.shareMode,
+    allowedContributorIds: member.chapter.access.map((a) => a.contributorId),
+    myContributorId: member.me.id,
+    family: member.storybook.child.household.contributors
+      .filter((c) => c.id !== member.me.id && c.inviteStatus !== "revoked")
+      .map((c) => ({ id: c.id, name: c.name, relationship: c.relationship, inviteStatus: c.inviteStatus })),
   });
 });
 
 router.put("/chapters/:id/access", async (req, res) => {
-  const { contributorIds } = req.body ?? {};
-  await prisma.chapterAccess.deleteMany({ where: { chapterId: req.params.id } });
-  if (Array.isArray(contributorIds) && contributorIds.length > 0) {
-    await prisma.chapterAccess.createMany({
-      data: contributorIds.map((contributorId: string) => ({ chapterId: req.params.id, contributorId })),
-    });
+  const member = await memberForChapter(req, res, req.params.id, { owner: true });
+  if (!member) return;
+  const shareMode = ["family", "selected", "private"].includes(req.body?.shareMode) ? req.body.shareMode : "selected";
+  const familyIds = new Set(member.storybook.child.household.contributors.map((c) => c.id));
+  const ids: string[] = Array.isArray(req.body?.contributorIds) ? req.body.contributorIds.map(String).filter((id: string) => familyIds.has(id)) : [];
+  await prisma.chapterAccess.deleteMany({ where: { chapterId: member.chapter.id } });
+  if (shareMode === "selected" && ids.length) {
+    await prisma.chapterAccess.createMany({ data: ids.map((contributorId) => ({ chapterId: member.chapter.id, contributorId })) });
   }
-  res.json({ ok: true });
+  await prisma.chapter.update({ where: { id: member.chapter.id }, data: { shareMode } });
+  res.json({ ok: true, shareMode });
+});
+
+// Texting chapter links needs a Twilio sending number, which isn't set up yet:
+// the share is recorded (recipients see it in their book) and the message is
+// returned for the sender to pass on themselves.
+router.post("/chapters/:id/share", async (req, res) => {
+  const member = await memberForChapter(req, res, req.params.id, { owner: true });
+  if (!member) return;
+  const chapter = member.chapter;
+  if (chapter.status !== "published") return res.status(400).json({ error: "Publish the chapter before sharing it." });
+  const familyIds = new Set(member.storybook.child.household.contributors.map((c) => c.id));
+  const recipientIds: string[] = (Array.isArray(req.body?.recipientIds) ? req.body.recipientIds.map(String) : []).filter((id: string) => familyIds.has(id));
+  if (recipientIds.length === 0) return res.status(400).json({ error: "Choose who to send it to." });
+
+  // Sending to someone gives them access when the chapter is shared with selected people.
+  if (chapter.shareMode !== "family") {
+    const existing = new Set(member.chapter.access.map((a) => a.contributorId));
+    const add = recipientIds.filter((id) => !existing.has(id));
+    if (add.length) await prisma.chapterAccess.createMany({ data: add.map((contributorId) => ({ chapterId: chapter.id, contributorId })) });
+    if (chapter.shareMode === "private") await prisma.chapter.update({ where: { id: chapter.id }, data: { shareMode: "selected" } });
+  }
+  const message = String(req.body?.message ?? "").slice(0, 200);
+  await prisma.chapterShare.create({ data: { chapterId: chapter.id, sentBy: member.me.id, recipientIds: JSON.stringify(recipientIds), message } });
+  const link = appUrl(`/storybooks/${chapter.storybookId}/read/${chapter.id}`);
+  const text = await renderMessage("chapter_ready", {
+    child_name: member.storybook.child.displayName,
+    storybook_title: member.storybook.title,
+    chapter_title: chapter.title,
+    chapter_url: link,
+  });
+  res.json({ ok: true, link, text: message ? `${message}\n\n${text ?? link}` : text ?? link });
 });
 
 // --- Settings ---
@@ -314,30 +546,30 @@ const SETTINGS_FIELDS = [
   "remindersPaused",
   "defaultVisibility",
   "defaultStoryUse",
+  "keepRecordings",
+  "vambieNameAge",
 ] as const;
 
 router.put("/storybooks/:id/settings", async (req, res) => {
-  const user = await getCurrentUser(req);
-  if (!user) return res.status(401).json({ error: "Sign in first" });
-
+  const member = await requireMember(req, res, req.params.id, { owner: true });
+  if (!member) return;
   const data: Record<string, unknown> = {};
   for (const field of SETTINGS_FIELDS) {
     if (field in (req.body ?? {})) data[field] = req.body[field];
   }
+  if ("remindersPausedUntil" in (req.body ?? {})) data.remindersPausedUntil = req.body.remindersPausedUntil ? new Date(req.body.remindersPausedUntil) : null;
+  if (typeof data.title === "string" && !data.title.trim()) delete data.title;
+  if ("vambieNameAge" in data) data.vambieNameAge = Math.min(12, Math.max(1, Math.round(Number(data.vambieNameAge)) || 4));
+  if ("readerAgeBand" in data && !STAGE_KEYS.includes(String(data.readerAgeBand))) delete data.readerAgeBand;
+  const storybook = await prisma.storybook.update({ where: { id: member.storybook.id }, data });
+
   const { childName, birthDate } = req.body ?? {};
-
-  const storybook = await prisma.storybook.update({ where: { id: req.params.id }, data });
-
   if (childName || birthDate) {
     await prisma.child.update({
       where: { id: storybook.childId },
-      data: {
-        ...(childName ? { displayName: childName } : {}),
-        ...(birthDate ? { birthDate: new Date(birthDate) } : {}),
-      },
+      data: { ...(childName ? { displayName: String(childName).trim() } : {}), ...(birthDate ? { birthDate: new Date(birthDate) } : {}) },
     });
   }
-
   res.json(storybook);
 });
 

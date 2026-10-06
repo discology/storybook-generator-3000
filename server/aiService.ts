@@ -5,6 +5,7 @@ import OpenAI, { toFile } from "openai";
 import { getAiInstruction } from "./aiInstructions";
 import { fillTemplate } from "./messageTemplates";
 import { characterCardValues } from "./characters";
+import { stageInfo } from "./readingStages";
 
 const GEMINI_MODEL = "gemini-2.5-flash";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5.5";
@@ -130,6 +131,7 @@ export async function transcribeAudio(filePath: string, mimeType: string): Promi
 }
 
 export interface InterpretResult {
+  title: string;
   events: string;
   emotions: string;
   themes: string;
@@ -137,11 +139,12 @@ export interface InterpretResult {
 }
 
 export async function interpretMemory(transcript: string): Promise<InterpretResult> {
-  const fallback = { events: transcript.slice(0, 160), emotions: "", themes: "", isMock: true };
+  const fallback = { title: "", events: transcript.slice(0, 160), emotions: "", themes: "", isMock: true };
   if (!getProvider()) return fallback;
   try {
     const { output } = await runAiStep("interpret", { transcript });
     return {
+      title: typeof output.title === "string" ? output.title.trim().replace(/[.!]+$/, "") : "",
       events: output.events ?? "",
       emotions: output.emotions ?? "",
       themes: output.themes ?? "",
@@ -156,6 +159,7 @@ export interface GuardianFindingResult {
   category: "continuity" | "reader_fit" | "private_details";
   status: "ok" | "needs_revision";
   note: string;
+  quote?: string;
 }
 
 export interface GuardianReviewInput {
@@ -201,14 +205,6 @@ export async function guardianReview(input: GuardianReviewInput): Promise<{ find
 }
 
 export function readerAgeBandToInstruction(band: string): string {
-  switch (band) {
-    case "0-3":
-      return "Very young child: extremely simple sentences, concrete, soothing, read-aloud-by-a-parent tone.";
-    case "4-7":
-      return "Early reader: simple sentences, warm and playful, can name feelings directly.";
-    case "8-12":
-      return "Older child: fuller sentences, can hold more emotional nuance and complexity.";
-    default:
-      return "General family audience: warm, simple, read-aloud tone.";
-  }
+  const stage = stageInfo(band);
+  return `${stage.label} (ages ${stage.ages}): ${stage.summary}`;
 }

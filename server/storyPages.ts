@@ -18,6 +18,7 @@ import {
 } from "./familyCharacters";
 import { getOpenAI } from "./openaiClient";
 import { MAX_REFERENCE_IMAGES, withImageRateLimit } from "./imageQueue";
+import { effectiveStage, vambieName } from "./readingStages";
 import {
   EMBELLISHMENT_LEVELS,
   PageRules,
@@ -64,7 +65,18 @@ interface GenerationSnapshot {
   // The family's saved characters when the chapter was planned (refs F1, F2…).
   // Characters chosen later while answering the chapter's questions are appended.
   family?: FamilyCastEntry[];
+  // "Vambie" once the child reached the family's chosen age; absent means "Baby Vambie".
+  vambieName?: string;
 }
+
+// Once the child is old enough, Baby Vambie is called just "Vambie" in the
+// chapter: every instruction and value sent to the AI for it says so.
+const named = (snapshot: GenerationSnapshot, text: string) => (snapshot.vambieName === "Vambie" ? text.replace(/Baby Vambie/g, "Vambie") : text);
+const namedValues = (snapshot: GenerationSnapshot, values: Record<string, string>) =>
+  snapshot.vambieName === "Vambie" ? Object.fromEntries(Object.entries(values).map(([k, v]) => [k, named(snapshot, v)])) : values;
+
+// Text-only pages (later reading stages) have no illustration.
+const hasPicture = (page: { pictureSize: string }) => page.pictureSize !== "none";
 
 interface Shot {
   type: string;
@@ -388,11 +400,13 @@ export async function createPagedChapter(input: CreateChapterInput) {
     for (const key of ["page_plan", "page_check", "page_revise", "illustration_check"]) {
       instructions[key] = (await getAiInstruction(key)).body;
     }
+    const stage = effectiveStage(storybook);
     snapshot = {
       ruleSetVersion: active.version,
       rules: active.rules,
-      readerAgeBand: storybook.readerAgeBand,
-      readingProfile: profileFor(active.rules, storybook.readerAgeBand),
+      readerAgeBand: stage,
+      readingProfile: profileFor(active.rules, stage),
+      vambieName: vambieName(storybook),
       instructions,
       cast: await buildCast(input.castKeys ?? []),
       characterCards: await characterCardValues(),
@@ -409,7 +423,7 @@ export async function createPagedChapter(input: CreateChapterInput) {
   } else {
     const { output } = await runAiStep(
       "page_plan",
-      {
+      namedValues(snapshot, {
         child_name: storybook.child.displayName,
         reading_level: describeProfile(profile),
         embellishment_rules: embellishmentRule(snapshot.rules),
@@ -417,8 +431,8 @@ export async function createPagedChapter(input: CreateChapterInput) {
         previous_chapters: priorChapters.map((c) => c.title).join(", ") || "(none yet — this is the first chapter)",
         revision_request: input.revisionRequest ? `A reviewer asked for this revision: "${input.revisionRequest}"` : "",
         ...snapshotCharacterValues(snapshot),
-      },
-      { body: snapshot.instructions.page_plan }
+      }),
+      { body: named(snapshot, snapshot.instructions.page_plan) }
     );
     const pages = Array.isArray(output?.pages)
       ? output.pages.map(normalizePage).filter((p: PlannedPage) => p.text || p.pictureSize === "wordless")
@@ -459,7 +473,7 @@ export async function createPagedChapter(input: CreateChapterInput) {
   if (existing) {
     await prisma.storyPage.deleteMany({ where: { chapterId: existing.id } });
     await prisma.guardianFinding.deleteMany({ where: { chapterId: existing.id } });
-    await prisma.chapter.update({ where: { id: existing.id }, data: { ...chapterData, revisionRequested: true } });
+    await prisma.chapter.update({ where: { id: existing.id }, data: { ...chapterData, revisionRequested: true, version: { increment: 1 } } });
     chapterId = existing.id;
   } else {
     const created = await prisma.chapter.create({
@@ -502,7 +516,7 @@ async function runGuardian(chapterId: string) {
   });
   await prisma.guardianFinding.deleteMany({ where: { chapterId } });
   await prisma.guardianFinding.createMany({
-    data: review.findings.map((f) => ({ chapterId, category: f.category, status: f.status, note: f.note })),
+    data: review.findings.map((f) => ({ chapterId, category: f.category, status: f.status, note: f.note, quote: f.status === "needs_revision" && f.quote ? String(f.quote) : null })),
   });
   const hasIssues = review.findings.some((f) => f.status === "needs_revision");
   await prisma.chapter.update({ where: { id: chapterId }, data: { guardianStatus: hasIssues ? "needs_revision" : "approved" } });
@@ -636,7 +650,7 @@ export async function checkPages(chapterId: string, pageNumbers?: number[]) {
     try {
       const { output } = await runAiStep(
         "page_check",
-        {
+        namedValues(snapshot, {
           child_name: chapter.storybook.child.displayName,
           reading_level: describeProfile(profile),
           embellishment_rules: embellishmentRule(snapshot.rules),
@@ -645,8 +659,8 @@ export async function checkPages(chapterId: string, pageNumbers?: number[]) {
           pages: chapter.pages.map((p) => formatPage(p, snapshot, unresolved)).join("\n\n"),
           pages_to_check: targets.map((p) => p.pageNumber).join(", "),
           ...snapshotCharacterValues(snapshot),
-        },
-        { body: snapshot.instructions.page_check }
+        }),
+        { body: named(snapshot, snapshot.instructions.page_check) }
       );
       for (const result of Array.isArray(output?.pages) ? output.pages : []) {
         if (result?.status === "flagged" && str(result.note)) notes.get(Number(result.pageNumber))?.push(str(result.note));
@@ -697,7 +711,7 @@ export async function revisePage(pageId: string, request: string) {
 
   const { output } = await runAiStep(
     "page_revise",
-    {
+    namedValues(snapshot, {
       reading_level: describeProfile(snapshot.readingProfile),
       embellishment_rules: embellishmentRule(snapshot.rules),
       memories: formatMemories(memories),
@@ -708,8 +722,8 @@ export async function revisePage(pageId: string, request: string) {
       next_page: neighbor(target.pageNumber + 1),
       revision_request: request,
       ...snapshotCharacterValues(snapshot),
-    },
-    { body: snapshot.instructions.page_revise }
+    }),
+    { body: named(snapshot, snapshot.instructions.page_revise) }
   );
   const revised = normalizePage(output);
   // Keep the page's picture size unless the revision chose one.
@@ -755,7 +769,7 @@ export async function approvePages(chapterId: string, pageIds?: string[]) {
     where: { chapterId, ...(pageIds ? { id: { in: pageIds } } : {}) },
     include: { assets: { where: { status: "ready" }, take: 1 } },
   });
-  const missing = pages.filter((p) => p.assets.length === 0).map((p) => p.pageNumber);
+  const missing = pages.filter((p) => hasPicture(p) && p.assets.length === 0).map((p) => p.pageNumber);
   if (missing.length) throw new Error(`Page ${missing.join(", ")} ${missing.length === 1 ? "has" : "have"} no illustration yet.`);
   await prisma.storyPage.updateMany({ where: { id: { in: pages.map((p) => p.id) } }, data: { approvedAt: new Date() } });
 }
@@ -780,7 +794,7 @@ const BELONG_NOTE =
 
 // Each page's picture size decides the image's shape and framing. Pages made
 // before picture sizes existed keep the original wide format.
-const PICTURE_SIZE_NAMES = ["vignette", "framed", "full", "wordless"];
+const PICTURE_SIZE_NAMES = ["vignette", "framed", "full", "wordless", "none"];
 const PICTURE_SIZES: Record<string, { size: string; framing: string }> = {
   vignette: {
     size: "1024x1024",
@@ -939,6 +953,7 @@ export interface IllustrationOptions {
 // Generates a new illustration version for one page. Never touches the text.
 export async function generateIllustration(pageId: string, options: IllustrationOptions = {}) {
   const page = await prisma.storyPage.findUniqueOrThrow({ where: { id: pageId } });
+  if (!hasPicture(page)) return;
   const { chapter, snapshot, characterSheet } = await loadChapter(page.chapterId);
   const rules = snapshot?.rules;
   const cast = snapshot?.cast ?? [];
@@ -952,8 +967,8 @@ export async function generateIllustration(pageId: string, options: Illustration
   if (chapter.characterSheetImage && !options.referencePageId) {
     scene.push({ path: chapter.characterSheetImage, label: SHEET_LABEL });
   } else {
-    const firstPage = chapter.pages.find((p) => p.pageNumber === 1);
-    const pageRef = await latestReadyAsset(options.referencePageId ?? (page.pageNumber === 1 ? "" : firstPage?.id ?? ""));
+    const firstPicture = chapter.pages.find(hasPicture);
+    const pageRef = await latestReadyAsset(options.referencePageId ?? (firstPicture && firstPicture.id !== page.id ? firstPicture.id : ""));
     if (pageRef?.imagePath) scene.push({ path: pageRef.imagePath, label: EARLIER_PAGE_LABEL });
   }
   const references: ImageReference[] = [
@@ -1058,7 +1073,7 @@ export async function updatePagesStatus(chapterId: string) {
     return;
   }
   // Call this once nothing more is queued: a page with no illustration then needs a retry.
-  const latest = chapter.pages.map((p) => p.assets[0]?.status);
+  const latest = chapter.pages.filter(hasPicture).map((p) => p.assets[0]?.status);
   const status = latest.some((s) => s === "generating")
     ? "illustrating"
     : latest.some((s) => s !== "ready")
@@ -1071,9 +1086,10 @@ export async function updatePagesStatus(chapterId: string) {
 // fails, page 1 is drawn first and used as the reference instead. Waits while
 // someone in the chapter still needs identifying.
 export async function illustrateChapter(chapterId: string) {
-  const pages = await prisma.storyPage.findMany({ where: { chapterId }, orderBy: { pageNumber: "asc" } });
+  const pages = (await prisma.storyPage.findMany({ where: { chapterId }, orderBy: { pageNumber: "asc" } })).filter(hasPicture);
   const current = await prisma.chapter.findUniqueOrThrow({ where: { id: chapterId } });
-  if (pages.length === 0 || parseUnresolved(current.unresolvedPeople).length) return;
+  if (parseUnresolved(current.unresolvedPeople).length) return;
+  if (pages.length === 0) return updatePagesStatus(chapterId);
   const chapter = await prisma.chapter.update({ where: { id: chapterId }, data: { pagesStatus: "illustrating" } });
   const sheet = chapter.characterSheetImage ?? (await generateCharacterSheet(chapterId));
   const queue = [...pages];
@@ -1087,7 +1103,7 @@ export async function illustrateChapter(chapterId: string) {
 
 // Redraws pages after a family character's new look was approved for drafts.
 export async function redrawPages(pageIds: string[]) {
-  const pages = await prisma.storyPage.findMany({ where: { id: { in: pageIds } } });
+  const pages = (await prisma.storyPage.findMany({ where: { id: { in: pageIds } } })).filter(hasPicture);
   for (const chapterId of new Set(pages.map((p) => p.chapterId))) {
     await prisma.chapter.update({ where: { id: chapterId }, data: { pagesStatus: "illustrating" } });
   }

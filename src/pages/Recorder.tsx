@@ -1,103 +1,213 @@
-import { useEffect, useRef, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
-import Vambie from "../components/Vambie";
+import BottomNav from "../components/BottomNav";
+import AudioPlayer from "../components/AudioPlayer";
+import AccessDenied from "../components/AccessDenied";
+import { IconCheck, IconChevronLeft, IconDownload, IconLock, IconMic, IconRefresh, IconSparkle, IconUpload, IconWarning } from "../components/icons";
+import { Chev, Field, Loading, Mascot, Masthead, Note, Select, Sheet, Switch, type MascotName } from "../components/ui";
+import { useStorybookData } from "../hooks/useStorybookData";
 import { apiGet } from "../lib/api";
-import type { Prompt, Storybook } from "../types";
+import { formatDuration, possessive } from "../lib/format";
+import { ageInYears } from "../lib/stages";
+import type { Prompt, StorybookView } from "../types";
 
-type Stage =
-  | "prompt"
-  | "requesting"
-  | "mic-blocked"
-  | "recording"
-  | "paused"
-  | "stopped"
-  | "uploading"
-  | "upload-error"
-  | "saved";
+type Stage = "deck" | "requesting" | "mic-blocked" | "recording" | "paused" | "review" | "uploading" | "upload-error" | "saved";
+
+interface DeckCard {
+  id: string | null;
+  question: string;
+  supportingText: string;
+  category: string;
+  color: string;
+  art: string | null;
+}
+
+const MAX_SECONDS = 15 * 60;
+const BARS = 26;
+const CARD_ART: MascotName[] = ["star", "book", "open-book", "hug-book", "envelope-happy", "closedbook"];
+const FREEFORM: DeckCard = { id: null, question: "What would you like to remember?", supportingText: "Tell it in your own words.", category: "Just talk", color: "purple", art: null };
 
 const pickMimeType = () => {
   const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
   return candidates.find((c) => typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(c)) ?? "";
 };
 
+const audienceFor = (relationship: string | null) =>
+  relationship === "Parent" || relationship === "Guardian" ? "Parents" : relationship === "Grandparent" ? "Grandparents" : null;
+
+function childStageFor(storybook: StorybookView) {
+  if (storybook.child.stage === "expecting") return "Expecting";
+  const age = ageInYears(storybook.child.birthDate);
+  if (age === null) return null;
+  return age < 1 ? "Newborn" : age < 4 ? "Toddler" : null;
+}
+
+const toCard = (p: Prompt): DeckCard => ({
+  id: p.id,
+  question: p.question,
+  supportingText: p.supportingText || "Tell it in your own words.",
+  category: p.category,
+  color: p.cardColor,
+  art: p.artworkPath,
+});
+
 export default function Recorder() {
   const { id } = useParams();
+  const [params] = useSearchParams();
   const navigate = useNavigate();
-  const [storybook, setStorybook] = useState<Storybook | null>(null);
+  const { storybook, status } = useStorybookData(id);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
-  const [promptIndex, setPromptIndex] = useState(0);
-  const [freeform, setFreeform] = useState(false);
-  const [stage, setStage] = useState<Stage>("prompt");
+  const [category, setCategory] = useState("All");
+  const [cardIndex, setCardIndex] = useState(0);
+  const [chosen, setChosen] = useState<DeckCard | null>(null);
+  const [stage, setStage] = useState<Stage>("deck");
   const [seconds, setSeconds] = useState(0);
-  const [memoryTitle, setMemoryTitle] = useState("");
-  const [eventDate, setEventDate] = useState("today");
+  const [levels, setLevels] = useState<number[]>(() => Array(BARS).fill(0.08));
+  const [blob, setBlob] = useState<Blob | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [when, setWhen] = useState("today");
+  const [pickedDate, setPickedDate] = useState("");
   const [visibility, setVisibility] = useState("contributor_only");
   const [storyUse, setStoryUse] = useState(true);
-  const [savedMemoryId, setSavedMemoryId] = useState<string | null>(null);
+  const [memoryId, setMemoryId] = useState<string | null>(null);
 
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const [blob, setBlob] = useState<Blob | null>(null);
-  const audioUrlRef = useRef<string | null>(null);
-  const [audioPreviewUrl, setAudioPreviewUrl] = useState<string | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const deckRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
-    apiGet(`/api/storybooks/${id}`).then((data) => {
-      setStorybook(data);
-      setVisibility(data.defaultVisibility);
-      setStoryUse(data.defaultStoryUse);
-    });
-    apiGet("/api/prompts?status=published").then(setPrompts);
-    return () => {
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-      if (timerRef.current) clearInterval(timerRef.current);
-      if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
+    apiGet("/api/prompts?status=published").then(setPrompts).catch(() => setPrompts([]));
+  }, []);
+
+  useEffect(() => {
+    if (storybook) {
+      setVisibility(storybook.defaultVisibility === "household" ? "household" : "contributor_only");
+      setStoryUse(storybook.defaultStoryUse);
+    }
+  }, [storybook]);
+
+  const stopEverything = useCallback(() => {
+    if (timerRef.current) clearInterval(timerRef.current);
+    if (rafRef.current) cancelAnimationFrame(rafRef.current);
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    void audioCtxRef.current?.close().catch(() => undefined);
+    audioCtxRef.current = null;
+  }, []);
+
+  useEffect(() => () => stopEverything(), [stopEverything]);
+  useEffect(() => () => {
+    if (previewUrl) URL.revokeObjectURL(previewUrl);
+  }, [previewUrl]);
+
+  // Leaving with an unsaved recording loses it.
+  const unsaved = ["recording", "paused", "review", "uploading", "upload-error"].includes(stage);
+  useEffect(() => {
+    if (!unsaved) return;
+    const warn = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "";
     };
-  }, [id]);
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [unsaved]);
+
+  const cards = useMemo(() => {
+    if (!storybook) return [];
+    const audience = audienceFor(storybook.me.relationship);
+    const childStage = childStageFor(storybook);
+    const fitting = prompts.filter(
+      (p) => (p.audience === "Everyone" || p.audience === audience) && (p.childStage === "All stages" || p.childStage === childStage)
+    );
+    const list = fitting.filter((p) => category === "All" || p.category === category).map(toCard);
+    const asked = params.get("q");
+    return asked && category === "All" ? [{ ...FREEFORM, question: asked, category: "Sample prompt" }, ...list] : list;
+  }, [prompts, storybook, category, params]);
+
+  const categories = useMemo(() => ["All", ...new Set(prompts.map((p) => p.category))], [prompts]);
+
+  const onDeckScroll = () => {
+    const el = deckRef.current;
+    if (!el || !el.firstElementChild) return;
+    const width = (el.firstElementChild as HTMLElement).offsetWidth + 14;
+    setCardIndex(Math.min(cards.length - 1, Math.max(0, Math.round(el.scrollLeft / width))));
+  };
+
+  const meter = (stream: MediaStream) => {
+    try {
+      const ctx = new AudioContext();
+      const source = ctx.createMediaStreamSource(stream);
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 256;
+      source.connect(analyser);
+      audioCtxRef.current = ctx;
+      const data = new Uint8Array(analyser.frequencyBinCount);
+      let last = 0;
+      const tick = (t: number) => {
+        rafRef.current = requestAnimationFrame(tick);
+        if (t - last < 60) return;
+        last = t;
+        analyser.getByteFrequencyData(data);
+        const step = Math.floor(data.length / BARS);
+        const next = Array.from({ length: BARS }, (_, i) => {
+          const mirrored = i < BARS / 2 ? BARS / 2 - 1 - i : i - BARS / 2;
+          const v = data[Math.min(data.length - 1, 2 + mirrored * step)] / 255;
+          return Math.max(0.08, Math.min(1, v * 1.4));
+        });
+        setLevels(next);
+      };
+      rafRef.current = requestAnimationFrame(tick);
+    } catch {
+      // The waveform is decoration; recording works without it.
+    }
+  };
 
   const startTimer = () => {
     timerRef.current = setInterval(() => setSeconds((s) => s + 1), 1000);
   };
-  const stopTimer = () => {
-    if (timerRef.current) clearInterval(timerRef.current);
-  };
 
-  const startRecording = async () => {
+  // Recordings stop on their own at the length limit.
+  useEffect(() => {
+    if (seconds >= MAX_SECONDS && stage === "recording") finishRecording();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [seconds, stage]);
+
+  const startRecording = async (card: DeckCard) => {
+    setChosen(card);
+    setStage("requesting");
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       streamRef.current = stream;
       const mimeType = pickMimeType();
       const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream);
       chunksRef.current = [];
-      recorder.ondataavailable = (e) => {
-        if (e.data.size > 0) chunksRef.current.push(e.data);
-      };
+      recorder.ondataavailable = (e) => e.data.size > 0 && chunksRef.current.push(e.data);
       recorder.onstop = () => {
-        const recordedBlob = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
-        setBlob(recordedBlob);
-        const url = URL.createObjectURL(recordedBlob);
-        audioUrlRef.current = url;
-        setAudioPreviewUrl(url);
+        const recorded = new Blob(chunksRef.current, { type: recorder.mimeType || "audio/webm" });
+        setBlob(recorded);
+        setPreviewUrl(URL.createObjectURL(recorded));
       };
-      mediaRecorderRef.current = recorder;
-      recorder.start();
+      recorderRef.current = recorder;
+      recorder.start(1000);
       setSeconds(0);
       startTimer();
+      meter(stream);
       setStage("recording");
     } catch {
       setStage("mic-blocked");
     }
   };
 
-  const pauseResume = () => {
-    const recorder = mediaRecorderRef.current;
+  const togglePause = () => {
+    const recorder = recorderRef.current;
     if (!recorder) return;
     if (stage === "recording") {
       recorder.pause();
-      stopTimer();
+      if (timerRef.current) clearInterval(timerRef.current);
       setStage("paused");
     } else if (stage === "paused") {
       recorder.resume();
@@ -106,260 +216,363 @@ export default function Recorder() {
     }
   };
 
-  const stopRecording = () => {
-    mediaRecorderRef.current?.stop();
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    stopTimer();
-    setStage("stopped");
-  };
+  function finishRecording() {
+    if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.stop();
+    stopEverything();
+    setLevels(Array(BARS).fill(0.08));
+    setStage("review");
+  }
 
-  const reRecord = () => {
-    if (audioUrlRef.current) URL.revokeObjectURL(audioUrlRef.current);
-    setAudioPreviewUrl(null);
+  const discard = () => {
+    if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.stop();
+    stopEverything();
     setBlob(null);
+    setPreviewUrl(null);
+    setMemoryId(null);
     setSeconds(0);
-    setStage("prompt");
+    setStage("deck");
   };
 
-  const submit = async () => {
-    if (!blob || !storybook?.defaultContributorId) return;
+  const leaveRecording = () => {
+    if (window.confirm("Stop and discard this recording?")) discard();
+  };
+
+  const eventDate = () => {
+    const d = new Date();
+    if (when === "yesterday") d.setDate(d.getDate() - 1);
+    if (when === "week") d.setDate(d.getDate() - 3);
+    if (when === "pick") return pickedDate ? new Date(`${pickedDate}T12:00:00`).toISOString() : null;
+    return d.toISOString();
+  };
+
+  const save = async () => {
+    if (!blob || !storybook) return;
     setStage("uploading");
     try {
-      const memRes = await fetch(`/api/storybooks/${id}/memories`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          contributorId: storybook.defaultContributorId,
-          title: memoryTitle || null,
-          eventDate: eventDate === "today" ? new Date().toISOString() : null,
-          visibility,
-          storyUseConsent: storyUse,
-        }),
-      });
-      if (!memRes.ok) throw new Error("memory create failed");
-      const memory = await memRes.json();
-
+      let savedId = memoryId;
+      if (!savedId) {
+        const res = await fetch(`/api/storybooks/${storybook.id}/memories`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            eventDate: eventDate(),
+            visibility,
+            storyUseConsent: storyUse,
+            durationSec: seconds,
+            promptId: chosen?.id ?? null,
+            promptText: chosen?.question ?? null,
+          }),
+        });
+        if (!res.ok) throw new Error("memory");
+        savedId = (await res.json()).id as string;
+        setMemoryId(savedId);
+      }
       const ext = blob.type.includes("mp4") ? "mp4" : blob.type.includes("ogg") ? "ogg" : "webm";
-      const formData = new FormData();
-      formData.append("audio", blob, `memory.${ext}`);
-      const audioRes = await fetch(`/api/memories/${memory.id}/audio`, { method: "POST", body: formData });
-      if (!audioRes.ok) throw new Error("audio upload failed");
-
-      setSavedMemoryId(memory.id);
+      const form = new FormData();
+      form.append("audio", blob, `memory.${ext}`);
+      const upload = await fetch(`/api/memories/${savedId}/audio`, { method: "POST", body: form });
+      if (!upload.ok) throw new Error("upload");
       setStage("saved");
     } catch {
       setStage("upload-error");
     }
   };
 
-  const downloadRecording = () => {
-    if (!audioPreviewUrl) return;
+  const download = () => {
+    if (!previewUrl || !blob) return;
     const a = document.createElement("a");
-    a.href = audioPreviewUrl;
-    a.download = "memory-recording.webm";
+    a.href = previewUrl;
+    a.download = `vambie-memory.${blob.type.includes("mp4") ? "m4a" : "webm"}`;
     a.click();
   };
 
-  const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
-  const ss = String(seconds % 60).padStart(2, "0");
-  const currentPrompt = prompts[promptIndex];
+  if (status === "denied") return <AccessDenied />;
+  if (!storybook) return <Loading />;
+
+  const base = `/storybooks/${storybook.id}`;
+  const child = storybook.child.displayName;
+  const nextDay = new Date(storybook.nextChapterAt).toLocaleDateString("en-US", { weekday: "long" });
 
   if (stage === "mic-blocked") {
     return (
-      <div>
-        <TopBar backTo={`/storybooks/${id}`} backLabel="Back" />
-        <div className="hero">
-          <div className="hero-mascot-stage">
-            <Vambie mood="worried" size={90} />
-            <h1 className="display" style={{ fontSize: "1.9rem" }}>
-              Let's turn your mic on.
-            </h1>
+      <div className="page">
+        <TopBar back={() => setStage("deck")} wordmark menu={`${base}/settings`} />
+        <Masthead plate="tall" title={<>Let's turn<br />your mic on.</>} art="mic" center />
+        <Sheet grow>
+          <div className="hstack" style={{ alignItems: "flex-start", gap: 14 }}>
+            <span className="icon-circle" style={{ width: 58, height: 58, background: "var(--red)", color: "var(--white)", flex: "none" }}>
+              <IconMic size={28} />
+            </span>
+            <div>
+              <h2 className="h-title" style={{ fontSize: 24 }}>Microphone access is blocked</h2>
+              <p className="t-small t-muted" style={{ marginTop: 4 }}>We need your permission to record your memory.</p>
+            </div>
           </div>
-        </div>
-        <div className="screen-pad">
-          <div className="card">
-            <strong>Microphone access is blocked</strong>
-            <p className="status-line">We need your permission to record your memory.</p>
-            <p className="status-line">1. Open this site's browser permissions</p>
-            <p className="status-line">2. Allow microphone access</p>
-            <p className="status-line">3. Return here and try again</p>
-            <button className="btn-primary chevron" onClick={startRecording}>
-              Try microphone again
+          <ol className="num-steps">
+            {["Open this site's browser permissions.", "Allow microphone access.", "Return here and try again."].map((text, i) => (
+              <li key={text}>
+                <span className="num-steps__n">{i + 1}</span>
+                {text}
+              </li>
+            ))}
+          </ol>
+          <hr className="divider" />
+          <p className="t-center t-small t-muted" style={{ margin: 0 }}>No recording has started yet.</p>
+          <div className="stack" style={{ marginTop: 16 }}>
+            <button className="btn btn--lime btn--caps" onClick={() => void startRecording(chosen ?? FREEFORM)}>
+              <IconMic size={22} filled /> Try microphone again <Chev />
             </button>
-            <button className="btn-secondary" style={{ marginTop: "0.6rem" }} onClick={() => setStage("prompt")}>
-              Back to prompts
+            <button className="btn btn--dark btn--caps" onClick={() => setStage("deck")}>
+              <IconChevronLeft size={22} strokeWidth={3} /> Back to prompts
             </button>
           </div>
-        </div>
+          <p className="t-center" style={{ marginTop: 14 }}>
+            <Link to="/help" className="tlink">Need help?</Link>
+          </p>
+        </Sheet>
       </div>
     );
   }
 
   if (stage === "upload-error") {
     return (
-      <div>
-        <TopBar backTo={`/storybooks/${id}`} backLabel="Back" />
-        <div className="screen-pad">
-          <div className="banner warn">Not saved yet</div>
-          <div className="card">
-            <h2 style={{ marginTop: 0 }}>Let's finish saving this.</h2>
-            {audioPreviewUrl && <audio src={audioPreviewUrl} controls style={{ width: "100%" }} />}
-            <p className="status-line">The upload stopped before it finished. Keep this page open while you retry.</p>
-            <button className="btn-primary chevron" onClick={submit}>
-              Retry upload
+      <div className="page">
+        <TopBar back={leaveRecording} wordmark menu={`${base}/settings`} />
+        <Masthead
+          badge={
+            <span className="badge badge--amber badge--caps">
+              <IconWarning size={18} /> Not saved yet
+            </span>
+          }
+          title={<>Let's finish<br />saving this.</>}
+          style={{ paddingBottom: 40, paddingRight: 150 }}
+        />
+        <Sheet peek="peek" grow>
+          <AudioPlayer src={previewUrl} durationSec={seconds} />
+          <h2 className="h-title" style={{ marginTop: 18 }}>The upload stopped before it finished.</h2>
+          <p className="t-body t-muted" style={{ marginTop: 6 }}>Keep this page open while you retry.</p>
+          <div className="stack" style={{ marginTop: 18 }}>
+            <button className="btn btn--lime btn--caps" onClick={() => void save()}>
+              <IconUpload size={22} /> Retry upload <Chev />
             </button>
-            <button className="btn-secondary" style={{ marginTop: "0.6rem" }} onClick={downloadRecording}>
-              Download recording
+            <button className="btn btn--outline btn--caps" onClick={download}>
+              <IconDownload size={22} /> Download recording <Chev />
             </button>
-            <div className="banner danger" style={{ marginTop: "0.75rem" }}>
-              If you leave now, this recording may be lost.
-            </div>
           </div>
-        </div>
+          <Note kind="danger" style={{ marginTop: 16 }}>
+            If you leave now, this recording may be lost.{" "}
+            <Link to="/help" className="tlink">Get help</Link>
+          </Note>
+        </Sheet>
       </div>
     );
   }
 
   if (stage === "saved") {
     return (
-      <div>
-        <TopBar wordmark />
-        <div className="hero">
-          <div className="hero-mascot-stage">
-            <Vambie mood="celebrating" size={100} />
-            <h1 className="display" style={{ fontSize: "1.9rem" }}>
-              A little moment.
-              <br />
-              Safely kept.
-            </h1>
-            <p className="subtitle" style={{ marginBottom: 0 }}>
-              Your recording is saved in {storybook?.child.displayName}'s memories.
-            </p>
+      <div className="page">
+        <div className="saved-screen">
+          <span className="badge badge--lime badge--caps">
+            <IconCheck size={18} strokeWidth={3} /> Saved
+          </span>
+          <h1 className="h-display" style={{ marginTop: 16 }}>
+            A little moment.
+            <br />
+            Safely kept.
+          </h1>
+          <Mascot name="hug-book" className="saved-screen__art" />
+          <p className="t-body">Your recording is saved in {possessive(child)} memories.</p>
+          <div className="preparing-card">
+            <IconSparkle size={30} />
+            <div>
+              <p className="preparing-card__title">Preparing your memory</p>
+              <p className="t-small" style={{ margin: 0, opacity: 0.92 }}>
+                {storyUse
+                  ? `It joins this week's chapter, made ${nextDay} morning. We'll let you know when it's ready.`
+                  : "It stays in your memories and won't be used in stories."}
+              </p>
+            </div>
           </div>
-        </div>
-        <div className="screen-pad">
-          <div className="banner info">Preparing your memory. We'll let you know when a new chapter is ready.</div>
-          <button className="btn-primary chevron" onClick={() => navigate(`/storybooks/${id}`)} style={{ marginTop: "1rem" }}>
-            Back to {storybook?.child.displayName}'s story
-          </button>
-          <button
-            className="btn-secondary"
-            style={{ marginTop: "0.6rem" }}
-            onClick={() => {
-              setStage("prompt");
-              reRecord();
-            }}
-          >
-            Record another memory
-          </button>
+          <div className="stack" style={{ width: "100%", marginTop: 16 }}>
+            <Link className="btn btn--lime btn--caps" to={base}>
+              Back to {possessive(child)} story <Chev />
+            </Link>
+            <button className="btn btn--ghost btn--caps" onClick={discard}>
+              Record another memory
+            </button>
+          </div>
+          {memoryId && (
+            <p style={{ marginTop: 14 }}>
+              <Link to={`${base}/memories/${memoryId}`} className="tlink tlink--light">
+                View saved memory
+              </Link>
+            </p>
+          )}
         </div>
       </div>
     );
   }
 
+  if (stage === "review" || stage === "uploading") {
+    return (
+      <div className="page">
+        <TopBar back={leaveRecording} />
+        <Masthead title="Keep this moment." style={{ paddingTop: 0 }} />
+        <Sheet grow>
+          <AudioPlayer src={previewUrl} durationSec={seconds} />
+          <p className="t-center" style={{ margin: "12px 0 0" }}>
+            <button className="tlink" onClick={() => window.confirm("Record it again? This recording will be discarded.") && discard()}>
+              <IconRefresh size={18} /> Re-record
+            </button>
+          </p>
+          <Field label="When did it happen?" htmlFor="when">
+            <Select
+              id="when"
+              value={when}
+              onChange={setWhen}
+              options={[
+                { value: "today", label: "Today" },
+                { value: "yesterday", label: "Yesterday" },
+                { value: "week", label: "Earlier this week" },
+                { value: "pick", label: "Pick a date…" },
+              ]}
+            />
+            {when === "pick" && (
+              <input type="date" className="input" style={{ marginTop: 8 }} value={pickedDate} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setPickedDate(e.target.value)} />
+            )}
+          </Field>
+          <Field label="Original recording" htmlFor="visibility">
+            <Select
+              id="visibility"
+              value={visibility}
+              onChange={setVisibility}
+              icon={<IconLock size={20} />}
+              options={[
+                { value: "contributor_only", label: "Only me" },
+                { value: "household", label: "Everyone in the family" },
+              ]}
+            />
+          </Field>
+          <hr className="divider" />
+          <div className="toggle-row">
+            <span className="t-body" style={{ fontWeight: 500 }}>Use this memory in {possessive(child)} story</span>
+            <Switch checked={storyUse} onChange={setStoryUse} label={`Use this memory in ${possessive(child)} story`} />
+          </div>
+          <p className="field__hint">Your recording stays private. A story inspired by it can be shared with your family.</p>
+          <button className="btn btn--lime btn--caps" style={{ marginTop: 22 }} onClick={() => void save()} disabled={stage === "uploading"}>
+            {stage === "uploading" ? "Saving…" : "Save memory"} <Chev />
+          </button>
+        </Sheet>
+      </div>
+    );
+  }
+
+  if (stage === "recording" || stage === "paused" || stage === "requesting") {
+    const card = chosen ?? FREEFORM;
+    return (
+      <div className="page">
+        <TopBar back={stage === "requesting" ? () => setStage("deck") : leaveRecording} />
+        <div className="rec-screen">
+          <span className="badge badge--purple badge--caps">{card.category}</span>
+          <h1 className="h-display">{card.question}</h1>
+          <p className="t-body" style={{ marginTop: 8 }}>{card.supportingText}</p>
+          <Mascot name="mic" className="rec-screen__art" />
+          <div className="live-wave" aria-hidden="true">
+            {levels.map((v, i) => (
+              <span key={i} style={{ height: `${Math.round(v * 100)}%`, opacity: stage === "paused" ? 0.4 : 1 }} />
+            ))}
+          </div>
+          <p className="rec-timer" aria-live="off">{formatDuration(seconds)}</p>
+          <button
+            className={`mic-btn ${stage === "recording" ? "mic-btn--live" : ""}`}
+            onClick={togglePause}
+            aria-label={stage === "recording" ? "Pause recording" : "Resume recording"}
+            style={{ marginTop: 14 }}
+            disabled={stage === "requesting"}
+          >
+            <IconMic size={52} filled />
+          </button>
+          <div className="rec-actions">
+            <button className="btn btn--ghost btn--caps" onClick={togglePause} disabled={stage === "requesting"}>
+              {stage === "paused" ? "Resume" : "Pause"}
+            </button>
+            <button className="btn btn--lime btn--caps" onClick={finishRecording} disabled={stage === "requesting" || seconds < 1}>
+              Finish <Chev />
+            </button>
+          </div>
+          <p className="t-small t-muted-dark" style={{ marginTop: 16 }}>
+            {stage === "requesting" ? "Allow the microphone to start." : "A little moment is enough."}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  // Prompt deck
+  const current = cards[cardIndex];
   return (
-    <div>
-      <TopBar backTo={`/storybooks/${id}`} backLabel="Back" />
-
-      {stage === "prompt" && (
-        <div className="hero">
-          <div className="hero-mascot-stage">
-            <Vambie mood="curious" size={90} />
-            {currentPrompt && !freeform ? (
-              <>
-                <span className="pill" style={{ background: "var(--purple)", color: "white" }}>
-                  {currentPrompt.category}
-                </span>
-                <h1 className="display" style={{ fontSize: "1.8rem" }}>
-                  {currentPrompt.question}
-                </h1>
-                <p className="subtitle" style={{ marginBottom: 0 }}>
-                  {currentPrompt.supportingText}
-                </p>
-              </>
-            ) : (
-              <>
-                <h1 className="display" style={{ fontSize: "1.8rem" }}>
-                  Something happen that you don't want to forget?
-                </h1>
-                <p className="subtitle" style={{ marginBottom: 0 }}>
-                  Tell us what happened.
-                </p>
-              </>
-            )}
-          </div>
-          <button className="btn-primary chevron" onClick={startRecording}>
-            Record this memory
-          </button>
-          <div className="row inline" style={{ justifyContent: "center" }}>
-            {prompts.length > 1 && !freeform && (
+    <div className="page page--nav">
+      <TopBar wordmark menu={`${base}/settings`} />
+      <Masthead title={<>A little nudge.<br />A real memory.</>} style={{ paddingTop: 0, paddingBottom: 14 }} />
+      <div className="pad" style={{ overflowX: "auto" }}>
+        <div className="chips" style={{ flexWrap: "nowrap" }}>
+          {categories.map((c) => (
+            <button
+              key={c}
+              className={`chip ${category === c ? "chip--on" : ""}`}
+              onClick={() => {
+                setCategory(c);
+                setCardIndex(0);
+                deckRef.current?.scrollTo({ left: 0 });
+              }}
+            >
+              {c}
+            </button>
+          ))}
+        </div>
+      </div>
+      {cards.length === 0 ? (
+        <p className="loading">No questions here yet. Try another category, or just talk.</p>
+      ) : (
+        <>
+          <div className="deck" ref={deckRef} onScroll={onDeckScroll} style={{ marginTop: 16 }}>
+            {cards.map((c, i) => (
               <button
-                className="btn-link"
-                onClick={() => setPromptIndex((i) => (i + 1) % prompts.length)}
-                style={{ width: "auto" }}
+                key={`${c.id}-${i}`}
+                className={`prompt-card prompt-card--${c.color}`}
+                onClick={() => void startRecording(c)}
+                aria-label={`Record: ${c.question}`}
+                style={{ border: 0, cursor: "pointer", font: "inherit" }}
               >
-                Next question
+                <span className={`badge badge--caps badge--sm prompt-card__badge ${c.color === "purple" ? "badge--pink" : "badge--purple"}`}>{c.category}</span>
+                <span className="prompt-card__q">{c.question}</span>
+                {c.art ? (
+                  <img src={`/${c.art}`} alt="" className="prompt-card__art" style={{ borderRadius: 16, aspectRatio: "1", objectFit: "cover" }} />
+                ) : (
+                  <Mascot name={CARD_ART[i % CARD_ART.length]} className="prompt-card__art" />
+                )}
               </button>
-            )}
-            <button className="btn-link" onClick={() => setFreeform((f) => !f)} style={{ width: "auto" }}>
-              {freeform ? "Use a prompt instead" : "Just let me talk"}
-            </button>
+            ))}
           </div>
-        </div>
+          <div className="deck-dots" aria-hidden="true">
+            {cards.slice(0, 8).map((c, i) => (
+              <span key={i} className={i === Math.min(cardIndex, 7) ? "on" : ""} />
+            ))}
+          </div>
+          <p className="t-center t-small t-muted-dark" style={{ margin: "8px 0 0" }}>Swipe for another question</p>
+        </>
       )}
-
-      {(stage === "recording" || stage === "paused") && (
-        <div className="record-stage">
-          <button className={`record-button ${stage === "recording" ? "recording" : ""}`} onClick={stopRecording}>
-            DONE
+      <div className="pad" style={{ marginTop: 16 }}>
+        <button className="btn btn--lime btn--caps" onClick={() => void startRecording(current ?? FREEFORM)}>
+          <IconMic size={24} filled /> Record this memory <Chev />
+        </button>
+        <p className="t-center" style={{ margin: "14px 0 0" }}>
+          <button className="tlink tlink--light" onClick={() => void startRecording(FREEFORM)}>
+            Just let me talk
           </button>
-          <div className="record-timer">
-            {mm}:{ss}
-          </div>
-          <button className="btn-secondary" style={{ width: "auto" }} onClick={pauseResume}>
-            {stage === "recording" ? "Pause" : "Resume"}
-          </button>
-        </div>
-      )}
-
-      {(stage === "stopped" || stage === "uploading") && audioPreviewUrl && (
-        <div className="screen-pad">
-          <div className="card">
-            <h2 style={{ marginTop: 0 }}>Keep this moment.</h2>
-            <audio src={audioPreviewUrl} controls style={{ width: "100%" }} />
-            <button className="btn-link" onClick={reRecord} style={{ marginTop: "0.5rem" }}>
-              Re-record
-            </button>
-
-            <label htmlFor="memoryTitle">Give it a title (optional)</label>
-            <input id="memoryTitle" value={memoryTitle} onChange={(e) => setMemoryTitle(e.target.value)} placeholder="e.g. First time at the park" />
-
-            <label htmlFor="eventDate">When did it happen?</label>
-            <select id="eventDate" value={eventDate} onChange={(e) => setEventDate(e.target.value)}>
-              <option value="today">Today</option>
-              <option value="unspecified">I'll add this later</option>
-            </select>
-
-            <label htmlFor="visibility">Original recording</label>
-            <select id="visibility" value={visibility} onChange={(e) => setVisibility(e.target.value)}>
-              <option value="contributor_only">Only me</option>
-              <option value="household">Everyone in the household</option>
-            </select>
-
-            <div className="checkbox-row">
-              <input type="checkbox" id="useInStory" checked={storyUse} onChange={(e) => setStoryUse(e.target.checked)} />
-              <label htmlFor="useInStory" style={{ margin: 0 }}>
-                Use this memory in {storybook?.child.displayName}'s story
-              </label>
-            </div>
-            <p className="status-line">Your recording stays private. A story inspired by it can be shared with your family.</p>
-
-            <button className="btn-primary chevron" onClick={submit} disabled={stage === "uploading"}>
-              {stage === "uploading" ? "Saving…" : "Save memory"}
-            </button>
-          </div>
-        </div>
-      )}
+        </p>
+      </div>
+      <BottomNav storybookId={storybook.id} />
     </div>
   );
 }

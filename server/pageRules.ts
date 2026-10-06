@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { STAGE_KEYS, normalizeStage } from "./readingStages";
 
 // Admin-configurable rules for turning a chapter into illustrated pages. Saving
 // creates a new GenerationRuleSet version; chapters keep the version they used.
@@ -12,6 +13,7 @@ export interface ReadingProfile {
   maxWordsPerPage: number;
   maxWordsPerSentence: number;
   vocabulary: string;
+  pictures?: string; // the picture pattern for this stage
 }
 
 export type EmbellishmentLevel = "minimal" | "moderate" | "imaginative";
@@ -52,29 +54,50 @@ export const INK_AND_WASH_STYLE =
 
 export const DEFAULT_RULES: PageRules = {
   readingProfiles: {
-    "0-3": {
-      label: "Simple & short · Ages 0-3",
+    read_to_me: {
+      label: "Read to me · Ages 0–3",
       pagesMin: 4,
       pagesMax: 6,
-      maxWordsPerPage: 20,
+      maxWordsPerPage: 15,
       maxWordsPerSentence: 8,
-      vocabulary: "Very simple, concrete words a toddler hears every day. Repetition and sound words are welcome.",
+      vocabulary: "Very simple, concrete words a toddler hears every day, read aloud by a grown-up. Rhythm, repetition and sound words are welcome. One short line per page.",
+      pictures: "A big picture on every page (mostly full and framed), and one wordless page for the most meaningful moment.",
     },
-    "4-7": {
-      label: "A little more adventure · Ages 4-7",
+    picture_book: {
+      label: "Picture book · Ages 3–5",
       pagesMin: 6,
       pagesMax: 8,
-      maxWordsPerPage: 40,
-      maxWordsPerSentence: 12,
-      vocabulary: "Simple, warm words an early reader can sound out; name feelings directly.",
+      maxWordsPerPage: 35,
+      maxWordsPerSentence: 10,
+      vocabulary: "Warm, simple words with a little rhythm; name feelings directly. A few short sentences per page.",
+      pictures: "A picture on every page: a vignette to open, framed pictures as the feeling builds, a full page for the biggest moment.",
     },
-    "8-12": {
-      label: "Longer stories · Ages 8-12",
+    early_reader: {
+      label: "Early reader · Ages 5–7",
+      pagesMin: 6,
+      pagesMax: 8,
+      maxWordsPerPage: 50,
+      maxWordsPerSentence: 12,
+      vocabulary: "Short sentences a new reader can sound out, with simple dialogue. Name feelings directly.",
+      pictures: "Mostly small vignettes and framed pictures above the text, so the words have room.",
+    },
+    chapter_book: {
+      label: "Chapter book · Ages 7–9",
       pagesMin: 6,
       pagesMax: 10,
-      maxWordsPerPage: 80,
+      maxWordsPerPage: 110,
       maxWordsPerSentence: 18,
-      vocabulary: "Richer vocabulary and fuller sentences; can hold more emotional nuance.",
+      vocabulary: "Fuller sentences with dialogue and inner thoughts; short scenes that build. Feelings can be layered.",
+      pictures: "Small spot pictures (vignettes) on about every other page; the pages between are text only (picture size none).",
+    },
+    big_kid: {
+      label: "Big kid · Ages 9–12",
+      pagesMin: 4,
+      pagesMax: 8,
+      maxWordsPerPage: 230,
+      maxWordsPerSentence: 24,
+      vocabulary: "Rich vocabulary and full paragraphs; real emotional nuance, inner voice and reflection.",
+      pictures: "One opening picture (framed or full) on page 1; every other page is text only (picture size none).",
     },
   },
   embellishment: "moderate",
@@ -102,15 +125,16 @@ export async function getActiveRules(): Promise<ActiveRuleSet> {
 // Returns an error message, or null if the rules are usable.
 export function validateRules(rules: any): string | null {
   if (!rules || typeof rules !== "object") return "Rules are missing.";
-  for (const band of Object.keys(DEFAULT_RULES.readingProfiles)) {
+  for (const band of STAGE_KEYS) {
     const p = rules.readingProfiles?.[band];
-    if (!p) return `Missing reading profile for ages ${band}.`;
+    if (!p) return `Missing the reading profile for the ${band.replace(/_/g, " ")} stage.`;
+    if (p.pictures !== undefined && typeof p.pictures !== "string") return `${p.label}: the picture pattern must be text.`;
     for (const field of ["pagesMin", "pagesMax", "maxWordsPerPage", "maxWordsPerSentence"] as const) {
-      if (!Number.isInteger(p[field]) || p[field] < 1) return `Ages ${band}: ${field} must be a whole number above 0.`;
+      if (!Number.isInteger(p[field]) || p[field] < 1) return `${p.label}: ${field} must be a whole number above 0.`;
     }
-    if (p.pagesMin > p.pagesMax) return `Ages ${band}: the minimum page count is above the maximum.`;
-    if (p.pagesMax > 16) return `Ages ${band}: at most 16 pages per chapter.`;
-    if (p.maxWordsPerSentence > p.maxWordsPerPage) return `Ages ${band}: words per sentence can't exceed words per page.`;
+    if (p.pagesMin > p.pagesMax) return `${p.label}: the minimum page count is above the maximum.`;
+    if (p.pagesMax > 16) return `${p.label}: at most 16 pages per chapter.`;
+    if (p.maxWordsPerSentence > p.maxWordsPerPage) return `${p.label}: words per sentence can't exceed words per page.`;
   }
   if (!(rules.embellishment in EMBELLISHMENT_LEVELS)) return "Pick an embellishment level.";
   for (const field of ["illustrationStyle", "peopleStyle"] as const) {
@@ -128,12 +152,15 @@ export async function saveRules(rules: PageRules): Promise<ActiveRuleSet> {
   return { version: created.version, rules: current, createdAt: created.createdAt };
 }
 
-export const profileFor = (rules: PageRules, band: string): ReadingProfile =>
-  rules.readingProfiles[band] ?? rules.readingProfiles["4-7"];
+// Accepts a stage key or a reading level from before the stages existed.
+export const profileFor = (rules: PageRules, band: string): ReadingProfile => {
+  const stage = normalizeStage(band);
+  return rules.readingProfiles[stage] ?? DEFAULT_RULES.readingProfiles[stage];
+};
 
 // Reading-level text given to the AI for the page plan and checks.
 export const describeProfile = (p: ReadingProfile) =>
-  `${p.label}. ${p.vocabulary} Use ${p.pagesMin}-${p.pagesMax} pages. Each page's text: at most ${p.maxWordsPerPage} words, and no sentence longer than ${p.maxWordsPerSentence} words.`;
+  `${p.label}. ${p.vocabulary} Use ${p.pagesMin}-${p.pagesMax} pages. Each page's text: at most ${p.maxWordsPerPage} words, and no sentence longer than ${p.maxWordsPerSentence} words.${p.pictures ? ` Pictures: ${p.pictures}` : ""}`;
 
 // Deterministic limit checks; returns one note per problem.
 export function checkPageLimits(text: string, p: ReadingProfile): string[] {

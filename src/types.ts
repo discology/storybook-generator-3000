@@ -149,6 +149,7 @@ export interface Prompt {
   audience: string;
   childStage: string;
   cardColor: string;
+  artworkPath: string | null;
   status: "draft" | "published" | "archived";
   sortOrder: number;
   createdAt: string;
@@ -315,4 +316,147 @@ export interface UnresolvedPerson {
   suggestedName: string;
   suggestedRelationship: string;
   appearances: { pageNumber: number; variant: string; outfit: string }[];
+}
+
+// --- Storybook as seen by one family member (GET /api/storybooks/:id) ---
+
+export interface StorybookMemory {
+  id: string;
+  title: string | null;
+  recordedAt: string;
+  eventDate: string | null;
+  durationSec: number | null;
+  status: string;
+  processingError: string | null;
+  visibility: string;
+  storyUseConsent: boolean;
+  contributorId: string;
+  contributor: { id: string; name: string; relationship: string | null };
+  mine: boolean;
+  favorite: boolean;
+  excerpt: string | null;
+  chapterIds: string[];
+  audioSrc: string | null;
+  promptText: string | null;
+}
+
+export interface StorybookChapter {
+  id: string;
+  sequence: number;
+  title: string;
+  status: "draft" | "guardian_review" | "published";
+  guardianStatus: "not_reviewed" | "needs_revision" | "approved";
+  pagesStatus: "none" | "needs_characters" | "illustrating" | "ready" | "needs_attention";
+  createdAt: string;
+  publishedAt: string | null;
+  pageCount: number;
+  approvedPages: number;
+  cover: string | null;
+  favorite: boolean;
+  readAt: string | null;
+  unresolvedCount: number;
+  shareMode: "family" | "selected" | "private";
+  version: number;
+  excerpt: string;
+  isMock: boolean;
+}
+
+export interface FamilyMember {
+  id: string;
+  name: string;
+  relationship: string | null;
+  role: string;
+  inviteStatus: string;
+}
+
+export interface StorybookView {
+  id: string;
+  title: string;
+  readerAgeBand: string;
+  growWithChild: boolean;
+  language: string;
+  status: string;
+  reminderFrequency: string;
+  reminderDay: string;
+  reminderTime: string;
+  reminderTimezone: string;
+  reminderChannel: string;
+  remindersPaused: boolean;
+  remindersPausedUntil: string | null;
+  defaultVisibility: string;
+  defaultStoryUse: boolean;
+  keepRecordings: boolean;
+  vambieNameAge: number;
+  createdAt: string;
+  child: Child;
+  memories: StorybookMemory[];
+  chapters: StorybookChapter[];
+  pendingCastKeys: string[];
+  currentStage: string;
+  vambieName: string;
+  me: { contributorId: string; role: string; name: string; relationship: string | null };
+  family: FamilyMember[];
+  nextChapterAt: string;
+  generating: boolean;
+  batchError: string | null;
+  defaultContributorId: string;
+  myRole: string;
+}
+
+export interface ThisWeek {
+  nextChapterAt: string;
+  generating: boolean;
+  error: string | null;
+  readyCount: number;
+  memories: {
+    id: string;
+    title: string | null;
+    status: string;
+    processingError: string | null;
+    storyUseConsent: boolean;
+    recordedAt: string;
+    durationSec: number | null;
+    contributor: { name: string };
+    mine: boolean;
+  }[];
+  otherCount: number;
+  chapterInProgress: { id: string; title: string; pagesStatus: string; sequence: number; createdAt: string } | null;
+}
+
+export interface MemoryDetail {
+  id: string;
+  storybookId: string;
+  title: string | null;
+  recordedAt: string;
+  eventDate: string | null;
+  durationSec: number | null;
+  status: string;
+  processingError: string | null;
+  visibility: string;
+  storyUseConsent: boolean;
+  promptText: string | null;
+  audioSrc: string | null;
+  hadRecording: boolean;
+  favorite: boolean;
+  mine: boolean;
+  contributor: { id: string; name: string; relationship: string | null };
+  transcript: TranscriptVersion | null;
+  interpretation: MemoryInterpretation | null;
+  chapters: { id: string; title: string; sequence: number; status: string; cover: string | null }[];
+  storybook: { id: string; title: string; childName: string };
+}
+
+export interface ReaderChapter {
+  id: string;
+  title: string;
+  sequence: number;
+  status: string;
+  content: string;
+  publishedAt: string | null;
+  pages: { id: string; pageNumber: number; text: string; pictureSize: string; visibleAction: string; image: string | null }[];
+  mark: { favorite: boolean; lastPage: number; readAt: string | null; finishedAt: string | null } | null;
+  storybook: { id: string; title: string; childName: string };
+  nextChapterId: string | null;
+  previousChapterId: string | null;
+  canShare: boolean;
 }

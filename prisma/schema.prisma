@@ -66,6 +66,8 @@ model Contributor {
   inviteStatus String   @default("joined") // joined | pending | revoked
   memories    Memory[]
   chapterAccess ChapterAccess[]
+  chapterMarks ChapterMark[]
+  feedback    StoryFeedback[]
   createdAt   DateTime  @default(now())
 }
 
@@ -79,6 +81,7 @@ model Invitation {
   relationship    String?
   token           String    @unique
   status          String    @default("pending") // pending | accepted | revoked | expired
+  renewRequestedAt DateTime? // the invitee asked for a fresh link
   createdAt       DateTime  @default(now())
   respondedAt     DateTime?
 }
@@ -91,6 +94,7 @@ model Prompt {
   audience       String   @default("Everyone")
   childStage     String   @default("All stages")
   cardColor      String   @default("purple")
+  artworkPath    String? // square card artwork; Baby Vambie art is used when empty
   status         String   @default("published") // draft | published | archived
   sortOrder      Int      @default(0)
   createdAt      DateTime @default(now())
@@ -112,6 +116,7 @@ model GuardianFinding {
   category   String   // continuity | reader_fit | private_details | fidelity | tone
   status     String   @default("needs_revision") // needs_revision | ok
   note       String
+  quote      String? // the exact words in the chapter this finding is about
   createdAt  DateTime @default(now())
 }
 
@@ -121,6 +126,9 @@ model ExportRequest {
   storybook   Storybook @relation(fields: [storybookId], references: [id], onDelete: Cascade)
   status      String    @default("preparing") // preparing | ready | failed | expired
   filePath    String?
+  contributorId String? // who asked for it; exports only hold what they may see
+  options     String    @default("{}") // JSON: what to include and the date range
+  error       String?
   createdAt   DateTime  @default(now())
   expiresAt   DateTime?
 }
@@ -152,8 +160,14 @@ model Storybook {
   reminderTimezone String @default("Pacific Time")
   reminderChannel  String @default("SMS")
   remindersPaused  Boolean @default(false)
+  remindersPausedUntil DateTime? // "Pause for 2 weeks"
   defaultVisibility String @default("contributor_only") // contributor_only | household
   defaultStoryUse   Boolean @default(true)
+  keepRecordings    Boolean @default(true) // false: audio is deleted once it's transcribed
+  vambieNameAge     Int     @default(4) // "Baby Vambie" is called just "Vambie" from this age
+  // The week's memories become one chapter the morning after the weekly reminder.
+  lastBatchAt       DateTime?
+  pendingCastKeys   String  @default("[]") // JSON: Vambies picked for the next weekly chapter
   memories      Memory[]
   chapters      Chapter[]
   exportRequests ExportRequest[]
@@ -174,6 +188,10 @@ model Memory {
   visibility       String    @default("contributor_only") // contributor_only | household | story
   storyUseConsent  Boolean   @default(false)
   status           String    @default("recorded") // recorded | transcribing | transcribed | interpreted | ready | failed
+  processingError  String?
+  promptId         String? // the prompt card it answered
+  promptText       String? // the question as it was worded then
+  favoritedBy      String    @default("[]") // JSON: contributor ids who bookmarked it
   transcripts      TranscriptVersion[]
   interpretation   MemoryInterpretation?
   chapterSources   ChapterSource[]
@@ -210,11 +228,17 @@ model Chapter {
   status      String   @default("draft") // draft | guardian_review | published
   guardianStatus String @default("not_reviewed") // not_reviewed | needs_revision | approved
   revisionRequested Boolean @default(false)
+  version     Int      @default(1) // bumps on every full rewrite
+  publishedAt DateTime?
+  shareMode   String   @default("family") // family | selected | private (owner only)
   isMock      Boolean  @default(false)
   sources     ChapterSource[]
   findings    GuardianFinding[]
   access      ChapterAccess[]
   pages       StoryPage[]
+  marks       ChapterMark[]
+  feedback    StoryFeedback[]
+  shares      ChapterShare[]
   // Page generation (empty for chapters created before illustrated pages existed).
   ruleSetVersion     Int?
   generationSnapshot String? // JSON: rules, reading profile and AI instructions used
@@ -406,4 +430,43 @@ model PageAppearance {
   details           String          @default("")
 
   @@unique([pageId, familyCharacterId])
+}
+
+// Per reader: bookmarked ("favorite") chapters and where they left off.
+model ChapterMark {
+  id            String      @id @default(cuid())
+  chapterId     String
+  chapter       Chapter     @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  contributorId String
+  contributor   Contributor @relation(fields: [contributorId], references: [id], onDelete: Cascade)
+  favorite      Boolean     @default(false)
+  lastPage      Int         @default(0)
+  readAt        DateTime? // first opened
+  finishedAt    DateTime?
+
+  @@unique([chapterId, contributorId])
+}
+
+// "For grown-ups: story feedback" from the reader; shows in admin Story Review.
+model StoryFeedback {
+  id            String      @id @default(cuid())
+  chapterId     String
+  chapter       Chapter     @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  contributorId String
+  contributor   Contributor @relation(fields: [contributorId], references: [id], onDelete: Cascade)
+  reason        String // missed_meaning | too_private | reading_level | wrong_detail
+  note          String      @default("")
+  status        String      @default("open") // open | resolved
+  createdAt     DateTime    @default(now())
+}
+
+// A chapter link sent to family members (with an optional note).
+model ChapterShare {
+  id             String   @id @default(cuid())
+  chapterId      String
+  chapter        Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  sentBy         String // contributor id
+  recipientIds   String // JSON: contributor ids
+  message        String   @default("")
+  createdAt      DateTime @default(now())
 }

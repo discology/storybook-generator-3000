@@ -2,7 +2,9 @@ import { Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./auth/AuthContext";
 import Home from "./pages/Home";
 import SignIn from "./pages/SignIn";
-import StorybookDetail from "./pages/StorybookDetail";
+import StorybookHome from "./pages/StorybookHome";
+import Setup from "./pages/Setup";
+import ThisWeek from "./pages/ThisWeek";
 import Recorder from "./pages/Recorder";
 import Reader from "./pages/Reader";
 import Family from "./pages/Family";
@@ -50,13 +52,15 @@ export default function App() {
         <Route
           path="*"
           element={
-            <div className="app-shell">
+            <div className="shell">
               <Routes>
                 <Route path="/" element={<Home />} />
                 <Route path="/sign-in" element={<SignIn />} />
+                <Route path="/start" element={<Setup />} />
                 <Route path="/invitations/:token" element={<InvitationAccept />} />
-                <Route path="/storybooks/:id" element={<StorybookDetail />} />
+                <Route path="/storybooks/:id" element={<StorybookHome />} />
                 <Route path="/storybooks/:id/record" element={<Recorder />} />
+                <Route path="/storybooks/:id/this-week" element={<ThisWeek />} />
                 <Route path="/storybooks/:id/read" element={<Reader />} />
                 <Route path="/storybooks/:id/family" element={<Family />} />
                 <Route path="/storybooks/:id/chapters/:chapterId/share" element={<ShareChapter />} />

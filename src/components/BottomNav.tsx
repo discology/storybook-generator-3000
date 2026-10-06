@@ -1,28 +1,24 @@
-import { NavLink } from "react-router-dom";
-import { IconHeart, IconHome, IconPeople, IconSmile } from "./icons";
+import { NavLink, useLocation } from "react-router-dom";
+import { IconHeart, IconHome, IconPeople } from "./icons";
 
-interface BottomNavProps {
-  storybookId: string;
-}
-
-export default function BottomNav({ storybookId }: BottomNavProps) {
-  const linkClass = ({ isActive }: { isActive: boolean }) => (isActive ? "active" : "");
+export default function BottomNav({ storybookId }: { storybookId: string }) {
+  const { pathname } = useLocation();
+  const base = `/storybooks/${storybookId}`;
+  const familyActive = pathname.startsWith(`${base}/family`) || pathname.startsWith(`${base}/characters`);
+  const memoriesActive = pathname.startsWith(`${base}/memories`);
+  const homeActive = pathname === base;
   return (
-    <nav className="bottom-nav">
-      <NavLink to="/" end className={linkClass}>
-        <IconHome size={20} />
+    <nav className="tabbar" aria-label="Main">
+      <NavLink to={base} end className={homeActive ? "active" : ""}>
+        <IconHome size={28} filled={homeActive} />
         Home
       </NavLink>
-      <NavLink to={`/storybooks/${storybookId}`} end className={linkClass}>
-        <IconHeart size={20} />
+      <NavLink to={`${base}/memories`} className={memoriesActive ? "active" : ""}>
+        <IconHeart size={28} filled={memoriesActive} />
         Memories
       </NavLink>
-      <NavLink to={`/storybooks/${storybookId}/characters`} className={linkClass}>
-        <IconSmile size={20} />
-        Characters
-      </NavLink>
-      <NavLink to={`/storybooks/${storybookId}/family`} className={linkClass}>
-        <IconPeople size={20} />
+      <NavLink to={`${base}/family`} className={familyActive ? "active" : ""}>
+        <IconPeople size={28} filled={familyActive} />
         Family
       </NavLink>
     </nav>
