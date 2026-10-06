@@ -3,102 +3,120 @@ import express, { Router } from "express";
 import { prisma } from "./db";
 import { getCurrentUser } from "./session";
 import { renderMessage, appUrl } from "./messageTemplates";
+import { isOwner, requireMember } from "./access";
 
 const router: Router = express.Router();
 
-router.get("/storybooks/:id/family", async (req, res) => {
-  const user = await getCurrentUser(req);
-  if (!user) return res.status(401).json({ error: "Sign in first" });
+export const INVITE_TTL_MS = 1000 * 60 * 60 * 24 * 14; // 14 days
 
-  const storybook = await prisma.storybook.findUnique({
-    where: { id: req.params.id },
-    include: { child: { include: { household: { include: { contributors: { orderBy: { createdAt: "asc" } } } } } } },
+const isExpired = (invitation: { status: string; createdAt: Date }) =>
+  invitation.status === "pending" && Date.now() - invitation.createdAt.getTime() > INVITE_TTL_MS;
+
+// Texting invites needs a Twilio sending number, which isn't set up yet, so
+// the invite text (from the admin-editable template) is returned for the
+// inviter to send themselves. null when admins turned invites off.
+async function inviteMessage(inviterName: string, childName: string, storybookTitle: string, relationship: string | null, token: string) {
+  return renderMessage("invite", {
+    inviter_name: inviterName,
+    child_name: childName,
+    relationship: relationship || "family member",
+    storybook_title: storybookTitle,
+    invite_url: appUrl(`/invitations/${token}`),
   });
-  if (!storybook) return res.status(404).json({ error: "Storybook not found" });
-  const me = storybook.child.household.contributors.find((c) => c.userId === user.id);
-  if (!me) return res.status(403).json({ error: "access_denied" });
+}
 
-  res.json({ contributors: storybook.child.household.contributors, myContributorId: me.id });
+router.get("/storybooks/:id/family", async (req, res) => {
+  const member = await requireMember(req, res, req.params.id);
+  if (!member) return;
+  const invitations = await prisma.invitation.findMany({ where: { householdId: member.storybook.child.householdId } });
+  res.json({
+    myContributorId: member.me.id,
+    isOwner: isOwner(member.me),
+    childName: member.storybook.child.displayName,
+    contributors: member.storybook.child.household.contributors
+      .filter((c) => c.inviteStatus !== "revoked")
+      .map((c) => {
+        const invitation = invitations.find((i) => i.contributorId === c.id);
+        return {
+          id: c.id,
+          name: c.name,
+          relationship: c.relationship,
+          role: c.role,
+          inviteStatus: c.inviteStatus,
+          isMe: c.id === member.me.id,
+          contact: isOwner(member.me) ? invitation?.contact ?? null : null,
+          invitedAt: invitation?.createdAt ?? null,
+          inviteExpired: invitation ? isExpired(invitation) : false,
+          renewRequested: Boolean(invitation?.renewRequestedAt) && c.inviteStatus === "pending",
+        };
+      }),
+  });
 });
 
 router.post("/storybooks/:id/family/invite", async (req, res) => {
-  const user = await getCurrentUser(req);
-  if (!user) return res.status(401).json({ error: "Sign in first" });
-
-  const { contact, relationship } = req.body ?? {};
-  if (!contact || !String(contact).trim()) return res.status(400).json({ error: "contact is required" });
-
-  const storybook = await prisma.storybook.findUnique({
-    where: { id: req.params.id },
-    include: { child: { include: { household: { include: { contributors: true } } } } },
-  });
-  if (!storybook) return res.status(404).json({ error: "Storybook not found" });
-  const me = storybook.child.household.contributors.find((c) => c.userId === user.id);
-  if (!me) return res.status(403).json({ error: "access_denied" });
+  const member = await requireMember(req, res, req.params.id, { owner: true });
+  if (!member) return;
+  const contact = String(req.body?.contact ?? "").trim();
+  const relationship = req.body?.relationship ? String(req.body.relationship) : null;
+  if (!contact) return res.status(400).json({ error: "Add a phone number or email." });
+  const { storybook, me } = member;
 
   const contributor = await prisma.contributor.create({
-    data: {
-      householdId: storybook.child.householdId,
-      name: String(contact).trim(),
-      relationship: relationship || null,
-      role: "contributor",
-      inviteStatus: "pending",
-    },
+    data: { householdId: storybook.child.householdId, name: contact, relationship, role: "contributor", inviteStatus: "pending" },
   });
-
   const token = crypto.randomBytes(16).toString("hex");
   const invitation = await prisma.invitation.create({
-    data: {
-      householdId: storybook.child.householdId,
-      contributorId: contributor.id,
-      invitedByName: me.name,
-      contact: String(contact).trim(),
-      relationship: relationship || null,
-      token,
-    },
+    data: { householdId: storybook.child.householdId, contributorId: contributor.id, invitedByName: me.name, contact, relationship, token },
   });
-
-  // Dev mode: texting invites needs a Twilio sending number, which isn't set up yet,
-  // so the invite text (from the admin-editable template) is returned for the
-  // inviter to send themselves. inviteMessage is null if admins turned invites off.
-  const inviteLink = `/invitations/${token}`;
-  const inviteMessage = await renderMessage("invite", {
-    inviter_name: me.name,
-    child_name: storybook.child.displayName,
-    relationship: relationship || "family member",
-    storybook_title: storybook.title,
-    invite_url: appUrl(inviteLink),
-  });
-  res.status(201).json({ contributor, invitation, inviteLink, inviteMessage, devMode: true });
+  const message = await inviteMessage(me.name, storybook.child.displayName, storybook.title, relationship, token);
+  res.status(201).json({ contributor, invitation, inviteLink: appUrl(`/invitations/${token}`), inviteMessage: message, devMode: true });
 });
 
-router.delete("/family/:contributorId", async (req, res) => {
-  const user = await getCurrentUser(req);
-  if (!user) return res.status(401).json({ error: "Sign in first" });
+// A fresh link for a pending invite (the old link stops working).
+router.post("/family/:contributorId/resend", async (req, res) => {
+  const contributor = await prisma.contributor.findUnique({ where: { id: req.params.contributorId }, include: { household: { include: { children: { include: { storybooks: true } } } } } });
+  const storybook = contributor?.household.children[0]?.storybooks[0];
+  if (!contributor || !storybook) return res.status(404).json({ error: "Not found" });
+  const member = await requireMember(req, res, storybook.id, { owner: true });
+  if (!member) return;
+  if (contributor.inviteStatus !== "pending") return res.status(400).json({ error: "They've already joined." });
 
-  const contributor = await prisma.contributor.findUnique({ where: { id: req.params.contributorId } });
-  if (!contributor) return res.status(404).json({ error: "Not found" });
+  const token = crypto.randomBytes(16).toString("hex");
+  const invitation = await prisma.invitation.update({
+    where: { contributorId: contributor.id },
+    data: { token, status: "pending", createdAt: new Date(), renewRequestedAt: null },
+  });
+  const message = await inviteMessage(member.me.name, member.storybook.child.displayName, storybook.title, invitation.relationship, token);
+  res.json({ inviteLink: appUrl(`/invitations/${token}`), inviteMessage: message, devMode: true });
+});
+
+// Cancels a pending invite or removes someone from the storybook.
+router.delete("/family/:contributorId", async (req, res) => {
+  const contributor = await prisma.contributor.findUnique({ where: { id: req.params.contributorId }, include: { household: { include: { children: { include: { storybooks: true } } } } } });
+  const storybook = contributor?.household.children[0]?.storybooks[0];
+  if (!contributor || !storybook) return res.status(404).json({ error: "Not found" });
+  const member = await requireMember(req, res, storybook.id, { owner: true });
+  if (!member) return;
+  if (contributor.role === "owner") return res.status(400).json({ error: "The storybook's owner can't be removed." });
 
   await prisma.invitation.updateMany({ where: { contributorId: contributor.id }, data: { status: "revoked" } });
   await prisma.contributor.update({ where: { id: contributor.id }, data: { inviteStatus: "revoked" } });
   res.json({ ok: true });
 });
 
-// --- Invitation acceptance (token-based, no storybook id needed) ---
+// --- Invitation acceptance (token-based) ---
 router.get("/invitations/:token", async (req, res) => {
   const invitation = await prisma.invitation.findUnique({
     where: { token: req.params.token },
-    include: {
-      household: { include: { children: { include: { storybooks: true } } } },
-    },
+    include: { household: { include: { children: { include: { storybooks: true } } } } },
   });
   if (!invitation) return res.status(404).json({ error: "not_found" });
-
   if (invitation.status === "revoked") return res.status(410).json({ error: "revoked" });
-  const expired = Date.now() - invitation.createdAt.getTime() > 1000 * 60 * 60 * 24 * 14; // 14 days
-  if (expired && invitation.status === "pending") return res.status(410).json({ error: "expired" });
+  if (isExpired(invitation)) return res.status(410).json({ error: "expired", renewRequested: Boolean(invitation.renewRequestedAt) });
 
   const child = invitation.household.children[0];
+  const user = await getCurrentUser(req);
+  const contributor = await prisma.contributor.findUnique({ where: { id: invitation.contributorId } });
   res.json({
     status: invitation.status,
     invitedByName: invitation.invitedByName,
@@ -106,33 +124,39 @@ router.get("/invitations/:token", async (req, res) => {
     childName: child?.displayName ?? "their child",
     storybookTitle: child?.storybooks[0]?.title ?? null,
     storybookId: child?.storybooks[0]?.id ?? null,
+    joinedByMe: invitation.status === "accepted" && !!user && contributor?.userId === user.id,
+    signedInName: user?.name ?? null,
   });
 });
 
 router.post("/invitations/:token/accept", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return res.status(401).json({ error: "Sign in first" });
-
   const invitation = await prisma.invitation.findUnique({ where: { token: req.params.token } });
   if (!invitation) return res.status(404).json({ error: "not_found" });
+  if (invitation.status === "revoked") return res.status(410).json({ error: "revoked" });
+  if (isExpired(invitation)) return res.status(410).json({ error: "expired" });
   if (invitation.status !== "pending") return res.status(410).json({ error: invitation.status });
 
-  await prisma.contributor.update({
-    where: { id: invitation.contributorId },
-    data: { userId: user.id, inviteStatus: "joined", name: user.name || user.phone || "Contributor" },
-  });
+  const name = String(req.body?.name ?? "").trim() || user.name || "";
+  if (!name) return res.status(400).json({ error: "Add your name so the family knows who's sharing." });
+  if (!user.name) await prisma.user.update({ where: { id: user.id }, data: { name } });
+
+  await prisma.contributor.update({ where: { id: invitation.contributorId }, data: { userId: user.id, inviteStatus: "joined", name, phone: user.phone } });
   await prisma.invitation.update({ where: { id: invitation.id }, data: { status: "accepted", respondedAt: new Date() } });
 
-  const household = await prisma.household.findUnique({
-    where: { id: invitation.householdId },
-    include: { children: { include: { storybooks: true } } },
-  });
-  const storybookId = household?.children[0]?.storybooks[0]?.id ?? null;
-  res.json({ ok: true, storybookId });
+  const household = await prisma.household.findUnique({ where: { id: invitation.householdId }, include: { children: { include: { storybooks: true } } } });
+  res.json({ ok: true, storybookId: household?.children[0]?.storybooks[0]?.id ?? null });
 });
 
+// The invitee asks for a fresh link; the inviter sees it in Family.
 router.post("/invitations/:token/request-new", async (req, res) => {
-  // Dev mode: no notification system wired up yet — this just acknowledges the request.
+  const invitation = await prisma.invitation.findUnique({ where: { token: req.params.token } });
+  if (!invitation) return res.status(404).json({ error: "not_found" });
+  if (invitation.status === "pending" && !invitation.renewRequestedAt) {
+    await prisma.invitation.update({ where: { id: invitation.id }, data: { renewRequestedAt: new Date() } });
+  }
+  // Same answer either way, so the request reveals nothing about the invite.
   res.json({ ok: true });
 });
 

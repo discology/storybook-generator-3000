@@ -12,7 +12,7 @@ import Recorder from "./pages/Recorder";
 import Reader, { ReadLatest } from "./pages/Reader";
 import StoryFeedback from "./pages/StoryFeedback";
 import Family from "./pages/Family";
-import ShareChapter from "./pages/ShareChapter";
+import ShareChapter, { ChapterAccess } from "./pages/ShareChapter";
 import ChapterPages from "./pages/ChapterPages";
 import OurCharacters from "./pages/OurCharacters";
 import FamilyCharacterDetail from "./pages/FamilyCharacterDetail";
@@ -73,6 +73,7 @@ export default function App() {
                 <Route path="/storybooks/:id/chapters/:chapterId/feedback" element={<StoryFeedback />} />
                 <Route path="/storybooks/:id/family" element={<Family />} />
                 <Route path="/storybooks/:id/chapters/:chapterId/share" element={<ShareChapter />} />
+                <Route path="/storybooks/:id/chapters/:chapterId/access" element={<ChapterAccess />} />
                 <Route path="/storybooks/:id/chapters/:chapterId/pages" element={<ChapterPages />} />
                 <Route path="/storybooks/:id/characters" element={<OurCharacters />} />
                 <Route path="/storybooks/:id/characters/:characterId" element={<FamilyCharacterDetail />} />

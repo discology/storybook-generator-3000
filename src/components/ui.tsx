@@ -247,6 +247,18 @@ export function Check({ checked, onChange, children, sub, id }: { checked: boole
   );
 }
 
+// A checkbox for rows that are already a <label> (the whole row toggles it).
+export function CheckMark({ checked, onChange, label }: { checked: boolean; onChange: (checked: boolean) => void; label: string }) {
+  return (
+    <>
+      <input type="checkbox" className="check-input" checked={checked} onChange={(e) => onChange(e.target.checked)} aria-label={label} />
+      <span className="check__box" aria-hidden="true">
+        <IconCheck size={18} strokeWidth={3.4} />
+      </span>
+    </>
+  );
+}
+
 export function RadioCard({ on, onClick, title, sub, badge }: { on: boolean; onClick: () => void; title: ReactNode; sub?: ReactNode; badge?: ReactNode }) {
   return (
     <button type="button" role="radio" aria-checked={on} className={`radio-card ${on ? "radio-card--on" : ""}`} onClick={onClick}>

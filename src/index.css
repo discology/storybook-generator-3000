@@ -2204,6 +2204,108 @@ label.chip {
   margin-top: 1px;
 }
 
+/* Family members */
+.person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 8px 12px 14px;
+  border-radius: 18px;
+  background: var(--dark-1);
+  border: 1px solid var(--dark-line);
+  color: var(--on-dark);
+}
+
+.person__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.person + .person {
+  margin-top: 10px;
+}
+
+.person__name {
+  font-family: var(--font-title);
+  font-weight: 700;
+  font-size: 21px;
+  line-height: 1.1;
+}
+
+.person__meta {
+  font-size: 15px;
+  color: var(--on-dark-2);
+  margin-top: 2px;
+}
+
+.person__status {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex: none;
+}
+
+.person__status .tlink {
+  font-size: 15px;
+}
+
+.share-box {
+  background: var(--white);
+  border: 1.5px solid var(--line);
+  border-radius: 14px;
+  padding: 12px 14px;
+  font-size: 16px;
+  white-space: pre-wrap;
+  color: var(--ink);
+}
+
+/* Person list on cream (sharing) */
+.pick-row {
+  color: var(--ink);
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 10px 0;
+  border-top: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.pick-row:first-child {
+  border-top: 0;
+}
+
+.check-input {
+  position: absolute;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.check-input:checked + .check__box {
+  background: var(--purple);
+  border-color: var(--purple);
+  color: var(--white);
+}
+
+.check-input:focus-visible + .check__box {
+  box-shadow: 0 0 0 3px rgba(123, 36, 253, 0.25);
+}
+
+.pick-row .check__box {
+  margin: 0 0 0 auto;
+}
+
 /* ---------- Prompt cards ---------- */
 
 .deck {
@@ -2775,7 +2877,7 @@ h3 {
   border: 1.5px solid #dcd7cd;
 }
 
-:where(label:not(.check):not(.field__label)),
+:where(label:not([class])),
 .field-label {
   display: block;
   font-size: 0.92rem;

@@ -207,7 +207,14 @@ export default function Reader() {
           </Link>
         )}
       </div>
-      <p style={{ marginTop: 20 }}>
+      {chapter.canShare && (
+        <p style={{ marginTop: 16 }}>
+          <Link to={`${base}/chapters/${chapter.id}/share`} className="tlink" style={{ fontSize: 17 }}>
+            Send this chapter to family
+          </Link>
+        </p>
+      )}
+      <p style={{ marginTop: 14 }}>
         <Link to={`${base}/chapters/${chapter.id}/feedback`} className="tlink" style={{ display: "inline-flex", gap: 8, alignItems: "center", fontWeight: 500, fontSize: 16 }}>
           <IconPeople size={20} /> For grown-ups: story feedback
         </Link>

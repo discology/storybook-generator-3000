@@ -1,9 +1,11 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
-import Vambie from "../components/Vambie";
+import { IconBook, IconCheck, IconClock, IconMic, IconPeople, IconWarning } from "../components/icons";
+import { Chev, Field, Loading, Mascot, Masthead, Note, Sheet } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
 import { apiSend, ApiError } from "../lib/api";
+import { possessive } from "../lib/format";
 
 interface InvitationInfo {
   status: string;
@@ -12,35 +14,42 @@ interface InvitationInfo {
   childName: string;
   storybookTitle: string | null;
   storybookId: string | null;
+  joinedByMe: boolean;
+  signedInName: string | null;
 }
 
+type Problem = "expired" | "revoked" | "not_found" | "requested";
+
+// Opening an invitation link: welcome, or the reason it no longer works.
 export default function InvitationAccept() {
   const { token } = useParams();
   const navigate = useNavigate();
-  const { user, loading: authLoading } = useAuth();
+  const { user, loading: authLoading, refresh } = useAuth();
   const [info, setInfo] = useState<InvitationInfo | null>(null);
-  const [errorKind, setErrorKind] = useState<"not_found" | "expired" | "revoked" | null>(null);
-  const [requested, setRequested] = useState(false);
+  const [problem, setProblem] = useState<Problem | null>(null);
+  const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     fetch(`/api/invitations/${token}`)
       .then(async (res) => {
+        const data = await res.json();
         if (!res.ok) {
-          const data = await res.json();
-          setErrorKind(data.error === "expired" ? "expired" : data.error === "revoked" ? "revoked" : "not_found");
+          setProblem(data.error === "expired" ? (data.renewRequested ? "requested" : "expired") : data.error === "revoked" ? "revoked" : "not_found");
           return;
         }
-        setInfo(await res.json());
+        setInfo(data);
+        if (data.joinedByMe && data.storybookId) navigate(`/storybooks/${data.storybookId}`, { replace: true });
       })
-      .catch(() => setErrorKind("not_found"));
-  }, [token]);
+      .catch(() => setProblem("not_found"));
+  }, [token, navigate, user]);
 
   const requestNew = async () => {
     setBusy(true);
     try {
       await apiSend(`/api/invitations/${token}/request-new`, "POST");
-      setRequested(true);
+      setProblem("requested");
     } finally {
       setBusy(false);
     }
@@ -52,90 +61,151 @@ export default function InvitationAccept() {
       return;
     }
     setBusy(true);
+    setError(null);
     try {
-      const data = await apiSend(`/api/invitations/${token}/accept`, "POST");
-      navigate(data.storybookId ? `/storybooks/${data.storybookId}` : "/");
+      const data = await apiSend(`/api/invitations/${token}/accept`, "POST", { name: name.trim() });
+      refresh();
+      navigate(data.storybookId ? `/storybooks/${data.storybookId}` : "/", { replace: true });
     } catch (err) {
-      if (err instanceof ApiError) setErrorKind(err.message === "revoked" ? "revoked" : "expired");
+      if (err instanceof ApiError && (err.message === "revoked" || err.message === "expired")) setProblem(err.message);
+      else setError(err instanceof ApiError ? err.message : "Couldn't join. Try again.");
     } finally {
       setBusy(false);
     }
   };
 
-  if (errorKind === "expired" || errorKind === "revoked") {
+  if (problem === "revoked" || problem === "not_found") {
     return (
-      <div>
-        <TopBar wordmark />
-        <div className="hero">
-          <div className="hero-mascot-stage">
-            <Vambie mood="worried" size={90} />
-            <h1 className="display" style={{ fontSize: "1.9rem" }}>
-              {requested ? "Your request is on its way." : "Let's get you a fresh invite."}
-            </h1>
-          </div>
-        </div>
-        <div className="screen-pad">
-          <div className="card">
-            {requested ? (
-              <p className="status-line">
-                If this invitation can be renewed, the inviter will receive your request. When a new link arrives,
-                open it to verify your details and join.
-              </p>
-            ) : (
-              <>
-                <p className="status-line">
-                  This invitation link is no longer active. Ask the person who invited you for a new link, or
-                  request one below.
-                </p>
-                <button className="btn-primary chevron" onClick={requestNew} disabled={busy}>
-                  Request a new invitation
-                </button>
-              </>
-            )}
-            <button className="btn-secondary" onClick={() => navigate("/sign-in")} style={{ marginTop: "0.6rem" }}>
-              Back to sign in
-            </button>
-          </div>
-        </div>
+      <div className="page">
+        <TopBar back="/sign-in" wordmark />
+        <Masthead
+          badge={
+            <span className="badge badge--amber badge--caps">
+              <IconWarning size={18} /> Invitation unavailable
+            </span>
+          }
+          title={<>This invitation is<br />no longer active.</>}
+          art="envelope"
+          center
+          size="md"
+        />
+        <Sheet grow>
+          <h2 className="h-title">{problem === "revoked" ? "The invitation was withdrawn." : "We couldn't find this invitation."}</h2>
+          <p className="t-body t-muted" style={{ marginTop: 8 }}>Contact the person who invited you if you think this was a mistake.</p>
+          <Link className="btn btn--lime" to="/sign-in" style={{ marginTop: 22 }}>
+            Back to sign in <Chev />
+          </Link>
+        </Sheet>
       </div>
     );
   }
 
-  if (!info) return <p className="status-line screen-pad">Loading…</p>;
+  if (problem === "expired") {
+    return (
+      <div className="page">
+        <TopBar back="/sign-in" wordmark />
+        <Masthead
+          plate="tall"
+          badge={
+            <span className="badge badge--amber badge--caps">
+              <IconClock size={18} /> Link expired
+            </span>
+          }
+          title={<>Let's get you<br />a fresh invite.</>}
+          art="envelope"
+          center
+          size="md"
+        />
+        <Sheet grow>
+          <h2 className="h-title">This invitation link is no longer active.</h2>
+          <p className="t-body t-muted" style={{ marginTop: 8 }}>Ask the person who invited you for a new link, or request one below.</p>
+          <div className="stack" style={{ marginTop: 22 }}>
+            <button className="btn btn--lime btn--caps" onClick={() => void requestNew()} disabled={busy}>
+              Request a new invitation <Chev />
+            </button>
+            <Link className="btn btn--outline" to="/sign-in">
+              Back to sign in
+            </Link>
+          </div>
+          <p className="t-center t-small t-muted" style={{ marginTop: 14 }}>This won't give access until a new invitation is accepted.</p>
+        </Sheet>
+      </div>
+    );
+  }
 
-  return (
-    <div>
-      <TopBar wordmark />
-      <div className="hero">
-        <div className="hero-mascot-stage">
-          <Vambie mood="celebrating" size={100} />
-          <span className="pill" style={{ background: "#e6198b", color: "white", marginBottom: "0.5rem" }}>
-            You're invited
+  if (problem === "requested") {
+    return (
+      <div className="page">
+        <TopBar back="/sign-in" wordmark />
+        <header className="masthead masthead--plate masthead--center">
+          <span className="icon-circle icon-circle--purple masthead__title" style={{ width: 64, height: 64, marginBottom: 14 }}>
+            <IconCheck size={32} strokeWidth={3} />
           </span>
-          <h1 className="display" style={{ fontSize: "1.9rem" }}>
-            Your voice belongs
-            <br />
-            in {info.childName}'s story.
-          </h1>
-          <p className="subtitle" style={{ marginBottom: 0 }}>
-            {info.invitedByName || "Someone"} invited you to add memories to {info.storybookTitle || `${info.childName}'s storybook`}.
-          </p>
-        </div>
+          <h1 className="h-display h-display--md masthead__title">Your request<br />is on its way.</h1>
+          <Mascot name="envelope-happy" className="masthead__art masthead__art--scene" />
+        </header>
+        <Sheet grow>
+          <h2 className="h-title">If this invitation can be renewed, the inviter will receive your request.</h2>
+          <p className="t-body t-muted" style={{ marginTop: 8 }}>When a new link arrives, open it to verify your details and join.</p>
+          <Link className="btn btn--lime btn--caps" to="/sign-in" style={{ marginTop: 22 }}>
+            Back to sign in <Chev />
+          </Link>
+          <Note kind="info" style={{ marginTop: 16 }}>A request does not grant access to a storybook.</Note>
+        </Sheet>
       </div>
-      <div className="screen-pad">
-        <div className="card">
-          <h3>You'll be able to</h3>
-          <p className="status-line">Record your own memories</p>
-          <p className="status-line">Read shared chapters</p>
-          <p className="status-line">Choose how your memories are used</p>
-          <button className="btn-primary chevron" onClick={accept} disabled={busy || authLoading}>
-            {busy ? "Joining…" : "Accept invitation"}
+    );
+  }
+
+  if (!info || authLoading) return <Loading />;
+
+  const needsName = !!user && !user.name;
+  return (
+    <div className="page">
+      <TopBar wordmark />
+      <header className="masthead masthead--plate masthead--center">
+        <span className="badge badge--pink badge--caps masthead__title">You're invited</span>
+        <h1 className="h-display h-display--md masthead__title" style={{ marginTop: 12 }}>
+          Your voice belongs
+          <br />
+          in {possessive(info.childName)} story.
+        </h1>
+        <Mascot name="star" className="masthead__art masthead__art--scene" />
+        <p className="masthead__sub" style={{ fontSize: 18, marginTop: 4 }}>
+          {info.invitedByName || "Someone in the family"} invited you to add memories to {possessive(info.childName)} storybook.
+        </p>
+      </header>
+      <Sheet grow>
+        <h2 className="h-title">You'll be able to</h2>
+        <div className="menu" style={{ marginTop: 4 }}>
+          {[
+            [<IconMic size={22} key="m" />, "Record your own memories"],
+            [<IconBook size={22} key="b" />, "Read shared chapters"],
+            [<IconPeople size={22} key="p" />, "Choose how your memories are used"],
+          ].map(([icon, text]) => (
+            <div key={text as string} className="menu__row" style={{ cursor: "default", padding: "12px 2px" }}>
+              <span className="menu__icon">{icon}</span>
+              <span className="menu__title" style={{ fontSize: 18 }}>{text}</span>
+            </div>
+          ))}
+        </div>
+        {needsName && (
+          <Field label="Your name" htmlFor="name" hint="The family sees it on your memories.">
+            <input id="name" className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. June" autoComplete="given-name" />
+          </Field>
+        )}
+        {error && <p className="error-text">{error}</p>}
+        <div className="stack" style={{ marginTop: 20 }}>
+          <button className="btn btn--lime btn--caps" onClick={() => void accept()} disabled={busy || (needsName && !name.trim())}>
+            {busy ? "Joining…" : "Accept invitation"} <Chev />
           </button>
-          <button className="btn-secondary" style={{ marginTop: "0.6rem" }} onClick={() => navigate("/")}>
+          <Link className="btn btn--dark" to="/">
             Not now
-          </button>
+          </Link>
         </div>
-      </div>
+        <p className="t-center t-small t-muted" style={{ marginTop: 14 }}>
+          {user ? "Joining doesn't unlock anyone's private recordings." : "Next: verify your phone number and set up your profile."}
+        </p>
+      </Sheet>
     </div>
   );
 }
