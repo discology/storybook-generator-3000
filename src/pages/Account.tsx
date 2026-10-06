@@ -286,6 +286,16 @@ export function Help() {
       <TopBar back={true} wordmark />
       <Masthead title={<>How can<br />we help?</>} art="magnifier" artMode="corner" style={{ paddingTop: 0 }} />
       <Sheet grow>
+        <Link to="/how-it-works" className="menu__row" style={{ textDecoration: "none", paddingTop: 4 }}>
+          <span className="menu__icon">
+            <IconBook size={24} />
+          </span>
+          <span className="menu__text">
+            <span className="menu__title">How Vambie works</span>
+            <span className="menu__sub" style={{ display: "block" }}>A four-page introduction</span>
+          </span>
+          <IconChevronRight size={20} className="menu__chev" />
+        </Link>
         {FAQ.map(([q, a]) => (
           <details key={q} className="disclosure">
             <summary>

@@ -23,6 +23,7 @@ import SettingsStoryPreferences from "./pages/SettingsStoryPreferences";
 import SettingsPrivacy from "./pages/SettingsPrivacy";
 import ExportMemories, { ExportStatus } from "./pages/Export";
 import Account, { DeleteAccount, Help } from "./pages/Account";
+import HowItWorks from "./pages/HowItWorks";
 import AdminLayout from "./pages/admin/AdminLayout";
 import AdminReviewQueue from "./pages/admin/AdminReviewQueue";
 import AdminChapterReview from "./pages/admin/AdminChapterReview";
@@ -93,6 +94,7 @@ export default function App() {
                 <Route path="/storybooks/:id/settings/account" element={<Account />} />
                 <Route path="/storybooks/:id/settings/delete-account" element={<DeleteAccount />} />
                 <Route path="/help" element={<Help />} />
+                <Route path="/how-it-works" element={<HowItWorks />} />
               </Routes>
             </div>
           }

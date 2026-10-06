@@ -43,7 +43,7 @@ export default function Landing() {
         </div>
       </header>
 
-      <Link to="/sign-in?next=/start" className="promo">
+      <Link to="/how-it-works" className="promo">
         <Mascot name="peek" />
         <span style={{ flex: 1 }}>
           Record a memory.
