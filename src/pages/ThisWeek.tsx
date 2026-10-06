@@ -19,6 +19,12 @@ export default function ThisWeek() {
   const [data, setData] = useState<ThisWeekData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [starting, setStarting] = useState(false);
+  const [vambies, setVambies] = useState<{ key: string; name: string; castingMode: string }[]>([]);
+  const [picked, setPicked] = useState<string[] | null>(null);
+
+  useEffect(() => {
+    apiGet("/api/characters").then(setVambies).catch(() => setVambies([]));
+  }, []);
 
   const load = useCallback(() => {
     apiGet(`/api/storybooks/${id}/this-week`)
@@ -57,6 +63,13 @@ export default function ThisWeek() {
   const base = `/storybooks/${id}`;
   const child = storybook.child.displayName;
   const owner = storybook.me.role === "owner";
+  const chosen = picked ?? storybook.pendingCastKeys;
+  // Extra Vambies for the next weekly chapter; "always" ones are in every chapter anyway.
+  const togglePick = async (key: string) => {
+    const next = chosen.includes(key) ? chosen.filter((k) => k !== key) : [...chosen, key];
+    setPicked(next);
+    await apiSend(`/api/storybooks/${id}/next-cast`, "PUT", { castKeys: next }).catch(() => setPicked(chosen));
+  };
   const latest = data.memories.find((m) => m.mine) ?? data.memories[0];
   const day = new Date(data.nextChapterAt).toLocaleDateString("en-US", { weekday: "long" });
   const allowed = data.memories.filter((m) => m.storyUseConsent);
@@ -147,6 +160,34 @@ export default function ThisWeek() {
 
         {data.error && !data.generating && <p className="error-text">The last try didn't work: {data.error}</p>}
         {error && <p className="error-text">{error}</p>}
+
+        {owner && vambies.length > 0 && (
+          <div style={{ marginTop: 18 }}>
+            <p className="eyebrow t-muted" style={{ margin: "0 0 8px" }}>
+              Vambies in this week's chapter
+            </p>
+            <div className="hstack" style={{ flexWrap: "wrap", gap: 8 }}>
+              {vambies.map((v) =>
+                v.castingMode === "always" ? (
+                  <span key={v.key} className="badge badge--green">
+                    <IconCheck size={14} strokeWidth={3} /> {v.name}
+                  </span>
+                ) : (
+                  <button
+                    key={v.key}
+                    type="button"
+                    aria-pressed={chosen.includes(v.key)}
+                    className={`btn btn--xs btn--auto ${chosen.includes(v.key) ? "btn--purple" : "btn--outline"}`}
+                    onClick={() => void togglePick(v.key)}
+                  >
+                    {chosen.includes(v.key) ? <IconCheck size={14} strokeWidth={3} /> : "+"} {v.name}
+                  </button>
+                )
+              )}
+            </div>
+            <p className="field__hint">Pick any Vambies you'd like in this week's chapter. Others join only when a memory fits them.</p>
+          </div>
+        )}
 
         {allowed.length > 1 && (
           <div style={{ marginTop: 18 }}>

@@ -3866,6 +3866,15 @@ button.btn-small,
     width: 100%;
   }
 
+  /* Tall pictures fit the page's height instead of running off the bottom. */
+  .reader__spread .reader__pic img {
+    width: auto !important;
+    max-width: 100%;
+    max-height: calc(100vh - 210px);
+    max-height: calc(100dvh - 210px);
+    margin: 0 auto;
+  }
+
   .reader__spread .reader__title {
     font-size: 48px;
   }

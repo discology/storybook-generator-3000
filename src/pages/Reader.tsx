@@ -272,7 +272,11 @@ export default function Reader() {
             </div>
             <div className="reader__right">
               {index === 0 && chapterHead}
-              {words}
+              {words ?? (
+                <div className="reader__ornament" aria-hidden="true">
+                  <IconSparkle size={22} />
+                </div>
+              )}
               {index === pages.length - 1 && (
                 <div className="reader__ornament" aria-hidden="true">
                   <IconSparkle size={18} />
