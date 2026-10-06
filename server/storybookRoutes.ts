@@ -111,10 +111,27 @@ router.get("/storybooks", async (req, res) => {
 
   const storybooks = await prisma.storybook.findMany({
     where: { child: { household: { contributors: { some: { userId: user.id, inviteStatus: { not: "revoked" } } } } } },
-    include: { child: true, _count: { select: { memories: true, chapters: true } } },
+    include: {
+      child: { include: { household: { include: { contributors: { where: { userId: user.id } } } } } },
+      chapters: { where: { status: "published" }, include: { access: true }, orderBy: { publishedAt: "desc" } },
+      _count: { select: { memories: true, chapters: true } },
+    },
     orderBy: { createdAt: "desc" },
   });
-  res.json(storybooks);
+  // Each storybook once, with the person's own place in it: their relationship,
+  // their role, and the newest chapter they can read.
+  res.json(
+    storybooks.map(({ chapters, child: { household, ...child }, ...s }) => {
+      const me = household.contributors[0];
+      const latest = me ? chapters.find((c) => canSeeChapter(c, me)) : undefined;
+      return {
+        ...s,
+        child,
+        me: me ? { role: me.role, relationship: me.relationship, name: me.name } : null,
+        latestChapter: latest ? { id: latest.id, title: latest.title, publishedAt: latest.publishedAt } : null,
+      };
+    })
+  );
 });
 
 // The storybook as the signed-in family member may see it.

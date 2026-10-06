@@ -64,9 +64,14 @@ export default function Settings() {
           <MenuRow icon={<IconShield size={24} />} title="Privacy & data" to={`${base}/settings/privacy`} />
           <MenuRow icon={<IconUser size={24} />} title="Account & sign-in" to={`${base}/settings/account`} />
           <MenuRow icon={<IconHelp size={24} />} title="Help" to="/help" />
-          {others.map((b) => (
-            <MenuRow key={b.id} icon={<IconBook size={24} />} title={`Open ${possessive(b.childName)} storybook`} sub={b.title} to={`/storybooks/${b.id}`} />
-          ))}
+          {others.length > 0 && (
+            <MenuRow
+              icon={<IconBook size={24} />}
+              title="Switch storybook"
+              sub={`You're in ${others.length + 1} storybooks`}
+              to="/storybooks"
+            />
+          )}
           <hr className="divider" style={{ margin: "4px 0" }} />
           <MenuRow icon={<IconSignOut size={24} />} title="Sign out" onClick={() => void signOut()} danger right={<span />} />
         </div>

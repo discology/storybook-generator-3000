@@ -116,7 +116,9 @@ router.get("/invitations/:token", async (req, res) => {
 
   const child = invitation.household.children[0];
   const user = await getCurrentUser(req);
-  const contributor = await prisma.contributor.findUnique({ where: { id: invitation.contributorId } });
+  const mine = user
+    ? await prisma.contributor.findUnique({ where: { householdId_userId: { householdId: invitation.householdId, userId: user.id } } })
+    : null;
   res.json({
     status: invitation.status,
     invitedByName: invitation.invitedByName,
@@ -124,7 +126,7 @@ router.get("/invitations/:token", async (req, res) => {
     childName: child?.displayName ?? "their child",
     storybookTitle: child?.storybooks[0]?.title ?? null,
     storybookId: child?.storybooks[0]?.id ?? null,
-    joinedByMe: invitation.status === "accepted" && !!user && contributor?.userId === user.id,
+    joinedByMe: invitation.status === "accepted" && mine?.inviteStatus === "joined",
     signedInName: user?.name ?? null,
   });
 });
@@ -142,8 +144,21 @@ router.post("/invitations/:token/accept", async (req, res) => {
   if (!name) return res.status(400).json({ error: "Add your name so the family knows who's sharing." });
   if (!user.name) await prisma.user.update({ where: { id: user.id }, data: { name } });
 
-  await prisma.contributor.update({ where: { id: invitation.contributorId }, data: { userId: user.id, inviteStatus: "joined", name, phone: user.phone } });
-  await prisma.invitation.update({ where: { id: invitation.id }, data: { status: "accepted", respondedAt: new Date() } });
+  // One place per person per family: someone who's already in it keeps their
+  // place (rejoining if they'd been removed), and the invite's placeholder goes.
+  const existing = await prisma.contributor.findUnique({ where: { householdId_userId: { householdId: invitation.householdId, userId: user.id } } });
+  await prisma.$transaction(async (tx) => {
+    if (existing) {
+      if (existing.inviteStatus !== "joined") {
+        await tx.contributor.update({ where: { id: existing.id }, data: { inviteStatus: "joined", relationship: existing.relationship ?? invitation.relationship } });
+      }
+      await tx.invitation.update({ where: { id: invitation.id }, data: { status: "accepted", respondedAt: new Date() } });
+      await tx.contributor.delete({ where: { id: invitation.contributorId } });
+    } else {
+      await tx.contributor.update({ where: { id: invitation.contributorId }, data: { userId: user.id, inviteStatus: "joined", name, phone: user.phone } });
+      await tx.invitation.update({ where: { id: invitation.id }, data: { status: "accepted", respondedAt: new Date() } });
+    }
+  });
 
   const household = await prisma.household.findUnique({ where: { id: invitation.householdId }, include: { children: { include: { storybooks: true } } } });
   res.json({ ok: true, storybookId: household?.children[0]?.storybooks[0]?.id ?? null });

@@ -171,6 +171,8 @@ export interface StorybookSummary {
   status: string;
   child: Child;
   _count: { memories: number; chapters: number };
+  me: { role: string; relationship: string | null; name: string } | null;
+  latestChapter: { id: string; title: string; publishedAt: string | null } | null;
 }
 
 export interface MessageVariable {

@@ -16,7 +16,7 @@ async function findMember(userId: string, storybookId: string) {
     include: { child: { include: { household: { include: { contributors: { orderBy: { createdAt: "asc" } } } } } } },
   });
   if (!storybook) return null;
-  // Someone can hold two places in a family (e.g. invited before they started it); the owner place wins.
+  // One place per person per family (a database rule); the owner check stays as a safeguard.
   const mine = storybook.child.household.contributors.filter((c) => c.userId === userId && c.inviteStatus !== "revoked");
   const me = mine.find((c) => c.role === "owner") ?? mine[0];
   return me ? { storybook, me } : { storybook, me: null };

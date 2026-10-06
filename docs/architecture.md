@@ -69,7 +69,7 @@ docs/                 these guides
 
 The schema is in `prisma/schema.prisma`. Here are the models, grouped by what they're for:
 
-- **People and access:** `User`, `Session`, `OtpCode`, `Household` (a family), `Contributor` (a person's place in a family: owner or contributor), `Invitation`.
+- **People and access:** `User`, `Session`, `OtpCode`, `Household` (a family), `Contributor` (a person's place in a family: owner or contributor; one per person per family, so someone in several families' storybooks has one place in each), `Invitation`.
 - **Storybooks and memories:** `Child`, `Storybook` (settings, reminder schedule, reading stage), `Memory`, `TranscriptVersion` (machine and corrected transcripts), `MemoryInterpretation`.
 - **Chapters:** `Chapter` (with its rules snapshot), `ChapterSource` (which memories it came from), `StoryPage`, `PageAsset` (every picture attempt for a page), `GuardianFinding`, `ChapterAccess` and `ChapterShare` (sharing), `ChapterMark` (bookmarks and reading progress), `StoryFeedback`.
 - **Characters:** `Character` and `CharacterArt` (the Vambies), `FamilyCharacter`, `CharacterDesign` (versioned looks per age), `DesignProposal`, `PageAppearance` (which design of a family member is on a page, and what they're wearing).
