@@ -15,7 +15,8 @@ import { failInterruptedIllustrations } from "./server/storyPages";
 import { resumeUnfinishedMemories } from "./server/memoryPipeline";
 import { startWeeklyChapters } from "./server/weeklyChapters";
 import guardianRoutes from "./server/guardianRoutes";
-import exportRoutes from "./server/exportRoutes";
+import exportRoutes, { failInterruptedExports } from "./server/exportRoutes";
+import accountRoutes from "./server/accountRoutes";
 
 const app = express();
 app.use(express.json());
@@ -35,11 +36,13 @@ app.use("/api", characterRoutes);
 app.use("/api", familyCharacterRoutes);
 app.use("/api", guardianRoutes);
 app.use("/api", exportRoutes);
+app.use("/api", accountRoutes);
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3002;
 app.listen(PORT, () => {
   console.log(`Storybook Generator 3000 backend listening on http://localhost:${PORT}`);
   void failInterruptedIllustrations();
   void resumeUnfinishedMemories();
+  void failInterruptedExports();
   startWeeklyChapters();
 });

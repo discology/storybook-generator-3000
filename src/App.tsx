@@ -21,6 +21,8 @@ import Settings from "./pages/Settings";
 import SettingsReminders from "./pages/SettingsReminders";
 import SettingsStoryPreferences from "./pages/SettingsStoryPreferences";
 import SettingsPrivacy from "./pages/SettingsPrivacy";
+import ExportMemories, { ExportStatus } from "./pages/Export";
+import Account, { DeleteAccount, Help } from "./pages/Account";
 import AdminLayout from "./pages/admin/AdminLayout";
 import AdminReviewQueue from "./pages/admin/AdminReviewQueue";
 import AdminChapterReview from "./pages/admin/AdminChapterReview";
@@ -81,6 +83,11 @@ export default function App() {
                 <Route path="/storybooks/:id/settings/reminders" element={<SettingsReminders />} />
                 <Route path="/storybooks/:id/settings/story-preferences" element={<SettingsStoryPreferences />} />
                 <Route path="/storybooks/:id/settings/privacy" element={<SettingsPrivacy />} />
+                <Route path="/storybooks/:id/settings/export" element={<ExportMemories />} />
+                <Route path="/storybooks/:id/settings/export/:exportId" element={<ExportStatus />} />
+                <Route path="/storybooks/:id/settings/account" element={<Account />} />
+                <Route path="/storybooks/:id/settings/delete-account" element={<DeleteAccount />} />
+                <Route path="/help" element={<Help />} />
               </Routes>
             </div>
           }

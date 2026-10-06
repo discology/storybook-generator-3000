@@ -1,121 +1,135 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
-import { apiSend } from "../lib/api";
+import AccessDenied from "../components/AccessDenied";
+import { IconHold } from "../components/icons";
+import { Chev, Loading, Masthead, Note, Segmented, Select, Sheet, Switch } from "../components/ui";
 import { useStorybookData } from "../hooks/useStorybookData";
+import { apiSend, ApiError } from "../lib/api";
+import { formatClock, formatDate } from "../lib/format";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+const TIMEZONES = ["Pacific Time", "Mountain Time", "Central Time", "Eastern Time", "Alaska Time", "Hawaii Time"];
+const TIMES = Array.from({ length: 33 }, (_, i) => {
+  const minutes = 6 * 60 + i * 30;
+  const value = `${String(Math.floor(minutes / 60)).padStart(2, "0")}:${String(minutes % 60).padStart(2, "0")}`;
+  return { value, label: formatClock(value) };
+});
+const TWO_WEEKS = 14 * 86400000;
 
 export default function SettingsReminders() {
   const { id } = useParams();
-  const { storybook, status } = useStorybookData(id);
+  const { storybook, status, reload } = useStorybookData(id);
   const [form, setForm] = useState({
+    enabled: true,
     reminderFrequency: "weekly",
     reminderDay: "Sunday",
     reminderTime: "19:00",
     reminderTimezone: "Pacific Time",
-    reminderChannel: "SMS",
-    remindersPaused: false,
+    remindersPausedUntil: null as string | null,
   });
   const [saved, setSaved] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (storybook) {
-      setForm({
-        reminderFrequency: storybook.reminderFrequency,
-        reminderDay: storybook.reminderDay,
-        reminderTime: storybook.reminderTime,
-        reminderTimezone: storybook.reminderTimezone,
-        reminderChannel: storybook.reminderChannel,
-        remindersPaused: storybook.remindersPaused,
-      });
-    }
+    if (!storybook) return;
+    setForm({
+      enabled: !storybook.remindersPaused,
+      reminderFrequency: storybook.reminderFrequency,
+      reminderDay: storybook.reminderDay,
+      reminderTime: storybook.reminderTime,
+      reminderTimezone: storybook.reminderTimezone,
+      remindersPausedUntil: storybook.remindersPausedUntil && new Date(storybook.remindersPausedUntil) > new Date() ? storybook.remindersPausedUntil : null,
+    });
   }, [storybook]);
 
-  const save = async () => {
-    await apiSend(`/api/storybooks/${id}/settings`, "PUT", form);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => {
+    setSaved(false);
+    setForm((f) => ({ ...f, [key]: value }));
   };
 
-  if (status === "loading" || !storybook) return <p className="status-line screen-pad">Loading…</p>;
+  const save = async (override?: Partial<typeof form>) => {
+    const next = { ...form, ...override };
+    setError(null);
+    try {
+      await apiSend(`/api/storybooks/${id}/settings`, "PUT", {
+        remindersPaused: !next.enabled,
+        reminderFrequency: next.reminderFrequency,
+        reminderDay: next.reminderDay,
+        reminderTime: next.reminderTime,
+        reminderTimezone: next.reminderTimezone,
+        reminderChannel: "SMS",
+        remindersPausedUntil: next.remindersPausedUntil,
+      });
+      setSaved(true);
+      reload(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't save. Try again.");
+    }
+  };
+
+  const pause = () => {
+    const until = form.remindersPausedUntil ? null : new Date(Date.now() + TWO_WEEKS).toISOString();
+    set("remindersPausedUntil", until);
+    void save({ remindersPausedUntil: until });
+  };
+
+  if (status === "denied") return <AccessDenied />;
+  if (!storybook) return <Loading />;
+
+  const chapterDay = DAYS[(DAYS.indexOf(form.reminderDay) + 1) % 7];
+  const row = (label: string, idAttr: string, control: React.ReactNode) => (
+    <div className="field kv-row">
+      <label className="field__label" htmlFor={idAttr} style={{ margin: 0 }}>
+        {label}
+      </label>
+      <div style={{ width: "58%" }}>{control}</div>
+    </div>
+  );
 
   return (
-    <div>
-      <TopBar backTo={`/storybooks/${id}/settings`} backLabel="Settings" />
-      <div className="hero" style={{ paddingTop: 0 }}>
-        <h1 className="display">Your pace. Your moments.</h1>
-      </div>
-      <div className="screen-pad">
-        <div className="card">
-          <div className="checkbox-row">
-            <input
-              type="checkbox"
-              id="remindersOn"
-              checked={!form.remindersPaused}
-              onChange={(e) => setForm((f) => ({ ...f, remindersPaused: !e.target.checked }))}
-            />
-            <label htmlFor="remindersOn" style={{ margin: 0 }}>
-              Memory reminders
-            </label>
-          </div>
-
-          <label>Frequency</label>
-          <div className="row inline">
-            <button
-              type="button"
-              className={form.reminderFrequency === "weekly" ? "btn-primary" : "btn-secondary"}
-              style={{ width: "auto" }}
-              onClick={() => setForm((f) => ({ ...f, reminderFrequency: "weekly" }))}
-            >
-              Weekly
-            </button>
-            <button
-              type="button"
-              className={form.reminderFrequency === "daily" ? "btn-primary" : "btn-secondary"}
-              style={{ width: "auto" }}
-              onClick={() => setForm((f) => ({ ...f, reminderFrequency: "daily" }))}
-            >
-              Daily
-            </button>
-          </div>
-
-          {form.reminderFrequency === "weekly" && (
-            <>
-              <label htmlFor="day">Day</label>
-              <select id="day" value={form.reminderDay} onChange={(e) => setForm((f) => ({ ...f, reminderDay: e.target.value }))}>
-                {DAYS.map((d) => (
-                  <option key={d}>{d}</option>
-                ))}
-              </select>
-            </>
-          )}
-
-          <label htmlFor="time">Time</label>
-          <input id="time" type="time" value={form.reminderTime} onChange={(e) => setForm((f) => ({ ...f, reminderTime: e.target.value }))} />
-
-          <label htmlFor="tz">Timezone</label>
-          <select id="tz" value={form.reminderTimezone} onChange={(e) => setForm((f) => ({ ...f, reminderTimezone: e.target.value }))}>
-            <option>Pacific Time</option>
-            <option>Mountain Time</option>
-            <option>Central Time</option>
-            <option>Eastern Time</option>
-          </select>
-
-          <label htmlFor="channel">Delivery</label>
-          <select id="channel" value={form.reminderChannel} onChange={(e) => setForm((f) => ({ ...f, reminderChannel: e.target.value }))}>
-            <option>SMS</option>
-            <option>Email</option>
-          </select>
-          <p className="status-line">
-            Dev mode: no Twilio/email provider configured yet — reminders won't actually send until one is connected.
-          </p>
-
-          <button className="btn-primary chevron" onClick={save}>
-            {saved ? "Saved" : "Save changes"}
-          </button>
+    <div className="page">
+      <TopBar back={`/storybooks/${id}/settings`} wordmark />
+      <Masthead title={<>Your pace.<br />Your moments.</>} style={{ paddingTop: 0, paddingRight: 140 }} />
+      <Sheet peek="peek" grow>
+        <div className="toggle-row">
+          <span className="h-title" style={{ fontSize: 24 }}>Memory reminders</span>
+          <Switch checked={form.enabled} onChange={(v) => set("enabled", v)} label="Memory reminders" />
         </div>
-      </div>
+        {form.enabled && (
+          <>
+            <div className="field" style={{ marginTop: 18 }}>
+              <span className="field__label">Frequency</span>
+              <Segmented
+                value={form.reminderFrequency as "weekly" | "daily"}
+                onChange={(v) => set("reminderFrequency", v)}
+                options={[
+                  { value: "weekly", label: "Weekly" },
+                  { value: "daily", label: "Daily" },
+                ]}
+              />
+            </div>
+            {form.reminderFrequency === "weekly" && row("Day", "day", <Select id="day" value={form.reminderDay} onChange={(v) => set("reminderDay", v)} options={DAYS} />)}
+            {row("Time", "time", <Select id="time" value={form.reminderTime} onChange={(v) => set("reminderTime", v)} options={TIMES} />)}
+            {row("Timezone", "tz", <Select id="tz" value={form.reminderTimezone} onChange={(v) => set("reminderTimezone", v)} options={TIMEZONES} />)}
+            {row("Delivery", "delivery", <Select id="delivery" value="SMS" onChange={() => undefined} options={["SMS"]} />)}
+            <hr className="divider" />
+            <p className="h-section">Need a break?</p>
+            <button className="btn btn--outline-purple" style={{ marginTop: 10 }} onClick={pause}>
+              <IconHold size={20} /> {form.remindersPausedUntil ? `Paused until ${formatDate(form.remindersPausedUntil, { month: "short", day: "numeric" })} · Resume now` : "Pause for 2 weeks"}
+            </button>
+            <p className="t-center t-small t-muted" style={{ marginTop: 8 }}>You can still record anytime.</p>
+          </>
+        )}
+        <Note kind="info" style={{ marginTop: 16 }}>
+          Each week's memories become a new chapter on {chapterDay} morning{form.enabled ? ", after your reminder" : ""}.
+        </Note>
+        {error && <p className="error-text">{error}</p>}
+        <button className="btn btn--lime btn--caps" style={{ marginTop: 18 }} onClick={() => void save()}>
+          {saved ? "Saved" : "Save changes"} <Chev />
+        </button>
+        <p className="t-center t-small t-muted" style={{ marginTop: 10 }}>Chapter-ready alerts are managed separately.</p>
+      </Sheet>
     </div>
   );
 }

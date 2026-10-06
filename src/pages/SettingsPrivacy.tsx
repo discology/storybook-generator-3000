@@ -1,148 +1,88 @@
 import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
-import Vambie from "../components/Vambie";
-import { apiGet, apiSend } from "../lib/api";
+import AccessDenied from "../components/AccessDenied";
+import { IconDatabase, IconDownload, IconTrash } from "../components/icons";
+import { Chev, Field, Loading, Masthead, MenuRow, Note, Select, Sheet, Switch } from "../components/ui";
 import { useStorybookData } from "../hooks/useStorybookData";
-import type { ExportRequest } from "../types";
+import { apiSend, ApiError } from "../lib/api";
 
 export default function SettingsPrivacy() {
   const { id } = useParams();
-  const { storybook, status } = useStorybookData(id);
-  const [defaults, setDefaults] = useState({ defaultVisibility: "contributor_only", defaultStoryUse: true });
+  const { storybook, status, reload } = useStorybookData(id);
+  const [form, setForm] = useState({ defaultVisibility: "contributor_only", defaultStoryUse: true, keepRecordings: true });
   const [saved, setSaved] = useState(false);
-
-  const [include, setInclude] = useState({ recordings: true, transcripts: true, chapters: true });
-  const [exports, setExports] = useState<ExportRequest[] | null>(null);
-  const [preparing, setPreparing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (storybook) setDefaults({ defaultVisibility: storybook.defaultVisibility, defaultStoryUse: storybook.defaultStoryUse });
+    if (storybook) setForm({ defaultVisibility: storybook.defaultVisibility, defaultStoryUse: storybook.defaultStoryUse, keepRecordings: storybook.keepRecordings });
   }, [storybook]);
 
-  const loadExports = () => {
-    apiGet(`/api/storybooks/${id}/exports`).then(setExports).catch(() => setExports([]));
-  };
-  useEffect(loadExports, [id]);
-
-  const saveDefaults = async () => {
-    await apiSend(`/api/storybooks/${id}/settings`, "PUT", defaults);
-    setSaved(true);
-    setTimeout(() => setSaved(false), 2000);
+  const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => {
+    setSaved(false);
+    setForm((f) => ({ ...f, [key]: value }));
   };
 
-  const prepareExport = async () => {
-    setPreparing(true);
+  const save = async () => {
+    setError(null);
     try {
-      await apiSend(`/api/storybooks/${id}/export`, "POST", {
-        includeRecordings: include.recordings,
-        includeTranscripts: include.transcripts,
-        includeChapters: include.chapters,
-      });
-      loadExports();
-    } finally {
-      setPreparing(false);
+      await apiSend(`/api/storybooks/${id}/settings`, "PUT", form);
+      setSaved(true);
+      reload(true);
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't save. Try again.");
     }
   };
 
-  if (status === "loading" || !storybook) return <p className="status-line screen-pad">Loading…</p>;
+  if (status === "denied") return <AccessDenied />;
+  if (!storybook) return <Loading />;
+  const base = `/storybooks/${storybook.id}`;
+  const owner = storybook.me.role === "owner";
 
   return (
-    <div>
-      <TopBar backTo={`/storybooks/${id}/settings`} backLabel="Settings" />
-      <div className="hero" style={{ paddingTop: 0 }}>
-        <h1 className="display">Your memories. Your choices.</h1>
-      </div>
-
-      <div className="screen-pad">
-        <div className="card">
-          <h3>Defaults for new memories</h3>
-          <label htmlFor="vis">Original recording visibility</label>
-          <select
-            id="vis"
-            value={defaults.defaultVisibility}
-            onChange={(e) => setDefaults((d) => ({ ...d, defaultVisibility: e.target.value }))}
-          >
-            <option value="contributor_only">Only me</option>
-            <option value="household">Everyone in the household</option>
-          </select>
-
-          <div className="checkbox-row">
-            <input
-              type="checkbox"
-              id="useInStories"
-              checked={defaults.defaultStoryUse}
-              onChange={(e) => setDefaults((d) => ({ ...d, defaultStoryUse: e.target.checked }))}
-            />
-            <label htmlFor="useInStories" style={{ margin: 0 }}>
-              Use new memories in stories by default
-            </label>
-          </div>
-          <p className="status-line">Your recording stays private. Generated stories can be shared with your family.</p>
-
-          <button className="btn-primary chevron" onClick={saveDefaults}>
-            {saved ? "Saved" : "Save defaults"}
-          </button>
-        </div>
-
-        <div className="card">
-          <h3>Export my memories</h3>
-          <p className="status-line">Choose what to include in your download.</p>
-          <div className="checkbox-row">
-            <input type="checkbox" id="incRec" checked={include.recordings} onChange={(e) => setInclude((s) => ({ ...s, recordings: e.target.checked }))} />
-            <label htmlFor="incRec" style={{ margin: 0 }}>My original recordings</label>
-          </div>
-          <div className="checkbox-row">
-            <input type="checkbox" id="incTr" checked={include.transcripts} onChange={(e) => setInclude((s) => ({ ...s, transcripts: e.target.checked }))} />
-            <label htmlFor="incTr" style={{ margin: 0 }}>My transcripts</label>
-          </div>
-          <div className="checkbox-row">
-            <input type="checkbox" id="incCh" checked={include.chapters} onChange={(e) => setInclude((s) => ({ ...s, chapters: e.target.checked }))} />
-            <label htmlFor="incCh" style={{ margin: 0 }}>Published chapters</label>
-          </div>
-
-          <button className="btn-primary chevron" onClick={prepareExport} disabled={preparing}>
-            {preparing ? "Gathering your moments…" : "Prepare export"}
-          </button>
-
-          {exports && exports.length > 0 && (
-            <div style={{ marginTop: "1rem" }}>
-              {exports.map((e) => (
-                <div key={e.id} className="link-row">
-                  <div>
-                    <strong>{storybook.title} · Export</strong>
-                    <div className="status-line">{new Date(e.createdAt).toLocaleString()}</div>
-                  </div>
-                  {e.status === "ready" && e.filePath && (
-                    <a className="btn-small btn-primary" href={e.filePath} download>
-                      Download
-                    </a>
-                  )}
-                  {e.status === "preparing" && <span className="pill warn">Preparing</span>}
-                  {e.status === "failed" && <span className="pill warn">Failed</span>}
-                  {e.status === "expired" && <span className="pill dark">Expired</span>}
-                </div>
-              ))}
+    <div className="page">
+      <TopBar back={`${base}/settings`} wordmark />
+      <Masthead title={<>Your memories.<br />Your choices.</>} style={{ paddingTop: 0, paddingRight: 140 }} />
+      <Sheet peek="peek" grow>
+        {owner && (
+          <>
+            <h2 className="h-title">Defaults for new memories</h2>
+            <Field label="Original recording visibility" htmlFor="visibility">
+              <Select
+                id="visibility"
+                value={form.defaultVisibility}
+                onChange={(v) => set("defaultVisibility", v)}
+                options={[
+                  { value: "contributor_only", label: "Only me" },
+                  { value: "household", label: "Everyone in the family" },
+                ]}
+              />
+            </Field>
+            <div className="toggle-row" style={{ marginTop: 18 }}>
+              <span className="t-body" style={{ fontWeight: 500 }}>Use new memories in stories</span>
+              <Switch checked={form.defaultStoryUse} onChange={(v) => set("defaultStoryUse", v)} label="Use new memories in stories" />
             </div>
-          )}
-          {exports && exports.some((e) => e.status === "ready") && (
-            <p className="status-line">Download links expire after 7 days. Downloading does not delete your memories.</p>
-          )}
+            <p className="field__hint">Your recording stays private. Generated stories can be shared with your family.</p>
+            <div className="toggle-row" style={{ marginTop: 16 }}>
+              <span className="t-body" style={{ fontWeight: 500 }}>Keep voice recordings</span>
+              <Switch checked={form.keepRecordings} onChange={(v) => set("keepRecordings", v)} label="Keep voice recordings" />
+            </div>
+            <p className="field__hint">When this is off, only the words are kept: each recording is deleted once it's transcribed.</p>
+            <Note kind="info" style={{ marginTop: 14 }}>You can change these choices when saving each memory.</Note>
+            {error && <p className="error-text">{error}</p>}
+            <button className="btn btn--lime btn--caps" style={{ marginTop: 16 }} onClick={() => void save()}>
+              {saved ? "Saved" : "Save defaults"} <Chev />
+            </button>
+            <hr className="divider" style={{ margin: "22px 0 8px" }} />
+          </>
+        )}
+        <h2 className="h-title">Your data</h2>
+        <div className="menu" style={{ marginTop: 4 }}>
+          <MenuRow icon={<IconDownload size={24} />} title="Export my memories" to={`${base}/settings/export`} />
+          <MenuRow icon={<IconDatabase size={24} />} title="Manage saved memories" to={`${base}/memories?tab=memories`} />
+          <MenuRow icon={<IconTrash size={24} />} title="Delete account" sub="Review what will be removed before confirming." to={`${base}/settings/delete-account`} danger />
         </div>
-
-        <div className="card">
-          <h3>Your data</h3>
-          <p className="status-line">
-            Manage or delete individual memories from the storybook's memory list — each one has its own "Delete"
-            option with a preview of what it affects.
-          </p>
-          <div className="banner warn" style={{ marginTop: "1rem" }}>
-            <Vambie mood="worried" size={28} />
-            Account deletion isn't wired up in this prototype yet — ask to have it built once this flow is
-            validated.
-          </div>
-        </div>
-      </div>
+      </Sheet>
     </div>
   );
 }

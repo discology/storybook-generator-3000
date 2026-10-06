@@ -562,7 +562,8 @@ router.put("/storybooks/:id/settings", async (req, res) => {
   }
   if ("remindersPausedUntil" in (req.body ?? {})) data.remindersPausedUntil = req.body.remindersPausedUntil ? new Date(req.body.remindersPausedUntil) : null;
   if (typeof data.title === "string" && !data.title.trim()) delete data.title;
-  if ("vambieNameAge" in data) data.vambieNameAge = Math.min(12, Math.max(1, Math.round(Number(data.vambieNameAge)) || 4));
+  // 13 means "keep calling him Baby Vambie": the stages end at 12.
+  if ("vambieNameAge" in data) data.vambieNameAge = Math.min(13, Math.max(1, Math.round(Number(data.vambieNameAge)) || 4));
   if ("readerAgeBand" in data && !STAGE_KEYS.includes(String(data.readerAgeBand))) delete data.readerAgeBand;
   const storybook = await prisma.storybook.update({ where: { id: member.storybook.id }, data });
 
