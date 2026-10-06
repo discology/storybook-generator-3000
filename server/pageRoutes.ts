@@ -192,8 +192,10 @@ router.post("/chapters/:id/pages/retry-failed", async (req, res) => {
     where: { chapterId: req.params.id },
     include: { assets: { orderBy: { version: "desc" }, take: 1 } },
   });
-  const failed = pages.filter((p) => !p.assets[0] || p.assets[0].status === "failed");
-  if (failed.length === pages.length) {
+  // Text-only pages (later reading stages) have no picture to retry.
+  const pictured = pages.filter((p) => p.pictureSize !== "none");
+  const failed = pictured.filter((p) => !p.assets[0] || p.assets[0].status === "failed");
+  if (failed.length === pictured.length) {
     void illustrateChapter(req.params.id);
   } else {
     await prisma.chapter.update({ where: { id: req.params.id }, data: { pagesStatus: "illustrating" } });

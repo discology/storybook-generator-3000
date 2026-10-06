@@ -74,7 +74,7 @@ const cleanAliases = (value: unknown) =>
 
 // Everything the character screen shows: designs by variant (newest first), how
 // many pages each version appears on, and whether any are in published chapters.
-async function present(characterId: string) {
+export async function present(characterId: string) {
   const c = await prisma.familyCharacter.findUniqueOrThrow({
     where: { id: characterId },
     include: { designs: { include: { proposals: { orderBy: { createdAt: "desc" } } }, orderBy: [{ variant: "asc" }, { version: "desc" }] } },

@@ -60,8 +60,8 @@ export default function FamilyCharacterDetail() {
   const back = params.get("back");
 
   return (
-    <div>
-      <TopBar backTo={`/storybooks/${id}/characters${back ? `?back=${encodeURIComponent(back)}` : ""}`} backLabel="Our Characters" />
+    <div className="page page--nav">
+      <TopBar back={`/storybooks/${id}/characters${back ? `?back=${encodeURIComponent(back)}` : ""}`} title="Who's in the pictures" />
       <div className="screen-pad">
         {back && (
           <div className="banner info">

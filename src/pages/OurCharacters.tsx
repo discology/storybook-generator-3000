@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
 import BottomNav from "../components/BottomNav";
+import { Loading, Masthead } from "../components/ui";
 import { apiGet, apiSend, ApiError } from "../lib/api";
 import type { FamilyCharacterDetail, FamilyCharacterSummary } from "../types";
 
@@ -57,19 +58,20 @@ export default function OurCharacters() {
     }
   };
 
-  if (!data) return <p className="status-line screen-pad">{error ?? "Loading…"}</p>;
+  if (!data) return error ? <p className="loading">{error}</p> : <Loading />;
 
   return (
-    <div>
-      <TopBar backTo={params.get("back") ?? `/storybooks/${id}`} backLabel="Back" />
+    <div className="page page--nav">
+      <TopBar back={params.get("back") ?? `/storybooks/${id}/family`} title="Family" />
+      <Masthead
+        title={<>Who's in<br />the pictures.</>}
+        sub="Approve how someone looks once, and every new page draws them that way."
+        art="magnifier"
+        artMode="corner"
+        style={{ paddingTop: 0 }}
+      />
       <div className="screen-pad">
-        <h1 className="display" style={{ fontSize: "1.8rem" }}>
-          Our Characters
-        </h1>
-        <p className="subtitle">
-          The people in {data.childName}'s stories. Once you approve how someone looks, every new page draws them that way.
-        </p>
-        <p className="status-line">{data.childName} appears as Baby Vambie, so you don't need to add them.</p>
+        <p className="t-small t-muted-dark" style={{ margin: "0 0 14px" }}>{data.childName} appears as Baby Vambie, so you don't need to add them.</p>
 
         {data.characters.map((c) => (
           <Link
