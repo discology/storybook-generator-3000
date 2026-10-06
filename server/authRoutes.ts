@@ -1,6 +1,7 @@
 import express, { Router } from "express";
 import { prisma } from "./db";
 import { SESSION_COOKIE, generateOtp, generateToken, getCurrentUser } from "./session";
+import { adminIsOpen, isAdmin } from "./admin";
 import { isSmsConfigured, normalizePhone, sendVerificationCode, checkVerificationCode } from "./sms";
 
 const router: Router = express.Router();
@@ -57,7 +58,7 @@ router.post("/auth/verify", async (req, res) => {
 router.get("/auth/me", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return res.status(401).json({ error: "Not signed in" });
-  res.json({ user });
+  res.json({ user: { id: user.id, phone: user.phone, name: user.name, isAdmin: isAdmin(user) }, adminOpen: adminIsOpen() });
 });
 
 router.post("/auth/logout", async (req, res) => {

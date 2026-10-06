@@ -355,3 +355,11 @@ export const IconSpinner = ({ size = 22, className }: { size?: number; className
     })}
   </svg>
 );
+
+export const IconArchive = icon(() => (
+  <>
+    <rect x="3" y="4" width="18" height="5" rx="1.5" />
+    <path d="M5 9v10a1.5 1.5 0 0 0 1.5 1.5h11A1.5 1.5 0 0 0 19 19V9" />
+    <path d="M10 13h4" />
+  </>
+));

@@ -33,7 +33,7 @@ async function requireHousehold(req: Request, res: Response, householdId: string
     res.status(401).json({ error: "Sign in first" });
     return false;
   }
-  const member = await prisma.contributor.findFirst({ where: { householdId, userId: user.id } });
+  const member = await prisma.contributor.findFirst({ where: { householdId, userId: user.id, inviteStatus: { not: "revoked" } } });
   if (!member) {
     res.status(403).json({ error: "access_denied" });
     return false;

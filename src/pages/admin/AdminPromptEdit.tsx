@@ -1,133 +1,250 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { apiGet, apiSend } from "../../lib/api";
-import Vambie from "../../components/Vambie";
+import { apiGet, apiSend, ApiError } from "../../lib/api";
+import { IconInfo, IconMenu, IconMic, IconTrash, IconUpload } from "../../components/icons";
+import { Chev, Field, Select } from "../../components/ui";
+import { PromptArt } from "./AdminPromptLibrary";
 import type { Prompt } from "../../types";
 
-const COLORS = ["purple", "gold", "pink", "green"];
-const COLOR_HEX: Record<string, string> = { purple: "#6b4fe8", gold: "#e0a622", pink: "#e6198b", green: "#2f8f3f" };
+const COLORS = [
+  { value: "purple", hex: "#7b24fd", label: "Purple" },
+  { value: "gold", hex: "#f6c519", label: "Gold" },
+  { value: "pink", hex: "#ff5ccf", label: "Pink" },
+  { value: "green", hex: "#8cfa2c", label: "Green" },
+];
+const AUDIENCES = [
+  { value: "Everyone", label: "All contributors" },
+  { value: "Parents", label: "Parents" },
+  { value: "Grandparents", label: "Grandparents" },
+];
+const STAGES = ["All stages", "Expecting", "Newborn", "Toddler"];
+const NEW_CATEGORY = "__new__";
 
 export default function AdminPromptEdit() {
   const { id } = useParams();
   const navigate = useNavigate();
   const [form, setForm] = useState<Prompt | null>(null);
-  const [dirty, setDirty] = useState(false);
+  const [saved, setSaved] = useState<Prompt | null>(null);
+  const [all, setAll] = useState<Prompt[]>([]);
+  const [newCategory, setNewCategory] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
-    apiGet(`/api/prompts/${id}`).then(setForm);
+    apiGet(`/api/prompts/${id}`).then((p: Prompt) => {
+      setForm(p);
+      setSaved(p);
+    });
+    apiGet("/api/prompts").then(setAll);
   }, [id]);
 
-  const field = (key: keyof Prompt) => ({
-    value: (form?.[key] as string) ?? "",
-    onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-      setForm((f) => (f ? { ...f, [key]: e.target.value } : f));
-      setDirty(true);
-    },
-  });
+  const categories = useMemo(() => [...new Set(all.map((p) => p.category))], [all]);
+  const dirty =
+    !!form && !!saved && (["question", "supportingText", "category", "audience", "childStage", "cardColor"] as const).some((k) => (form[k] ?? "") !== (saved[k] ?? ""));
+  const index = Math.max(0, all.filter((p) => p.status === "published").findIndex((p) => p.id === id));
 
-  const save = async (status?: Prompt["status"]) => {
+  const set = <K extends keyof Prompt>(key: K, value: Prompt[K]) => setForm((f) => (f ? { ...f, [key]: value } : f));
+
+  const save = async (status: Prompt["status"]) => {
     if (!form) return;
-    const updated = await apiSend(`/api/prompts/${id}`, "PUT", { ...form, ...(status ? { status } : {}) });
-    setForm(updated);
-    setDirty(false);
-    if (status === "published") navigate("/admin/prompts");
+    if (!form.question.trim()) {
+      setError("The question can't be empty.");
+      return;
+    }
+    setBusy(status);
+    setError(null);
+    try {
+      const updated: Prompt = await apiSend(`/api/prompts/${id}`, "PUT", {
+        question: form.question.trim(),
+        supportingText: form.supportingText,
+        category: form.category.trim() || "General",
+        audience: form.audience,
+        childStage: form.childStage,
+        cardColor: form.cardColor,
+        status,
+      });
+      setForm(updated);
+      setSaved(updated);
+      setNewCategory(false);
+      if (status === "published") navigate("/admin/prompts");
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't save. Try again.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const uploadArt = async (file: File) => {
+    setBusy("art");
+    setError(null);
+    try {
+      const body = new FormData();
+      body.append("image", file);
+      const res = await fetch(`/api/prompts/${id}/artwork`, { method: "POST", body });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Upload failed.");
+      setForm((f) => (f ? { ...f, artworkPath: data.artworkPath } : f));
+      setSaved((s) => (s ? { ...s, artworkPath: data.artworkPath } : s));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Upload failed.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const archive = async () => {
+    if (!window.confirm("Archive this prompt? Families stop seeing it; memories recorded with it keep the question.")) return;
+    await apiSend(`/api/prompts/${id}`, "PUT", { status: "archived" });
+    navigate("/admin/prompts");
   };
 
   if (!form) return <p>Loading…</p>;
 
   return (
     <div>
-      <div style={{ color: "var(--ink-soft)", fontSize: "0.85rem", marginBottom: "0.5rem" }}>
-        <Link to="/admin/prompts" style={{ color: "inherit" }}>
-          Prompt Library
-        </Link>{" "}
-        / Edit prompt
-      </div>
-      <div className="row inline" style={{ justifyContent: "space-between", marginTop: 0 }}>
-        <h1 style={{ margin: 0, color: "var(--ink)" }}>Edit prompt</h1>
-        <div className="row inline">
-          {dirty && <span className="pill warn">Unpublished changes</span>}
-          <button className="btn-secondary" style={{ width: "auto" }} onClick={() => save("draft")}>
-            Save draft
-          </button>
-          <button className="btn-primary" style={{ width: "auto" }} onClick={() => save("published")}>
-            Publish changes
-          </button>
-        </div>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: "1.5rem", marginTop: "1rem" }}>
-        <div className="card">
-          <label>Question</label>
-          <input {...field("question")} />
-          <label>Supporting text</label>
-          <input {...field("supportingText")} />
-          <div className="row">
-            <div style={{ flex: 1 }}>
-              <label>Category</label>
-              <input {...field("category")} />
-            </div>
-            <div style={{ flex: 1 }}>
-              <label>Audience</label>
-              <select {...field("audience")}>
-                <option>Everyone</option>
-                <option>Parents</option>
-                <option>Grandparents</option>
-              </select>
-            </div>
-          </div>
-          <label>Child stage</label>
-          <select {...field("childStage")}>
-            <option>All stages</option>
-            <option>Expecting</option>
-            <option>Newborn</option>
-            <option>Toddler</option>
-          </select>
-          <label>Card color</label>
-          <div className="row inline">
-            {COLORS.map((c) => (
-              <button
-                key={c}
-                type="button"
-                onClick={() => {
-                  setForm((f) => (f ? { ...f, cardColor: c } : f));
-                  setDirty(true);
-                }}
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: "50%",
-                  background: COLOR_HEX[c],
-                  border: form.cardColor === c ? "3px solid var(--ink)" : "none",
-                  padding: 0,
-                }}
-              />
-            ))}
-          </div>
-        </div>
-
+      <div className="adm-head">
         <div>
-          <h3 style={{ color: "var(--ink)" }}>Mobile preview</h3>
-          <div style={{ background: "#0a0a0c", borderRadius: 16, padding: "1.5rem", color: "white" }}>
-            <div
-              style={{
-                background: COLOR_HEX[form.cardColor] || "#6b4fe8",
-                borderRadius: 14,
-                padding: "1.25rem",
-                textAlign: "center",
-              }}
-            >
-              <span className="pill" style={{ background: "rgba(255,255,255,0.25)", color: "white", marginBottom: "0.5rem" }}>
-                {form.category}
-              </span>
-              <h3 style={{ color: "white", fontSize: "1.3rem", margin: "0.5rem 0" }}>{form.question}</h3>
-              <Vambie size={70} />
-            </div>
-            <button className="btn-primary chevron" style={{ marginTop: "1rem" }}>
-              Record this memory
-            </button>
+          <div className="adm-crumbs">
+            <Link to="/admin/prompts">Prompt Library</Link> / Edit prompt
           </div>
+          <h1 className="adm-title" style={{ fontSize: 48 }}>Edit prompt</h1>
         </div>
+        <div className="hstack">
+          {dirty && <span className="pill-status pill-status--held">Unpublished changes</span>}
+          {form.status === "archived" && !dirty && <span className="pill-status pill-status--archived">Archived</span>}
+          <button className="btn btn--soft btn--sm btn--auto" onClick={() => void save("draft")} disabled={busy !== null}>
+            {busy === "draft" ? "Saving…" : "Save draft"}
+          </button>
+          <button className="btn btn--lime btn--sm btn--auto" onClick={() => void save("published")} disabled={busy !== null}>
+            {busy === "published" ? "Publishing…" : "Publish changes"}
+          </button>
+        </div>
+      </div>
+
+      <div className="adm-grid" style={{ gridTemplateColumns: "minmax(0, 1fr) 320px" }}>
+        <section>
+          <Field label="Question" htmlFor="question">
+            <input id="question" className="input" value={form.question} onChange={(e) => set("question", e.target.value)} maxLength={90} />
+          </Field>
+          <Field label="Supporting text" htmlFor="supporting">
+            <input id="supporting" className="input" value={form.supportingText ?? ""} onChange={(e) => set("supportingText", e.target.value)} placeholder="Tell it in your own words." maxLength={120} />
+          </Field>
+          <div className="form-grid">
+            <Field label="Category" htmlFor="category">
+              {newCategory || !categories.includes(form.category) ? (
+                <input id="category" className="input" value={form.category} onChange={(e) => set("category", e.target.value)} placeholder="New category" autoFocus={newCategory} />
+              ) : (
+                <Select
+                  id="category"
+                  value={form.category}
+                  onChange={(v) => {
+                    if (v === NEW_CATEGORY) {
+                      setNewCategory(true);
+                      set("category", "");
+                    } else set("category", v);
+                  }}
+                  options={[...categories.map((c) => ({ value: c, label: c })), { value: NEW_CATEGORY, label: "New category…" }]}
+                />
+              )}
+            </Field>
+            <Field label="Audience" htmlFor="audience">
+              <Select id="audience" value={form.audience} onChange={(v) => set("audience", v)} options={AUDIENCES} />
+            </Field>
+            <Field label="Child stage" htmlFor="stage">
+              <Select id="stage" value={form.childStage} onChange={(v) => set("childStage", v)} options={STAGES} />
+            </Field>
+            <div className="field">
+              <span className="field__label">Card color</span>
+              <div className="swatches" role="radiogroup">
+                {COLORS.map((c) => (
+                  <button
+                    key={c.value}
+                    role="radio"
+                    aria-checked={form.cardColor === c.value}
+                    aria-label={c.label}
+                    className={`swatch ${form.cardColor === c.value ? "swatch--on" : ""}`}
+                    style={{ background: c.hex }}
+                    onClick={() => set("cardColor", c.value)}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="field">
+            <span className="field__label">Artwork</span>
+            <div className="hstack" style={{ gap: 18, alignItems: "flex-start" }}>
+              <PromptArt prompt={form} index={index} className="artwork-box" />
+              <div>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  hidden
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) void uploadArt(file);
+                    e.target.value = "";
+                  }}
+                />
+                <button className="btn btn--soft btn--sm btn--auto" onClick={() => fileRef.current?.click()} disabled={busy !== null}>
+                  <IconUpload size={18} /> {busy === "art" ? "Uploading…" : form.artworkPath ? "Change artwork" : "Upload artwork"}
+                </button>
+                <p className="field__hint">Use a square image. Recommended 1024 × 1024.</p>
+                {form.artworkPath && (
+                  <button
+                    className="tlink"
+                    style={{ fontSize: 14 }}
+                    onClick={async () => {
+                      await apiSend(`/api/prompts/${id}`, "PUT", { artworkPath: null });
+                      setForm((f) => (f ? { ...f, artworkPath: null } : f));
+                    }}
+                  >
+                    Use Baby Vambie art instead
+                  </button>
+                )}
+                {!form.artworkPath && <p className="field__hint">Without artwork, the card shows Baby Vambie.</p>}
+              </div>
+            </div>
+          </div>
+
+          {error && <p className="error-text">{error}</p>}
+          <div className="note note--info" style={{ marginTop: 22, fontSize: 15 }}>
+            <span className="note__icon">
+              <IconInfo size={14} />
+            </span>
+            <span className="note__body">Publishing updates future cards. Previous recordings keep the prompt version they used.</span>
+          </div>
+          {form.status !== "archived" && (
+            <button className="tlink t-red" style={{ marginTop: 18, display: "inline-flex", gap: 6, alignItems: "center", color: "var(--red)" }} onClick={() => void archive()}>
+              <IconTrash size={18} /> Archive prompt
+            </button>
+          )}
+        </section>
+
+        <aside>
+          <h2 className="h-title" style={{ fontSize: 22, marginBottom: 12 }}>Mobile preview</h2>
+          <div className="phone-preview">
+            <div className="kv-row" style={{ marginBottom: 12 }}>
+              <span className="wordmark" style={{ fontSize: 20 }}>Vambie</span>
+              <IconMenu size={24} />
+            </div>
+            <div className={`prompt-card prompt-card--${form.cardColor}`}>
+              <span className={`badge badge--caps badge--sm prompt-card__badge ${form.cardColor === "purple" ? "badge--pink" : "badge--purple"}`}>{form.category || "Category"}</span>
+              <span className="prompt-card__q">{form.question || "Your question"}</span>
+              <PromptArt prompt={form} index={index} className="prompt-card__art" style={{ background: "none", borderRadius: form.artworkPath ? 16 : 0, aspectRatio: "1" }} />
+            </div>
+            <div className="deck-dots" aria-hidden="true">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <span key={i} className={i === 0 ? "on" : ""} />
+              ))}
+            </div>
+            <span className="btn btn--lime btn--caps" style={{ marginTop: 14, fontSize: 18, minHeight: 50 }}>
+              <IconMic size={20} filled /> Record this memory <Chev />
+            </span>
+          </div>
+        </aside>
       </div>
     </div>
   );

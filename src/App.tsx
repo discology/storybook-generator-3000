@@ -35,13 +35,16 @@ import AdminAiInstructionEdit from "./pages/admin/AdminAiInstructionEdit";
 import AdminPageRules from "./pages/admin/AdminPageRules";
 import AdminCharacters from "./pages/admin/AdminCharacters";
 import AdminCharacterEdit from "./pages/admin/AdminCharacterEdit";
+import AdminOverview, { AdminFamilies, AdminSettings } from "./pages/admin/AdminOverview";
 
 export default function App() {
   return (
     <AuthProvider>
       <Routes>
         <Route path="/admin" element={<AdminLayout />}>
-          <Route index element={<AdminReviewQueue />} />
+          <Route index element={<AdminOverview />} />
+          <Route path="families" element={<AdminFamilies />} />
+          <Route path="settings" element={<AdminSettings />} />
           <Route path="review" element={<AdminReviewQueue />} />
           <Route path="review/:chapterId" element={<AdminChapterReview />} />
           <Route path="prompts" element={<AdminPromptLibrary />} />

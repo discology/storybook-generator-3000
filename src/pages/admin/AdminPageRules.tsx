@@ -8,6 +8,7 @@ interface ReadingProfile {
   maxWordsPerPage: number;
   maxWordsPerSentence: number;
   vocabulary: string;
+  pictures?: string;
 }
 
 interface PageRules {
@@ -97,7 +98,7 @@ export default function AdminPageRules() {
       {error && <p className="status-line" style={{ color: "#d94c4c" }}>{error}</p>}
 
       <div className="card">
-        <h3 style={{ marginTop: 0 }}>Reading levels</h3>
+        <h3 style={{ marginTop: 0 }}>Reading stages</h3>
         <table className="admin-table">
           <thead>
             <tr>
@@ -106,13 +107,14 @@ export default function AdminPageRules() {
                 <th key={f.key}>{f.label}</th>
               ))}
               <th>Vocabulary</th>
+              <th>Pictures</th>
             </tr>
           </thead>
           <tbody>
             {Object.entries(rules.readingProfiles).map(([band, p]) => (
               <tr key={band}>
                 <td style={{ whiteSpace: "nowrap" }}>
-                  <strong>Ages {band}</strong>
+                  <strong>{p.label}</strong>
                 </td>
                 {NUMBER_FIELDS.map((f) => (
                   <td key={f.key}>
@@ -126,7 +128,10 @@ export default function AdminPageRules() {
                   </td>
                 ))}
                 <td>
-                  <textarea rows={2} value={p.vocabulary} onChange={(e) => setProfile(band, "vocabulary", e.target.value)} />
+                  <textarea rows={3} value={p.vocabulary} onChange={(e) => setProfile(band, "vocabulary", e.target.value)} />
+                </td>
+                <td>
+                  <textarea rows={3} value={p.pictures ?? ""} onChange={(e) => setProfile(band, "pictures", e.target.value)} placeholder="e.g. A picture on every page" />
                 </td>
               </tr>
             ))}

@@ -3,6 +3,7 @@ import cookieParser from "cookie-parser";
 import express from "express";
 import path from "path";
 import authRoutes from "./server/authRoutes";
+import { requireAdmin } from "./server/admin";
 import storybookRoutes from "./server/storybookRoutes";
 import familyRoutes from "./server/familyRoutes";
 import promptRoutes from "./server/promptRoutes";
@@ -25,6 +26,8 @@ app.use(cookieParser());
 // read by the server; recordings and exports go through access-checked routes.
 app.use(["/uploads/private", "/uploads/memories", "/uploads/exports"], (_req, res) => res.status(404).end());
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+app.use("/api/admin", requireAdmin);
+app.use("/api/prompts", (req, res, next) => (req.method === "GET" ? next() : requireAdmin(req, res, next)));
 app.use("/api", authRoutes);
 app.use("/api", storybookRoutes);
 app.use("/api", familyRoutes);

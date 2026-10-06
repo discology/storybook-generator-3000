@@ -18,7 +18,7 @@ import { DEFAULT_RULES, EMBELLISHMENT_LEVELS, IMAGE_MODELS, getActiveRules, save
 
 const router: Router = express.Router();
 
-// Only members of the chapter's family can review or change its pages.
+// Only the storybook's owner reviews and changes a chapter's pages before it's published.
 async function requireChapterAccess(req: Request, res: Response, chapterId: string) {
   const user = await getCurrentUser(req);
   if (!user) {
@@ -33,7 +33,7 @@ async function requireChapterAccess(req: Request, res: Response, chapterId: stri
     res.status(404).json({ error: "Chapter not found" });
     return null;
   }
-  if (!chapter.storybook.child.household.contributors.some((c) => c.userId === user.id)) {
+  if (!chapter.storybook.child.household.contributors.some((c) => c.userId === user.id && c.role === "owner" && c.inviteStatus !== "revoked")) {
     res.status(403).json({ error: "access_denied" });
     return null;
   }
