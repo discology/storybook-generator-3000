@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { apiGet, apiSend, ApiError } from "../../lib/api";
-import { IconInfo, IconMenu, IconMic, IconTrash, IconUpload } from "../../components/icons";
+import { IconImage, IconInfo, IconMenu, IconMic, IconSparkle, IconTrash, IconUpload } from "../../components/icons";
 import { Chev, Field, Select } from "../../components/ui";
-import { PromptArt } from "./AdminPromptLibrary";
+import { CARD_ART, PromptArt } from "./AdminPromptLibrary";
+import PromptArtworkDialog, { type ArtworkTab } from "./PromptArtworkDialog";
 import type { Prompt } from "../../types";
 
 const COLORS = [
@@ -29,6 +30,7 @@ export default function AdminPromptEdit() {
   const [newCategory, setNewCategory] = useState(false);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [artDialog, setArtDialog] = useState<ArtworkTab | null>(null);
   const fileRef = useRef<HTMLInputElement | null>(null);
 
   useEffect(() => {
@@ -41,7 +43,7 @@ export default function AdminPromptEdit() {
 
   const categories = useMemo(() => [...new Set(all.map((p) => p.category))], [all]);
   const dirty =
-    !!form && !!saved && (["question", "supportingText", "category", "audience", "childStage", "cardColor"] as const).some((k) => (form[k] ?? "") !== (saved[k] ?? ""));
+    !!form && !!saved && (["question", "supportingText", "category", "audience", "childStage", "cardColor", "artworkPath"] as const).some((k) => (form[k] ?? "") !== (saved[k] ?? ""));
   const index = Math.max(0, all.filter((p) => p.status === "published").findIndex((p) => p.id === id));
 
   const set = <K extends keyof Prompt>(key: K, value: Prompt[K]) => setForm((f) => (f ? { ...f, [key]: value } : f));
@@ -62,6 +64,7 @@ export default function AdminPromptEdit() {
         audience: form.audience,
         childStage: form.childStage,
         cardColor: form.cardColor,
+        artworkPath: form.artworkPath,
         status,
       });
       setForm(updated);
@@ -81,11 +84,11 @@ export default function AdminPromptEdit() {
     try {
       const body = new FormData();
       body.append("image", file);
+      body.append("question", form?.question ?? "");
       const res = await fetch(`/api/prompts/${id}/artwork`, { method: "POST", body });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Upload failed.");
-      setForm((f) => (f ? { ...f, artworkPath: data.artworkPath } : f));
-      setSaved((s) => (s ? { ...s, artworkPath: data.artworkPath } : s));
+      set("artworkPath", data.imagePath);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Upload failed.");
     } finally {
@@ -188,23 +191,25 @@ export default function AdminPromptEdit() {
                     e.target.value = "";
                   }}
                 />
-                <button className="btn btn--soft btn--sm btn--auto" onClick={() => fileRef.current?.click()} disabled={busy !== null}>
-                  <IconUpload size={18} /> {busy === "art" ? "Uploading…" : form.artworkPath ? "Change artwork" : "Upload artwork"}
-                </button>
-                <p className="field__hint">Use a square image. Recommended 1024 × 1024.</p>
-                {form.artworkPath && (
-                  <button
-                    className="tlink"
-                    style={{ fontSize: 14 }}
-                    onClick={async () => {
-                      await apiSend(`/api/prompts/${id}`, "PUT", { artworkPath: null });
-                      setForm((f) => (f ? { ...f, artworkPath: null } : f));
-                    }}
-                  >
+                <div className="art-actions">
+                  <button className="btn btn--purple btn--sm btn--auto" onClick={() => setArtDialog("generate")} disabled={busy !== null}>
+                    <IconSparkle size={18} /> Generate from the question
+                  </button>
+                  <button className="btn btn--soft btn--sm btn--auto" onClick={() => setArtDialog("poses")} disabled={busy !== null}>
+                    <IconImage size={18} /> Choose from library
+                  </button>
+                  <button className="btn btn--soft btn--sm btn--auto" onClick={() => fileRef.current?.click()} disabled={busy !== null}>
+                    <IconUpload size={18} /> {busy === "art" ? "Uploading…" : "Upload"}
+                  </button>
+                </div>
+                <p className="field__hint">Uploads should be square, ideally 1024 × 1024. Families see new artwork once you publish the card.</p>
+                {form.artworkPath ? (
+                  <button className="tlink" style={{ fontSize: 14 }} onClick={() => set("artworkPath", null)}>
                     Use Baby Vambie art instead
                   </button>
+                ) : (
+                  <p className="field__hint">Without artwork, the card shows Baby Vambie.</p>
                 )}
-                {!form.artworkPath && <p className="field__hint">Without artwork, the card shows Baby Vambie.</p>}
               </div>
             </div>
           </div>
@@ -222,6 +227,20 @@ export default function AdminPromptEdit() {
             </button>
           )}
         </section>
+
+        {artDialog && (
+          <PromptArtworkDialog
+            promptId={form.id}
+            card={form}
+            defaultPose={CARD_ART[index % CARD_ART.length]}
+            initialTab={artDialog}
+            onClose={() => setArtDialog(null)}
+            onPick={(path) => {
+              set("artworkPath", path);
+              setArtDialog(null);
+            }}
+          />
+        )}
 
         <aside>
           <h2 className="h-title" style={{ fontSize: 22, marginBottom: 12 }}>Mobile preview</h2>

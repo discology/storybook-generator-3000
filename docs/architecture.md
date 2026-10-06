@@ -60,6 +60,7 @@ docs/                 these guides
 | `characters.ts`, `familyCharacters.ts` | Character cards, casting, reference art and render choice, design proposals |
 | `aiService.ts`, `aiInstructions.ts` | Calling the AI provider; each AI step's instructions and reply format |
 | `imageQueue.ts` | Pacing image requests to the OpenAI account's per-minute limit |
+| `promptArt.ts` | The prompt card artwork library, and drawing card pictures from a question |
 | `aiUsage.ts`, `costRoutes.ts` | Recording what each AI call costs (prices per model), and the admin Costs page |
 | `messageTemplates.ts` | Text message types, variables and wording |
 
@@ -71,7 +72,7 @@ The schema is in `prisma/schema.prisma`. Here are the models, grouped by what th
 - **Storybooks and memories:** `Child`, `Storybook` (settings, reminder schedule, reading stage), `Memory`, `TranscriptVersion` (machine and corrected transcripts), `MemoryInterpretation`.
 - **Chapters:** `Chapter` (with its rules snapshot), `ChapterSource` (which memories it came from), `StoryPage`, `PageAsset` (every picture attempt for a page), `GuardianFinding`, `ChapterAccess` and `ChapterShare` (sharing), `ChapterMark` (bookmarks and reading progress), `StoryFeedback`.
 - **Characters:** `Character` and `CharacterArt` (the Vambies), `FamilyCharacter`, `CharacterDesign` (versioned looks per age), `DesignProposal`, `PageAppearance` (which design of a family member is on a page, and what they're wearing).
-- **Configuration:** `Prompt`, `MessageTemplate`, `AiInstruction`, `GenerationRuleSet` (one row per page rules version).
+- **Configuration:** `Prompt`, `PromptArtwork` (pictures generated or uploaded for prompt cards), `MessageTemplate`, `AiInstruction`, `GenerationRuleSet` (one row per page rules version).
 - **Exports:** `ExportRequest`.
 - **Costs:** `AiUsage` (one row per AI call: step, model, tokens, cost in dollars, and the family, chapter or memory it was for).
 
@@ -122,9 +123,11 @@ Runtime files live in `uploads/`, which isn't committed.
 | `uploads/pages/` | Page pictures and chapter character sheets | Only to the family's members and admins |
 | `uploads/characters/family/` | Family members' design pictures | Only to the family's members and admins |
 | `uploads/characters/` (the rest) | Vambie art and renders | Public |
-| `uploads/prompts/` | Prompt card artwork | Public |
+| `uploads/prompts/` | Prompt card artwork: generated and uploaded pictures in the artwork library | Public |
 
 `server/uploadAccess.ts` applies these rules to every `/uploads` request, after normalizing the address. On the hosted app, `uploads/` points at the data volume ([Deployment](deployment.md)).
+
+`server/assets/baby-vambie-render.png` is Baby Vambie's official 3D render, the reference new card pictures are drawn from (`server/promptArt.ts`). It's committed and isn't served.
 
 ## Conventions
 

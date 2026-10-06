@@ -63,6 +63,7 @@ export const STEP_LABELS: Record<string, { label: string; kind: UsageKind; group
   design_proposal: { label: "Family character designs", kind: "image", group: "family" },
   reference_sheet: { label: "Family reference sheets", kind: "image", group: "family" },
   library_art: { label: "Vambie library art", kind: "image", group: "admin" },
+  prompt_art: { label: "Prompt card art", kind: "image", group: "admin" },
   admin_test: { label: "Admin test runs", kind: "text", group: "admin" },
 };
 

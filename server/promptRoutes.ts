@@ -1,14 +1,12 @@
 import express, { Router } from "express";
-import fs from "fs";
 import multer from "multer";
-import path from "path";
 import { prisma } from "./db";
+import { PICTURES_PER_CLICK, cardPoses, generatePromptArt, isLibraryPicture, madeForCards, savePromptArt } from "./promptArt";
 
 // Prompt cards for the recorder. Reading is open; changes need an admin
-// (enforced in server.ts).
+// (enforced in server.ts). A card's artwork comes from the artwork library
+// (server/promptArt.ts) and, like its other fields, reaches families when saved.
 
-const ART_DIR = path.join(process.cwd(), "uploads", "prompts");
-fs.mkdirSync(ART_DIR, { recursive: true });
 const IMAGE_TYPES: Record<string, string> = { "image/png": ".png", "image/jpeg": ".jpg", "image/webp": ".webp" };
 const upload = multer({ storage: multer.memoryStorage(), limits: { fileSize: 8 * 1024 * 1024 } });
 
@@ -61,6 +59,9 @@ router.put("/prompts/:id", async (req, res) => {
   if (!existing) return res.status(404).json({ error: "Not found" });
 
   const { question, supportingText, category, audience, childStage, cardColor, status, artworkPath } = req.body ?? {};
+  if (typeof artworkPath === "string" && !(await isLibraryPicture(artworkPath))) {
+    return res.status(400).json({ error: "Pick artwork from the library." });
+  }
   const prompt = await prisma.prompt.update({
     where: { id: req.params.id },
     data: {
@@ -71,7 +72,7 @@ router.put("/prompts/:id", async (req, res) => {
       ...(childStage !== undefined ? { childStage } : {}),
       ...(cardColor !== undefined ? { cardColor } : {}),
       ...(status !== undefined ? { status } : {}),
-      ...(artworkPath === null ? { artworkPath: null } : {}),
+      ...(artworkPath === null || typeof artworkPath === "string" ? { artworkPath } : {}),
     },
   });
   res.json(prompt);
@@ -84,15 +85,40 @@ router.delete("/prompts/:id", async (req, res) => {
   res.status(204).end();
 });
 
+// The artwork library: Baby Vambie's card poses and every picture made for a card.
+router.get("/admin/prompt-art", async (_req, res) => {
+  res.json({ poses: cardPoses(), made: await madeForCards(), perClick: PICTURES_PER_CLICK });
+});
+
+// An uploaded picture joins the library; the card uses it once it's saved.
 router.post("/prompts/:id/artwork", upload.single("image"), async (req, res) => {
   const prompt = await prisma.prompt.findUnique({ where: { id: req.params.id } });
   if (!prompt) return res.status(404).json({ error: "Not found" });
   const ext = req.file ? IMAGE_TYPES[req.file.mimetype] : undefined;
   if (!req.file || !ext) return res.status(400).json({ error: "Upload a PNG, JPEG or WebP image." });
-  const name = `${prompt.id}-${Date.now()}${ext}`;
-  fs.writeFileSync(path.join(ART_DIR, name), req.file.buffer);
-  const updated = await prisma.prompt.update({ where: { id: prompt.id }, data: { artworkPath: `uploads/prompts/${name}` } });
-  res.json(updated);
+  const question = String(req.body?.question ?? "").trim() || prompt.question;
+  const artwork = await prisma.promptArtwork.create({ data: { imagePath: savePromptArt(req.file.buffer, ext), source: "upload", question } });
+  res.json(artwork);
+});
+
+// Draws two pictures from the question as it's currently written (the card
+// may have unsaved edits). Both join the library; neither is applied.
+router.post("/prompts/:id/artwork/generate", async (req, res) => {
+  const prompt = await prisma.prompt.findUnique({ where: { id: req.params.id } });
+  if (!prompt) return res.status(404).json({ error: "Not found" });
+  const body = req.body ?? {};
+  try {
+    const artworks = await generatePromptArt({
+      question: typeof body.question === "string" ? body.question : prompt.question,
+      supportingText: typeof body.supportingText === "string" ? body.supportingText : prompt.supportingText,
+      idea: typeof body.idea === "string" ? body.idea.slice(0, 400) : null,
+      cardColor: typeof body.cardColor === "string" ? body.cardColor : prompt.cardColor,
+    });
+    res.json({ artworks });
+  } catch (error: any) {
+    console.error(`Prompt art for ${prompt.id} failed:`, error?.message);
+    res.status(502).json({ error: error?.message || "The pictures couldn't be drawn. Try again." });
+  }
 });
 
 router.put("/prompts/:id/reorder", async (req, res) => {

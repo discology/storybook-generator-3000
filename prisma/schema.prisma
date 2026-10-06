@@ -100,6 +100,17 @@ model Prompt {
   createdAt      DateTime @default(now())
 }
 
+// Pictures generated or uploaded for prompt cards. Any card can reuse them
+// from the artwork library (server/promptArt.ts).
+model PromptArtwork {
+  id        String   @id @default(cuid())
+  imagePath String
+  source    String // generated | upload
+  question  String // the question it was made for
+  idea      String? // the admin's picture idea, if they gave one
+  createdAt DateTime @default(now())
+}
+
 model ChapterAccess {
   chapterId     String
   contributorId String

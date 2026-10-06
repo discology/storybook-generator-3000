@@ -42,7 +42,11 @@ Prompt cards are the questions families see when they record.
 - **Audience** decides who sees the card: all contributors, parents (the Parent and Guardian relationships) or grandparents.
 - **Child stage** shows the card at every age, or only while the family is expecting, for newborns (under 1) or for toddlers (1 to 3).
 - **Card color** sets purple, gold, pink or green.
-- **Artwork:** upload a square image, ideally 1024 × 1024. Without artwork, the card shows Baby Vambie.
+- **Artwork:** opens the card artwork window, which shows a preview of the card with the picture you select. Without artwork, the card shows one of Baby Vambie's card poses.
+  - **Generate from the question** draws two pictures of Baby Vambie in the 3D style of the card poses, on a transparent background so he sits on the card's color. It uses the question as it's written now, its supporting text, and an optional picture idea ("Baby Vambie blowing out a candle on a cupcake"). It takes about 30 seconds and costs about $0.40 a click. The cost appears on the Costs page as "Prompt card art".
+  - **Choose from library** has Baby Vambie's 14 card poses, and every picture generated or uploaded for any card, labeled with the question it was made for. Generated pictures stay in the library even if no card uses them.
+  - **Upload** adds a square image (ideally 1024 × 1024) to the library and to this card.
+  - New artwork reaches families when you publish the card, like the other fields.
 - **Save draft** saves the card as a draft, which takes it out of the families' deck until you publish it. **Publish changes** updates the card for families. Memories already recorded keep the question as it was worded when they were recorded.
 
 ## Families
