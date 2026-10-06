@@ -9,6 +9,7 @@ import {
   chaptersUsing,
   generateCharacterArt,
   referenceImageOf,
+  restyleCharacterArt,
   saveCharacterImage,
   validateKey,
 } from "./characters";
@@ -130,6 +131,17 @@ router.post("/admin/characters/:id/art/generate", async (req, res) => {
     res.status(201).json(await present(req.params.id));
   } catch (error: any) {
     res.status(502).json({ error: error?.message ?? "Couldn't generate artwork. Try again." });
+  }
+});
+
+// Redraw the reference art in the book's current art style (a candidate until picked).
+router.post("/admin/characters/:id/art/restyle", async (req, res) => {
+  if (!(await loadCharacter(req.params.id))) return res.status(404).json({ error: "Not found" });
+  try {
+    await restyleCharacterArt(req.params.id);
+    res.status(201).json(await present(req.params.id));
+  } catch (error: any) {
+    res.status(502).json({ error: error?.message ?? "Couldn't redraw the artwork. Try again." });
   }
 });
 

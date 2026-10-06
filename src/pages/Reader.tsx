@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
 import Vambie from "../components/Vambie";
 import { apiGet, apiSend } from "../lib/api";
+import PagePicture from "../components/PagePicture";
 import type { Storybook } from "../types";
 
 const PAGE_COLORS: Record<string, { bg: string; text: string }> = {
@@ -178,15 +179,21 @@ export default function Reader() {
           <>
             {/* Illustration on top; the page's exact text in its own area beneath, never inside the image. */}
             {page.assets[0]?.imagePath && (
-              <img
-                src={`/${page.assets[0].imagePath}`}
-                alt={page.visibleAction}
-                style={{ width: "100%", aspectRatio: "3 / 2", objectFit: "cover", borderRadius: 14, display: "block", marginTop: pageIndex === 0 ? 0 : "0.5rem" }}
-              />
+              // Full and wordless pages run edge to edge.
+              <div
+                style={{
+                  marginTop: pageIndex === 0 ? 0 : "0.5rem",
+                  marginInline: page.pictureSize === "full" || page.pictureSize === "wordless" ? "-1.25rem" : 0,
+                }}
+              >
+                <PagePicture src={`/${page.assets[0].imagePath}`} size={page.pictureSize ?? ""} alt={page.visibleAction} />
+              </div>
             )}
-            <p style={{ fontSize: `${1.15 * textSize}rem`, lineHeight: 1.6, textAlign: "left", margin: "1.1rem 0.25rem 0", overflowWrap: "break-word" }}>
-              {page.text}
-            </p>
+            {page.text && (
+              <p style={{ fontSize: `${1.15 * textSize}rem`, lineHeight: 1.6, textAlign: "left", margin: "1.1rem 0.25rem 0", overflowWrap: "break-word" }}>
+                {page.text}
+              </p>
+            )}
           </>
         ) : (
           <p style={{ fontSize: `${1 * textSize}rem`, lineHeight: 1.7, textAlign: "left", whiteSpace: "pre-wrap" }}>{chapter.content}</p>

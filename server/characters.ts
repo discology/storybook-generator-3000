@@ -5,7 +5,9 @@ import type { Prisma } from "../src/generated/prisma/client";
 import { AI_STEPS } from "./aiInstructions";
 import { MESSAGE_TYPES } from "./messageTemplates";
 import { getActiveRules } from "./pageRules";
+import { toFile } from "openai";
 import { getOpenAI } from "./openaiClient";
+import { withImageRateLimit } from "./imageQueue";
 
 // The Character Library: recurring characters (the Vambies) with locked looks,
 // personalities and reference art. AI instructions reference a character as
@@ -38,6 +40,7 @@ export interface CastMember {
   // Labeled official renders (view × expression, per look set) for matching
   // each page's mood and camera angle. Absent on older chapter snapshots.
   renders?: CharacterRender[];
+  referenceIsRender?: boolean; // the reference art is an official 3D render
   version: number;
   required: boolean; // always cast or picked by the parent; otherwise optional
 }
@@ -110,6 +113,7 @@ const toCastMember = (c: CharacterWithArt, required: boolean): CastMember => ({
   renders: c.art
     .filter((a) => a.view && a.expression)
     .map((a) => ({ view: a.view!, expression: a.expression!, set: a.artSet, path: a.imagePath })),
+  referenceIsRender: Boolean(c.art.find((a) => a.id === c.referenceArtId)?.view),
   version: c.version,
   required,
 });
@@ -157,7 +161,9 @@ const VIEW_LABELS: Record<string, string> = { front: "front", angle: "three-quar
 // the scene calls for (e.g. "with guitar" when a guitar is in the scene).
 export function renderReferences(member: CastMember, page: { emotionalTone: string; visibleAction: string; setting: string }, shot: { type?: string; angle?: string } | null) {
   const renders = member.renders ?? [];
-  if (!renders.length) return [];
+  // 3D renders match only 3D reference art; next to book-style art they'd pull
+  // the picture back toward a 3D look.
+  if (!renders.length || member.referenceIsRender === false) return [];
   const scene = `${page.visibleAction} ${page.setting}`.toLowerCase();
   const sets = [...new Set(renders.map((r) => r.set))];
   const set = sets.find((s) => s && scene.includes(s.replace(/^with\s+/, "").toLowerCase())) ?? "";
@@ -237,11 +243,49 @@ export async function generateCharacterArt(characterId: string) {
   ]
     .filter(Boolean)
     .join("\n\n");
-  const response = await client.images.generate({ model: rules.imageModel, prompt, size: "1024x1024", quality: "high", output_format: "png" });
+  const response = await withImageRateLimit(0, () =>
+    client.images.generate({ model: rules.imageModel, prompt, size: "1024x1024", quality: "high", output_format: "png" })
+  );
   const b64 = response.data?.[0]?.b64_json;
   if (!b64) throw new Error("The image service returned no image.");
   const imagePath = saveCharacterImage(Buffer.from(b64, "base64"), `${character.key}-${Date.now()}.png`);
   return prisma.characterArt.create({ data: { characterId, imagePath, source: "generated", prompt } });
+}
+
+// Redraws the character's reference art in the book's current art style, as a
+// candidate an admin can pick as the new reference. Picking it also stops 3D
+// renders being attached, so pictures stay in the book's style.
+export async function restyleCharacterArt(characterId: string) {
+  const character = await prisma.character.findUniqueOrThrow({ where: { id: characterId }, include: { art: true } });
+  const reference = referenceImageOf(character);
+  if (!reference) throw new Error("Pick reference art first: it's what gets redrawn.");
+  const client = getOpenAI();
+  if (!client) throw new Error("Redrawing artwork needs an OpenAI API key (OPENAI_API_KEY).");
+  const { rules } = await getActiveRules();
+  const prompt = [
+    rules.illustrationStyle,
+    `Redraw this exact character as reference art for this picture book: keep ${character.name}'s silhouette, proportions, colors and features exactly${
+      character.appearance ? ` (${character.appearance})` : ""
+    }, drawn in the book's art style described above rather than as a 3D render. Full body, front view, relaxed neutral pose, centered on plain warm-cream paper. No scenery, no props, no labels.`,
+    character.neverRules ? `Never: ${character.neverRules}` : "",
+    "Do not include any text, letters or words in the image.",
+  ]
+    .filter(Boolean)
+    .join("\n\n");
+  const response = await withImageRateLimit(1, async () =>
+    client.images.edit({
+      model: rules.imageModel,
+      prompt,
+      image: [await toFile(fs.createReadStream(path.join(process.cwd(), reference)), path.basename(reference), { type: reference.endsWith(".png") ? "image/png" : "image/jpeg" })],
+      size: "1024x1024",
+      quality: "high",
+      output_format: "png",
+    })
+  );
+  const b64 = response.data?.[0]?.b64_json;
+  if (!b64) throw new Error("The image service returned no image.");
+  const imagePath = saveCharacterImage(Buffer.from(b64, "base64"), `${character.key}-book-style-${Date.now()}.png`);
+  return prisma.characterArt.create({ data: { characterId, imagePath, source: "generated", artSet: "book style", prompt } });
 }
 
 // How many chapters were made with this character in their cast.

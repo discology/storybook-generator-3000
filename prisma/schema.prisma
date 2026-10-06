@@ -273,7 +273,8 @@ model StoryPage {
   emotionalTone      String
   continuity         String
   shot               String? // JSON: { type, angle, focus }
-  text               String // exact words shown beneath the illustration
+  pictureSize        String      @default("") // vignette | framed | full | wordless; "" on pages made before sizes existed
+  text               String // exact words shown beneath the illustration (empty on wordless pages)
   interpretationNote String
   sourceMemoryId     String?
   sourceQuote        String?

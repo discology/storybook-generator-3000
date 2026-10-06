@@ -258,12 +258,27 @@ function PageCard({
 
   return (
     <div className="card" style={{ padding: 0, overflow: "hidden" }}>
-      <div style={{ position: "relative", background: "#ece4d3", aspectRatio: "3 / 2" }}>
+      <div
+        style={{
+          position: "relative",
+          background: "#ece4d3",
+          aspectRatio: page.pictureSize === "vignette" || page.pictureSize === "framed" ? "1" : page.pictureSize ? "2 / 3" : "3 / 2",
+        }}
+      >
         {ready?.imagePath && (
           <img
             src={`/${ready.imagePath}`}
             alt={page.visibleAction}
-            style={{ width: "100%", height: "100%", objectFit: "cover", display: "block", opacity: asset?.status === "generating" ? 0.4 : 1 }}
+            style={{
+              width: "100%",
+              height: "100%",
+              objectFit: "cover",
+              display: "block",
+              opacity: asset?.status === "generating" ? 0.4 : 1,
+              ...(page.pictureSize === "vignette"
+                ? { maskImage: "radial-gradient(ellipse 62% 62% at 50% 50%, #000 58%, transparent 76%)", WebkitMaskImage: "radial-gradient(ellipse 62% 62% at 50% 50%, #000 58%, transparent 76%)" }
+                : {}),
+            }}
           />
         )}
         {asset?.status === "generating" && (
@@ -294,7 +309,10 @@ function PageCard({
 
       <div style={{ padding: "1rem 1.1rem" }}>
         <div className="row inline" style={{ justifyContent: "space-between", marginTop: 0 }}>
-          <span className="status-line">PAGE {page.pageNumber}</span>
+          <span className="status-line">
+            PAGE {page.pageNumber}
+            {page.pictureSize ? ` · ${page.pictureSize}` : ""}
+          </span>
           {page.approvedAt ? (
             <span className="pill good">Approved</span>
           ) : notes.length > 0 || ready?.checkStatus === "flagged" ? (
@@ -321,6 +339,10 @@ function PageCard({
               </button>
             </div>
           </>
+        ) : page.pictureSize === "wordless" ? (
+          <p className="status-line" style={{ margin: "0.5rem 0" }}>
+            No words on this page: the picture tells it.
+          </p>
         ) : (
           <p style={{ fontSize: "1.1rem", lineHeight: 1.6, margin: "0.5rem 0" }}>{page.text}</p>
         )}

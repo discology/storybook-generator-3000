@@ -133,7 +133,16 @@ export default function FamilyCharacterDetail() {
                   busy={busy}
                   act={act}
                   canChange={!draft}
+                  olderStyle={Boolean(character.currentStyle && approved.styleSnapshot && approved.styleSnapshot !== character.currentStyle)}
                   onChange={() => act(`change-${variant}`, () => apiSend(`/api/family-characters/${characterId}/designs`, "POST", { variant }))}
+                  onRestyle={() =>
+                    act(`restyle-${variant}`, () =>
+                      apiSend(`/api/family-characters/${characterId}/designs`, "POST", {
+                        variant,
+                        changeNote: "Redraw in the book's current art style; keep every feature the same",
+                      })
+                    )
+                  }
                 />
               )}
               {draft && <DraftEditor design={draft} name={character.name} previous={approved ?? null} busy={busy} act={act} fixedIdentity={character.fixedIdentity ?? ""} />}
@@ -198,14 +207,18 @@ function ApprovedDesign({
   busy,
   act,
   canChange,
+  olderStyle,
   onChange,
+  onRestyle,
 }: {
   design: CharacterDesign;
   name: string;
   busy: string | null;
   act: Act;
   canChange: boolean;
+  olderStyle: boolean;
   onChange: () => void;
+  onRestyle: () => void;
 }) {
   return (
     <div className="card">
@@ -245,10 +258,20 @@ function ApprovedDesign({
           <strong>Usually wears:</strong> {design.usualClothing}
         </p>
       )}
+      {olderStyle && (
+        <p className="status-line">This look was approved in an earlier art style. Redraw it so {name} matches the book's current style.</p>
+      )}
       {canChange && (
-        <button className="btn-small btn-secondary" disabled={busy !== null} onClick={onChange}>
-          Change {name}'s appearance
-        </button>
+        <div className="row inline" style={{ flexWrap: "wrap" }}>
+          {olderStyle && (
+            <button className="btn-small btn-primary" disabled={busy !== null} onClick={onRestyle}>
+              Redraw in the book's style
+            </button>
+          )}
+          <button className="btn-small btn-secondary" disabled={busy !== null} onClick={onChange}>
+            Change {name}'s appearance
+          </button>
+        </div>
       )}
     </div>
   );

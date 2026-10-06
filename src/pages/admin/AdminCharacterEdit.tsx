@@ -41,7 +41,7 @@ export default function AdminCharacterEdit() {
   const [form, setForm] = useState<Form | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const [busy, setBusy] = useState<"upload" | "generate" | null>(null);
+  const [busy, setBusy] = useState<"upload" | "generate" | "restyle" | null>(null);
 
   const apply = (c: LibraryCharacter & { castingModes?: CastingModes }) => {
     setCharacter(c);
@@ -69,7 +69,7 @@ export default function AdminCharacterEdit() {
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => set(key, e.target.value),
   });
 
-  const run = async (action: () => Promise<LibraryCharacter>, kind?: "upload" | "generate") => {
+  const run = async (action: () => Promise<LibraryCharacter>, kind?: "upload" | "generate" | "restyle") => {
     setError(null);
     if (kind) setBusy(kind);
     try {
@@ -218,6 +218,14 @@ export default function AdminCharacterEdit() {
             >
               {busy === "generate" ? "Drawing… (about 30s)" : "Generate artwork"}
             </button>
+            <button
+              className="btn-small btn-secondary"
+              disabled={busy !== null || !character.referenceImage}
+              title="Redraw the reference art in the book's current art style"
+              onClick={() => run(() => apiSend(`/api/admin/characters/${id}/art/restyle`, "POST"), "restyle")}
+            >
+              {busy === "restyle" ? "Redrawing… (about 30s)" : "Redraw in the book's style"}
+            </button>
           </div>
           {dirty && <p className="status-line">Save your changes before generating, so the art uses the new look.</p>}
 
@@ -304,7 +312,7 @@ export default function AdminCharacterEdit() {
                       }}
                     />
                     <div className="status-line" style={{ fontSize: "0.75rem" }}>
-                      {a.source === "upload" ? "Uploaded" : "Generated"}
+                      {a.artSet === "book style" ? "In the book's style" : a.source === "upload" ? "Uploaded" : "Generated"}
                     </div>
                     {a.id === character.referenceArtId ? (
                       <span className="pill good">Reference</span>

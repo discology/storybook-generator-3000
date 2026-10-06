@@ -105,6 +105,7 @@ export interface StoryPage {
   emotionalTone: string;
   continuity: string;
   shot: string | null; // JSON: { type, angle, focus }
+  pictureSize: string; // vignette | framed | full | wordless; "" on older pages
   text: string;
   interpretationNote: string;
   sourceMemoryId: string | null;
@@ -261,6 +262,7 @@ export interface CharacterDesign {
   portraitPath: string | null;
   sheetPath: string | null;
   sheetStatus: "none" | "generating" | "ready" | "failed";
+  styleSnapshot: string;
   approvedAt: string | null;
   hasPhoto: boolean;
   pages: number;
@@ -279,6 +281,7 @@ export interface FamilyCharacterDetail {
   designs: CharacterDesign[];
   fixedIdentity?: string;
   allowedVariations?: string;
+  currentStyle?: string;
 }
 
 export interface FamilyCharacterSummary {

@@ -6,6 +6,7 @@ import type { Prisma } from "../src/generated/prisma/client";
 import { getActiveRules } from "./pageRules";
 import { getOpenAI } from "./openaiClient";
 import { runAiStep } from "./aiService";
+import { withImageRateLimit } from "./imageQueue";
 
 // "Our Characters": each family's recurring people (and pets). A character has a
 // permanent ID; their look lives in approved, versioned designs, one line per age
@@ -173,9 +174,9 @@ export async function generateProposal(designId: string) {
     .join("\n\n");
 
   const common = { model: rules.imageModel, prompt, size: "1024x1024", quality: "high" as const, output_format: "png" as const };
-  const response = references.length
-    ? await client.images.edit({ ...common, image: await Promise.all(references.map(toUpload)) })
-    : await client.images.generate(common);
+  const response = await withImageRateLimit(references.length, async () =>
+    references.length ? client.images.edit({ ...common, image: await Promise.all(references.map(toUpload)) }) : client.images.generate(common)
+  );
   const b64 = response.data?.[0]?.b64_json;
   if (!b64) throw new Error("The image service returned no image.");
   const imagePath = saveFile(DESIGNS_DIR, `${design.id}-proposal-${Date.now()}.png`, Buffer.from(b64, "base64"));
@@ -249,9 +250,10 @@ export async function generateReferenceSheet(designId: string) {
   const { rules } = await getActiveRules();
   const name = design.familyCharacter.name;
   try {
-    const response = await client.images.edit({
+    const portrait = design.portraitPath;
+    const response = await withImageRateLimit(1, async () => client.images.edit({
       model: rules.imageModel,
-      image: [await toUpload(design.portraitPath)],
+      image: [await toUpload(portrait)],
       prompt: [
         `The attached image is ${name}'s approved character design for a children's picture book.`,
         `Create a character reference sheet of this exact character, in exactly the same illustration style, colors and outfit: a front view, a side view and a three-quarter view (full body), plus four head-and-shoulders expressions (happy, surprised, sad, thoughtful). Plain warm-cream background.`,
@@ -263,7 +265,7 @@ export async function generateReferenceSheet(designId: string) {
       size: "1536x1024",
       quality: "high",
       output_format: "png",
-    });
+    }));
     const b64 = response.data?.[0]?.b64_json;
     if (!b64) throw new Error("The image service returned no image.");
     const sheetPath = saveFile(DESIGNS_DIR, `${design.id}-sheet-${Date.now()}.png`, Buffer.from(b64, "base64"));
@@ -285,7 +287,7 @@ export function appearanceReferences(a: AppearanceWithDesign) {
   if (a.design.portraitPath) {
     refs.push({
       path: a.design.portraitPath,
-      label: `${name}'s approved design${a.design.variant !== "today" ? ` (${a.design.variant})` : ""}. Draw ${name} exactly like this: same face, skin tone, eyes, hair, build and signature accessories. Their clothes in this scene are described below.`,
+      label: `${name}'s approved design${a.design.variant !== "today" ? ` (${a.design.variant})` : ""}. Draw ${name} with exactly this face, skin tone, eyes, hair, build and signature accessories, in this book's art style. Their clothes in this scene are described below.`,
     });
   }
   if (a.design.sheetPath) {

@@ -18,6 +18,7 @@ import {
   savePhoto,
 } from "./familyCharacters";
 import { redrawPages } from "./storyPages";
+import { getActiveRules } from "./pageRules";
 
 // "Our Characters": a family's people (and pets), their approved looks and the
 // history of every version. Only members of that family can see or change them.
@@ -156,7 +157,13 @@ router.post("/storybooks/:id/characters", async (req, res) => {
 router.get("/family-characters/:characterId", async (req, res) => {
   const character = await characterForRequest(req, res);
   if (!character) return;
-  res.json({ ...(await present(character.id)), fixedIdentity: FIXED_IDENTITY, allowedVariations: ALLOWED_VARIATIONS });
+  const { rules } = await getActiveRules();
+  res.json({
+    ...(await present(character.id)),
+    fixedIdentity: FIXED_IDENTITY,
+    allowedVariations: ALLOWED_VARIATIONS,
+    currentStyle: rules.illustrationStyle, // to spot designs approved in an older art style
+  });
 });
 
 router.put("/family-characters/:characterId", async (req, res) => {

@@ -98,13 +98,17 @@ Shot list
 - Open with a wide establishing shot that shows where we are. Use close-ups for the most emotional moments and for important small objects.
 - Never use the same shot type on two pages in a row. When the setting stays the same, show it from a new viewpoint or distance instead of repeating the view.
 
+Picture size
+- Let the size of each picture follow the feeling: "vignette" (small, on open paper) for quiet openings and endings, "framed" as the feeling builds, "full" for the biggest moments.
+- Give the chapter's single most meaningful moment a "wordless" page when the picture can say it all: its text is empty. Use at most one wordless page, and only if the reading level allows a page without words.
+
 Bottom-of-page text
 - Write the exact narration or dialogue shown beneath that page's illustration. It must match what the picture shows, complement rather than repeat it, and never describe events that belong to another page.
 
 <memories>
 
 <revision_request>`,
-    outputFormat: `Respond with ONLY a JSON object, no markdown fences, in this shape: {"title": "chapter title", "characters": [{"name": "an extra: someone who isn't a saved family character", "appearance": "fixed look and outfit for this chapter"}], "unresolved": [{"ref": "U1", "mention": "how the memory refers to them", "kind": "unclear | new | missing_variant", "candidates": ["F1"], "variant": "the look the memory needs, e.g. today or as a child", "question": "one short question for the parent", "suggestedName": "...", "suggestedRelationship": "..."}], "pages": [{"storyMoment": "...", "characters": ["cast keys, family refs (F1), unresolved refs (U1) and extras' names"], "appearances": [{"ref": "F1 or U1", "variant": "today", "outfit": "what they wear in this scene"}], "setting": "...", "visibleAction": "...", "emotionalTone": "...", "continuity": "what must match neighboring pages", "shot": {"type": "wide establishing | medium | close-up | extreme close-up | over-the-shoulder | bird's-eye | low angle", "angle": "e.g. eye level, from behind Grandma", "focus": "the one thing the picture centers on"}, "text": "exact words shown beneath the illustration", "sourceMemory": 1, "sourceQuote": "the words from the memory this page draws on, or empty", "interpretationNote": "what on this page is fictional or interpreted"}]}`,
+    outputFormat: `Respond with ONLY a JSON object, no markdown fences, in this shape: {"title": "chapter title", "characters": [{"name": "an extra: someone who isn't a saved family character", "appearance": "fixed look and outfit for this chapter"}], "unresolved": [{"ref": "U1", "mention": "how the memory refers to them", "kind": "unclear | new | missing_variant", "candidates": ["F1"], "variant": "the look the memory needs, e.g. today or as a child", "question": "one short question for the parent", "suggestedName": "...", "suggestedRelationship": "..."}], "pages": [{"storyMoment": "...", "characters": ["cast keys, family refs (F1), unresolved refs (U1) and extras' names"], "appearances": [{"ref": "F1 or U1", "variant": "today", "outfit": "what they wear in this scene"}], "setting": "...", "visibleAction": "...", "emotionalTone": "...", "continuity": "what must match neighboring pages", "shot": {"type": "wide establishing | medium | close-up | extreme close-up | over-the-shoulder | bird's-eye | low angle", "angle": "e.g. eye level, from behind Grandma", "focus": "the one thing the picture centers on"}, "pictureSize": "vignette | framed | full | wordless", "text": "exact words shown beneath the illustration (empty on a wordless page)", "sourceMemory": 1, "sourceQuote": "the words from the memory this page draws on, or empty", "interpretationNote": "what on this page is fictional or interpreted"}]}`,
   },
   {
     key: "page_check",
@@ -144,6 +148,8 @@ Extras:
 
 Pages:
 <pages>
+
+Wordless pages have no text on purpose: judge them by their scene alone.
 
 For pages <pages_to_check>, flag a page if:
 - its text contradicts its scene: the text mentions a character, action or important object the scene doesn't show, or describes it differently. (A character who is visible but not mentioned in the text is fine: the text should complement the picture, not narrate it.);
@@ -200,7 +206,7 @@ Next page: <next_page>
 The parent asked: "<revision_request>"
 
 Rewrite page <page_number> to make that change. Keep it one main action or emotional moment, keep it consistent with the previous and next pages, keep family facts as told, and make sure the scene and the exact text agree. Choose a camera shot that suits the moment and differs from the shot type of the previous and next pages. In "characters", name cast members by their key and family characters by their ref (F1), and give each family character an "appearances" entry with their look and what they wear in this scene.`,
-    outputFormat: `Respond with ONLY a JSON object, no markdown fences, for the single revised page: {"storyMoment": "...", "characters": ["cast keys, family refs and extras' names"], "appearances": [{"ref": "F1", "variant": "today", "outfit": "..."}], "setting": "...", "visibleAction": "...", "emotionalTone": "...", "continuity": "...", "shot": {"type": "...", "angle": "...", "focus": "..."}, "text": "exact words shown beneath the illustration", "sourceMemory": 1, "sourceQuote": "...", "interpretationNote": "..."}`,
+    outputFormat: `Respond with ONLY a JSON object, no markdown fences, for the single revised page: {"storyMoment": "...", "characters": ["cast keys, family refs and extras' names"], "appearances": [{"ref": "F1", "variant": "today", "outfit": "..."}], "setting": "...", "visibleAction": "...", "emotionalTone": "...", "continuity": "...", "shot": {"type": "...", "angle": "...", "focus": "..."}, "pictureSize": "vignette | framed | full | wordless (keep the current one unless the change calls for another)", "text": "exact words shown beneath the illustration (empty on a wordless page)", "sourceMemory": 1, "sourceQuote": "...", "interpretationNote": "..."}`,
   },
   {
     key: "illustration_check",

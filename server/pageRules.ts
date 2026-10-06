@@ -45,6 +45,11 @@ export const EMBELLISHMENT_LEVELS: Record<EmbellishmentLevel, { label: string; r
 
 export const IMAGE_MODELS = ["gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"];
 
+// The chosen art direction: classic ink line and watercolor wash, with the
+// Vambies' signature colors as the only bright notes.
+export const INK_AND_WASH_STYLE =
+  "Art direction: a classic picture book drawn in expressive pen-and-ink line with fine cross-hatching, finished with transparent watercolor washes. Ink first, wash second: no 3D shading, glossy surfaces or smooth gradients. A muted, earthy palette (sage, olive, ochre, warm browns; dusky blue and violet for night and big feelings), in which the Vambies' signature colors, like Baby Vambie's aqua, are the only clear, bright colors. Warm cream paper texture. Simple faces; feelings show through posture and small gestures. Keep faces and the key action inside the central 80% of the frame. No text, letters, numbers or words anywhere in the image.";
+
 export const DEFAULT_RULES: PageRules = {
   readingProfiles: {
     "0-3": {
@@ -73,8 +78,7 @@ export const DEFAULT_RULES: PageRules = {
     },
   },
   embellishment: "moderate",
-  illustrationStyle:
-    "Children's picture-book illustration, soft watercolor and gouache, warm natural light, gentle textures, cozy and calm. No text, letters, numbers or words anywhere in the image.",
+  illustrationStyle: INK_AND_WASH_STYLE,
   peopleStyle:
     "Draw family members as warm, simple storybook figures. Do not try to resemble real people, and never make them photorealistic.",
   imageModel: "gpt-image-2",

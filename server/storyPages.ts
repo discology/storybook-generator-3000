@@ -17,6 +17,7 @@ import {
   parseAliases,
 } from "./familyCharacters";
 import { getOpenAI } from "./openaiClient";
+import { MAX_REFERENCE_IMAGES, withImageRateLimit } from "./imageQueue";
 import {
   EMBELLISHMENT_LEVELS,
   PageRules,
@@ -86,6 +87,7 @@ interface PlannedPage {
   emotionalTone: string;
   continuity: string;
   shot: Shot | null;
+  pictureSize: string; // vignette | framed | full | wordless
   text: string;
   sourceMemory?: number;
   sourceQuote?: string;
@@ -168,7 +170,7 @@ const pageCharacterNames = (p: PageRow, snapshot: GenerationSnapshot | null, unr
   });
 
 const formatPage = (p: PageRow, snapshot: GenerationSnapshot | null, unresolved: UnresolvedPerson[] = []) =>
-  `Page ${p.pageNumber}\nStory moment: ${p.storyMoment}\nCharacters: ${pageCharacterNames(p, snapshot, unresolved).join(", ")}\nSetting: ${p.setting}\nVisible action: ${p.visibleAction}\nEmotional tone: ${p.emotionalTone}\nContinuity: ${p.continuity}\nShot: ${describeShot(parseShot(p.shot)) || "(none)"}\nText: "${p.text}"\nInterpretation: ${p.interpretationNote}`;
+  `Page ${p.pageNumber}${p.pictureSize ? ` (picture size: ${p.pictureSize})` : ""}\nStory moment: ${p.storyMoment}\nCharacters: ${pageCharacterNames(p, snapshot, unresolved).join(", ")}\nSetting: ${p.setting}\nVisible action: ${p.visibleAction}\nEmotional tone: ${p.emotionalTone}\nContinuity: ${p.continuity}\nShot: ${describeShot(parseShot(p.shot)) || "(none)"}\nText: "${p.text}"\nInterpretation: ${p.interpretationNote}`;
 
 const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 
@@ -184,6 +186,7 @@ function normalizePage(raw: any): PlannedPage {
     emotionalTone: str(raw?.emotionalTone),
     continuity: str(raw?.continuity),
     shot: raw?.shot && str(raw.shot.type) ? { type: str(raw.shot.type), angle: str(raw.shot.angle), focus: str(raw.shot.focus) } : null,
+    pictureSize: PICTURE_SIZE_NAMES.includes(str(raw?.pictureSize).toLowerCase()) ? str(raw.pictureSize).toLowerCase() : "framed",
     text: str(raw?.text),
     sourceMemory: Number.isInteger(raw?.sourceMemory) ? raw.sourceMemory : undefined,
     sourceQuote: str(raw?.sourceQuote),
@@ -199,7 +202,9 @@ const pageData = (page: PlannedPage, memories: SourceMemory[]) => ({
   emotionalTone: page.emotionalTone,
   continuity: page.continuity,
   shot: page.shot ? JSON.stringify(page.shot) : null,
-  text: page.text,
+  pictureSize: page.pictureSize,
+  // A wordless page's picture says it all.
+  text: page.pictureSize === "wordless" ? "" : page.text,
   interpretationNote: page.interpretationNote,
   sourceMemoryId: memories[(page.sourceMemory ?? 1) - 1]?.id ?? memories[0]?.id ?? null,
   sourceQuote: page.sourceQuote || null,
@@ -263,6 +268,7 @@ function mockPlan(childName: string, memories: SourceMemory[], profile: ReadingP
     emotionalTone: "Calm",
     continuity: "",
     shot: null,
+    pictureSize: "framed",
     text: i === 0 ? `(Placeholder) ${childName} had a day. Baby Vambie sat close.` : `(Placeholder page ${i + 1}.)`,
     sourceMemory: 1,
     sourceQuote: "",
@@ -414,7 +420,9 @@ export async function createPagedChapter(input: CreateChapterInput) {
       },
       { body: snapshot.instructions.page_plan }
     );
-    const pages = Array.isArray(output?.pages) ? output.pages.map(normalizePage).filter((p: PlannedPage) => p.text) : [];
+    const pages = Array.isArray(output?.pages)
+      ? output.pages.map(normalizePage).filter((p: PlannedPage) => p.text || p.pictureSize === "wordless")
+      : [];
     if (pages.length === 0) throw new Error("The AI returned no pages. Try again.");
     plan = {
       title: str(output.title) || `Chapter ${existing?.sequence ?? storybook.chapters.length + 1}`,
@@ -607,7 +615,9 @@ export async function checkPages(chapterId: string, pageNumbers?: number[]) {
   const targets = chapter.pages.filter((p) => !pageNumbers || pageNumbers.includes(p.pageNumber));
   if (targets.length === 0) return;
 
-  const notes = new Map<number, string[]>(targets.map((p) => [p.pageNumber, checkPageLimits(p.text, profile)]));
+  const notes = new Map<number, string[]>(
+    targets.map((p) => [p.pageNumber, p.pictureSize === "wordless" ? [] : checkPageLimits(p.text, profile)])
+  );
   // Back-to-back pages with the same shot type read as the same picture twice.
   for (const page of targets) {
     const shot = parseShot(page.shot);
@@ -702,7 +712,9 @@ export async function revisePage(pageId: string, request: string) {
     { body: snapshot.instructions.page_revise }
   );
   const revised = normalizePage(output);
-  if (!revised.text) throw new Error("The AI returned an empty page. Try again.");
+  // Keep the page's picture size unless the revision chose one.
+  if (!PICTURE_SIZE_NAMES.includes(str(output?.pictureSize).toLowerCase())) revised.pictureSize = target.pictureSize || "framed";
+  if (!revised.text && revised.pictureSize !== "wordless") throw new Error("The AI returned an empty page. Try again.");
   const family = snapshot.family ?? [];
   revised.characters = toPageTokens(revised.characters, snapshot.cast ?? [], family);
 
@@ -760,7 +772,29 @@ const SHEET_LABEL =
   "This chapter's character sheet. Use it ONLY for how the characters look (body shape, colors, outfits) and for the art style. Do not copy its layout, poses or plain background: paint a completely new, fully detailed scene framed as described.";
 const EARLIER_PAGE_LABEL =
   "An earlier page of this same book: draw the characters, outfits and art style as they appear there, in a new scene.";
-const castArtLabel = (m: CastMember) => `Official artwork of ${m.name}. Draw ${m.name} exactly like this: same shape, colors and features.`;
+const castArtLabel = (m: CastMember) =>
+  `Official artwork of ${m.name}: match ${m.name}'s shape, proportions, colors and features exactly, drawn in this book's art style.`;
+// References define who characters are; the art style comes from the rules.
+const BELONG_NOTE =
+  "Reference images show who each character is (shape, proportions, colors, features), not how to render them: draw every character in this book's art style, with the same line, texture, lighting and palette as the scene, so they belong in it.";
+
+// Each page's picture size decides the image's shape and framing. Pages made
+// before picture sizes existed keep the original wide format.
+const PICTURE_SIZE_NAMES = ["vignette", "framed", "full", "wordless"];
+const PICTURE_SIZES: Record<string, { size: string; framing: string }> = {
+  vignette: {
+    size: "1024x1024",
+    framing:
+      "Picture size: a small vignette: the characters and a few props on plain warm-cream paper, the color fading out in soft, irregular edges with empty paper all around; no background scenery and no border.",
+  },
+  framed: { size: "1024x1024", framing: "Picture size: a square picture of the whole scene." },
+  full: { size: "1024x1536", framing: "Picture size: a tall full-page picture of the whole scene." },
+  wordless: {
+    size: "1024x1536",
+    framing: "Picture size: a tall full-page picture with no words on the page: the meaningful moment of the chapter, filling the frame edge to edge.",
+  },
+};
+const pictureFormat = (page: { pictureSize: string }) => PICTURE_SIZES[page.pictureSize] ?? { size: "1536x1024", framing: "" };
 
 const describeReferences = (references: ImageReference[]) =>
   references.length ? `Attached images, in order:\n${references.map((r, i) => `${i + 1}. ${r.label}`).join("\n")}` : "";
@@ -804,11 +838,13 @@ function buildImagePrompt(page: PageRow, ctx: PromptContext, references: ImageRe
   const shot = parseShot(page.shot);
   return [
     shot ? `Camera: ${describeShot(shot)}.` : "",
+    pictureFormat(page).framing,
     ctx.rules.illustrationStyle,
     // Chapters from before the Character Library described Baby Vambie in the rules.
     ctx.cast.length ? "" : ctx.rules.babyVambieAppearance ?? "",
     ctx.rules.peopleStyle,
     describeReferences(references),
+    references.length ? BELONG_NOTE : "",
     correction ?? "",
     `Characters in this scene (draw no one else):\n${describePageCharacters(JSON.parse(page.characters), ctx).join("\n") || "Baby Vambie"}`,
     `Setting: ${page.setting}`,
@@ -864,7 +900,7 @@ export async function generateCharacterSheet(chapterId: string): Promise<string 
   const references = [
     ...cast.filter((m) => m.referenceImage).map((m) => ({ path: m.referenceImage!, label: castArtLabel(m) })),
     ...appearances.flatMap((a) => appearanceReferences(a).slice(0, 1)),
-  ];
+  ].slice(0, MAX_REFERENCE_IMAGES);
   try {
     const common = {
       model: snapshot.rules.imageModel,
@@ -873,9 +909,11 @@ export async function generateCharacterSheet(chapterId: string): Promise<string 
       quality: snapshot.rules.imageQuality,
       output_format: "jpeg" as const,
     };
-    const response = references.length
-      ? await client.images.edit({ ...common, image: await Promise.all(references.map((r) => toUpload(r.path))) })
-      : await client.images.generate(common);
+    const response = await withImageRateLimit(references.length, async () =>
+      references.length
+        ? client.images.edit({ ...common, image: await Promise.all(references.map((r) => toUpload(r.path))) })
+        : client.images.generate(common)
+    );
     const b64 = response.data?.[0]?.b64_json;
     if (!b64) throw new Error("The image service returned no image.");
     const imagePath = saveImage(b64, `${chapterId}-characters-${Date.now()}.jpg`);
@@ -905,25 +943,26 @@ export async function generateIllustration(pageId: string, options: Illustration
   const rules = snapshot?.rules;
   const cast = snapshot?.cast ?? [];
   const appearances = await pageAppearances(pageId);
-  // References: the chapter's character sheet, the official art of every cast
-  // member on the page and the approved design of every family character on it.
-  // Chapters made before character sheets existed (or whose sheet failed) use
-  // page 1's illustration instead, so their pages still match.
-  const references: ImageReference[] = [];
+  // References, most important first, since a request can only carry a few:
+  // each character's own art and family portraits, then the chapter's character
+  // sheet (chapters made before sheets existed use page 1 instead, so their
+  // pages still match), then family reference sheets and mood/angle renders.
+  const onPage = (JSON.parse(page.characters) as string[]).map((t) => findCastMember(cast, t)).filter((m): m is CastMember => Boolean(m));
+  const scene: ImageReference[] = [];
   if (chapter.characterSheetImage && !options.referencePageId) {
-    references.push({ path: chapter.characterSheetImage, label: SHEET_LABEL });
+    scene.push({ path: chapter.characterSheetImage, label: SHEET_LABEL });
   } else {
     const firstPage = chapter.pages.find((p) => p.pageNumber === 1);
     const pageRef = await latestReadyAsset(options.referencePageId ?? (page.pageNumber === 1 ? "" : firstPage?.id ?? ""));
-    if (pageRef?.imagePath) references.push({ path: pageRef.imagePath, label: EARLIER_PAGE_LABEL });
+    if (pageRef?.imagePath) scene.push({ path: pageRef.imagePath, label: EARLIER_PAGE_LABEL });
   }
-  for (const name of JSON.parse(page.characters) as string[]) {
-    const member = findCastMember(cast, name);
-    if (!member) continue;
-    if (member.referenceImage) references.push({ path: member.referenceImage, label: castArtLabel(member) });
-    references.push(...renderReferences(member, page, parseShot(page.shot)));
-  }
-  for (const a of appearances) references.push(...appearanceReferences(a));
+  const references: ImageReference[] = [
+    ...onPage.filter((m) => m.referenceImage).map((m) => ({ path: m.referenceImage!, label: castArtLabel(m) })),
+    ...appearances.flatMap((a) => appearanceReferences(a).slice(0, 1)),
+    ...scene,
+    ...appearances.flatMap((a) => appearanceReferences(a).slice(1)),
+    ...onPage.flatMap((m) => renderReferences(m, page, parseShot(page.shot))),
+  ].slice(0, MAX_REFERENCE_IMAGES);
 
   const toFix = appearances.filter((a) => options.fixCharacterIds?.includes(a.familyCharacterId));
   const fixNote = toFix.length ? toFix.map((a) => a.familyCharacter.name).join(", ") : null;
@@ -945,10 +984,12 @@ export async function generateIllustration(pageId: string, options: Illustration
 
   let mismatched: string[] = [];
   try {
-    const common = { model: rules.imageModel, prompt, size: "1536x1024", quality: rules.imageQuality, output_format: "jpeg" as const };
-    const response = references.length
-      ? await client.images.edit({ ...common, image: await Promise.all(references.map((r) => toUpload(r.path))) })
-      : await client.images.generate(common);
+    const common = { model: rules.imageModel, prompt, size: pictureFormat(page).size, quality: rules.imageQuality, output_format: "jpeg" as const };
+    const response = await withImageRateLimit(references.length, async () =>
+      references.length
+        ? client.images.edit({ ...common, image: await Promise.all(references.map((r) => toUpload(r.path))) })
+        : client.images.generate(common)
+    );
     const b64 = response.data?.[0]?.b64_json;
     if (!b64) throw new Error("The image service returned no image.");
     const imagePath = saveImage(b64, `${pageId}-v${asset.version}.jpg`);
