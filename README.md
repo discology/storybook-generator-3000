@@ -53,13 +53,13 @@ Open http://localhost:5174. Without Twilio settings, the sign-in code appears on
 | [Privacy and access](docs/privacy-and-access.md) | Who can see and do what, what's sent to AI providers, deletion and exports |
 | [Admin guide](docs/admin-guide.md) | Story Review, Prompt Library, Characters and the settings that shape every chapter |
 | [Design system](docs/design-system.md) | Colors, type, components, Baby Vambie artwork and the story art direction |
+| [Deployment](docs/deployment.md) | How the app is hosted on Fly.io, its settings, deploying, data and backups |
 
 ## Status
 
-This is a working prototype that runs on one computer. Not built yet:
+This is a working prototype, hosted on Fly.io and invite-only for now: see [Deployment](docs/deployment.md). Not built yet:
 
 - **Sending text messages.** Sign-in codes are texted through Twilio Verify. Invites, reminders, chapter links and "your chapter is ready" alerts aren't sent yet; the app shows the message for the person to share themselves.
-- **Hosting.** There's no production deployment, and on a real phone the microphone only works over HTTPS.
 - **Other languages.** Stories are written in English only.
 
 ## Built with

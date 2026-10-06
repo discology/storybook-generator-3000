@@ -26,7 +26,7 @@ The person who recorded a memory can correct its words at any time, and the memo
 
 ## 3. The weekly chapter
 
-- **When.** At 6 AM in the family's time zone, on the morning after their weekly reminder day. Sunday reminders mean a Monday-morning chapter, so memories recorded in answer to the reminder still make it in. The storybook's owner can also choose **Make it now** on This week's chapter.
+- **When.** At 6 AM in the family's time zone, on the morning after their weekly reminder day. Sunday reminders mean a Monday-morning chapter, so memories recorded in answer to the reminder still make it in. The storybook's owner can also choose **Make it now** on This week's chapter. (A development copy only makes weekly chapters with `WEEKLY_CHAPTERS=on`.)
 - **What goes in.** Every prepared memory that's allowed in stories and isn't in a chapter yet, plus any Vambies the parent picked for the next chapter.
 - **A snapshot of the rules.** Each chapter stores what it was made with: the page rules version, reading stage, AI instructions, the Vambie characters and the family's approved designs. Later changes in the admin panel only affect new chapters, so a book never changes under a family.
 
@@ -127,5 +127,4 @@ Pictures are most of the cost: about $0.05 to draw each one, plus about $0.008 f
 ## Not built yet
 
 - Text messages other than sign-in codes: invites, reminders, chapter links and "your chapter is ready" alerts. The app shows the message for the person to send themselves.
-- Hosting for real families, including HTTPS, which phones need for the microphone.
 - Stories in languages other than English.

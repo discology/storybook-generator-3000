@@ -1,0 +1,32 @@
+# Fly.io configuration for the hosted app (docs/deployment.md).
+app = "vambie-storybook"
+primary_region = "sjc"
+
+[env]
+  APP_URL = "https://vambie-storybook.fly.dev"
+
+# The database and saved files. SQLite allows one machine at a time.
+[[mounts]]
+  source = "vambie_data"
+  destination = "/data"
+  initial_size = "3gb"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  # Weekly chapters and picture drawing run inside the app, so it never sleeps.
+  auto_stop_machines = "off"
+  auto_start_machines = true
+  min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "30s"
+    interval = "30s"
+    method = "GET"
+    path = "/api/health"
+    timeout = "5s"
+
+[[vm]]
+  memory = "1gb"
+  cpu_kind = "shared"
+  cpus = 1

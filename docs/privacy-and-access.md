@@ -6,7 +6,9 @@ Who can see what, what leaves the app, and how families can take their data or d
 
 - **The owner** is the family member who started the storybook, usually a parent. They choose the storybook's settings, invite family, review and publish chapters, and choose who can read each one.
 - **Family members** join with an invitation link. They can record memories and read the chapters shared with them.
-- **Admins** are the Vambie team: the phone numbers listed in `ADMIN_PHONES`. They review held chapters, manage prompt cards and characters, and edit the settings that shape every chapter. If `ADMIN_PHONES` is empty, anyone signed in can open the admin panel. That's only meant for development on your own computer.
+- **Admins** are the Vambie team: the phone numbers listed in `ADMIN_PHONES`. They review held chapters, manage prompt cards and characters, and edit the settings that shape every chapter. If `ADMIN_PHONES` is empty, anyone signed in can open the admin panel on a development copy; the hosted app keeps it closed.
+
+On the hosted app, starting a storybook is invite-only: only admins and the numbers in `ALLOWED_PHONES` can start one, and everyone else joins a family through an invitation link.
 
 ## What each person can see and do
 
@@ -69,11 +71,25 @@ Anyone in the family can download a copy of their data from Privacy settings. An
   - their account and sign-in sessions are deleted.
 - Copies that were already downloaded or printed can't be recalled. The app says so before anything is deleted.
 
+## Files
+
+- **Recordings, exports and reference photos** are never served as files. Recordings and exports go through API routes that check who's asking, and reference photos are only read by the server.
+- **Page pictures, chapter character sheets and family members' design pictures** are only served to members of that family and to admins.
+- **Vambie artwork and prompt-card artwork** are public, since they're the same for everyone.
+- Addresses are normalized before these rules are applied, so a path like `/uploads/x/../private/…` is judged by where it really leads.
+
+## Hosting
+
+On the hosted app ([Deployment](deployment.md)):
+
+- everything travels over HTTPS, and session cookies are HTTPS-only and HTTP-only;
+- sign-in codes are only texted, through Twilio Verify, which also limits how often codes can be requested;
+- the database and files live on an encrypted disk, with a daily snapshot kept for 5 days.
+
 ## Known limitations
 
-The prototype runs on one computer. Before using it with real families, these need work:
+This is still a prototype. Before inviting families widely:
 
-- **Some files are served by URL without a sign-in check:** page pictures, chapter character sheets, family members' design pictures and prompt artwork. Their file names are long and hard to guess, but anyone with the address could open them. Recordings, exports and reference photos are protected.
-- **HTTPS and secure cookies.** Sessions use HTTP-only cookies, which still need the `Secure` flag once the app runs over HTTPS.
-- **Sign-in codes.** With Twilio Verify, Twilio limits how often codes can be requested. In development mode the app stores codes itself, with no limit.
-- **Backups and encryption at rest** for the database and `uploads/` aren't set up.
+- **Terms and privacy policy.** The sign-in screen mentions them, but they haven't been written.
+- **Backups stay with Fly.** Daily snapshots are kept for 5 days on Fly itself, and there's no copy anywhere else.
+- **AI providers' terms.** Check OpenAI's current data-use and retention terms for family content, especially recordings and photos.

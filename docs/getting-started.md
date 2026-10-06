@@ -35,7 +35,9 @@ Then fill in `.env`. Everything except `DATABASE_URL` is optional.
 | `GEMINI_API_KEY` | Uses Google Gemini for transcription and the text steps when there's no OpenAI key. Pictures still need OpenAI. |
 | `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_VERIFY_SERVICE_SID` | Texts sign-in codes through Twilio Verify. |
 | `APP_URL` | The app's public address, used in links inside messages (default `http://localhost:5174`). |
-| `ADMIN_PHONES` | Phone numbers that can open the admin panel, comma-separated, like `+15551234567`. If it's empty, anyone signed in can open it, which is only safe on your own computer. |
+| `ADMIN_PHONES` | Phone numbers that can open the admin panel, comma-separated, like `+15551234567`. If it's empty, anyone signed in can open it on a development copy; the hosted app keeps it closed. |
+| `WEEKLY_CHAPTERS` | `on` makes weekly chapters automatically on a development copy too. It's off by default, so a local copy and the hosted app never both spend money on the same chapter. |
+| `ALLOWED_PHONES`, `OPEN_SIGNUP` | Who can start a storybook on the hosted app; see [Deployment](deployment.md). A development copy lets anyone start one. |
 
 `.env` is listed in `.gitignore`, so keys never end up in the repository.
 

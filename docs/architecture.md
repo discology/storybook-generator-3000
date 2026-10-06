@@ -80,7 +80,8 @@ Background jobs run inside the API process. There's no separate worker yet.
 | When | What runs |
 | --- | --- |
 | A recording is uploaded | The memory pipeline: transcribe, title and interpret. The audio is deleted afterwards if the family doesn't keep recordings. |
-| Every 5 minutes | The weekly chapter check: any storybook whose scheduled time has passed gets its chapter. |
+| Every 5 minutes | The weekly chapter check: any storybook whose scheduled time has passed gets its chapter. This runs on the hosted app, and on a development copy only with `WEEKLY_CHAPTERS=on`. |
+| A slow action is requested | Rewriting a chapter, drawing a design, revising a page and similar actions answer right away with a job id and finish in the background. The browser asks `/api/jobs/:id` until the result is ready (`server/jobs.ts`, `src/lib/api.ts`). |
 | A chapter is planned (or Who's who is answered) | Illustration: the character sheet, then three pages at a time, paced to the image limit. |
 | An export is requested | The zip is built, and the download expires after 7 days. |
 | The API starts | Unfinished memories resume. Pictures and exports that were in progress are marked failed, so they can be retried from the app. |
@@ -110,11 +111,12 @@ Runtime files live in `uploads/`, which isn't committed.
 | `uploads/memories/` | Voice recordings | Only through `/api/memories/:id/audio`, after an access check |
 | `uploads/exports/` | Export zips | Only through `/api/exports/:id/download`, to the person who asked for it |
 | `uploads/private/photos/` | Family members' reference photos | Only to family members, through an access-checked route |
-| `uploads/pages/` | Page pictures and chapter character sheets | By URL |
-| `uploads/characters/` | Vambie art and renders, and family members' design pictures | By URL |
-| `uploads/prompts/` | Prompt card artwork | By URL |
+| `uploads/pages/` | Page pictures and chapter character sheets | Only to the family's members and admins |
+| `uploads/characters/family/` | Family members' design pictures | Only to the family's members and admins |
+| `uploads/characters/` (the rest) | Vambie art and renders | Public |
+| `uploads/prompts/` | Prompt card artwork | Public |
 
-Files served "by URL" are only reachable by someone who knows the address, and their file names are hard to guess, but they aren't checked against a sign-in. [Privacy and access](privacy-and-access.md) covers this.
+`server/uploadAccess.ts` applies these rules to every `/uploads` request, after normalizing the address. On the hosted app, `uploads/` points at the data volume ([Deployment](deployment.md)).
 
 ## Conventions
 
@@ -122,3 +124,4 @@ Files served "by URL" are only reachable by someone who knows the address, and t
 - **Admins edit the wording; code owns the structure.** Message and AI instruction text are editable, while the message types, variables and reply formats are fixed in code.
 - **Access checks.** Storybook, memory, chapter, family and export routes use the helpers in `server/access.ts` (`requireMember`, `memberForMemory`, `memberForChapter`). Page review (owner only) and family characters (family members only) have their own checks, in `pageRoutes.ts` and `familyCharacterRoutes.ts`.
 - **Every route under `/api/admin` requires an admin,** and so does changing prompt cards. This is enforced once, in `server.ts`.
+- **Slow actions run as jobs.** A route that can take more than a few seconds is listed with `asJob` in `server.ts`; the browser helpers in `src/lib/api.ts` wait for the result, so screens don't need to change.

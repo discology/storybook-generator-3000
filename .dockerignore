@@ -1,0 +1,14 @@
+node_modules
+dist
+uploads
+src/generated
+prisma/*.db
+prisma/*.db-journal
+.env
+.env.*
+!.env.example
+.git
+.vscode
+docs
+*.log
+.DS_Store
