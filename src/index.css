@@ -3845,6 +3845,113 @@ button.btn-small,
   font-size: 17px;
 }
 
+/* ---------- Try before sign-up (VSB-75) ---------- */
+
+.try-working {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 28px 8px 8px;
+  text-align: center;
+}
+
+.try-working svg {
+  animation: spin 1s linear infinite;
+}
+
+.try-prompt {
+  min-height: 0;
+  padding: 18px;
+  margin: 4px 0 16px;
+  gap: 8px;
+}
+
+.try-prompt .prompt-card__q {
+  font-size: 28px;
+  margin: 0;
+}
+
+.try-recorder {
+  margin-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.try-clock {
+  font-family: var(--font-display);
+  font-size: 44px;
+  margin: 4px 0;
+  text-align: center;
+}
+
+.try-title {
+  text-align: center;
+  margin: 0 16px 10px;
+}
+
+.try-title .reader__chapter {
+  display: block;
+}
+
+.try-title__name {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 30px;
+  line-height: 1.05;
+  text-transform: uppercase;
+  color: var(--on-dark);
+  margin-top: 4px;
+}
+
+.try-page {
+  min-height: 460px;
+  display: flex;
+  flex-direction: column;
+}
+
+.try-page__text {
+  font-family: var(--font-book);
+  font-size: 21px;
+  line-height: 1.45;
+  text-align: center;
+  margin: 18px 6px 8px;
+  color: #2a2620;
+}
+
+.try-page__num {
+  margin-top: auto;
+  text-align: center;
+  font-family: var(--font-book);
+  font-size: 14px;
+  color: #8a8172;
+}
+
+.try-page--end {
+  justify-content: center;
+  text-align: center;
+  padding: 28px 20px;
+}
+
+.try-page--end .how-title {
+  font-size: 34px;
+}
+
+.try-save {
+  display: flex;
+  margin: 14px 20px 0;
+  width: auto;
+}
+
+.try-remind {
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--white);
+}
+
 /* ---------- Tablet & wide screens ---------- */
 
 @media (min-width: 900px) {

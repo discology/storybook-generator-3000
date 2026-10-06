@@ -91,6 +91,7 @@ const MADE_BY: Record<string, string> = {
   family: "Family",
   weekly: "Weekly batch",
   admin: "Vambie team",
+  visitor: "Visitor (not signed up)",
   system: "After a restart",
 };
 

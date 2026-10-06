@@ -49,6 +49,12 @@ model Household {
   children    Child[]
   invitations Invitation[]
   familyCharacters FamilyCharacter[]
+  // A visitor trying Vambie before signing up (VSB-75, server/guests.ts): the
+  // device's cookie, when the unsaved draft is deleted, and, for a relative
+  // recording before joining, the invitation they came from.
+  guestToken     String?   @unique
+  guestExpiresAt DateTime?
+  guestInvite    String?
   createdAt   DateTime     @default(now())
 }
 
@@ -509,4 +515,23 @@ model AiUsage {
   @@index([createdAt])
   @@index([chapterId])
   @@index([householdId])
+}
+
+
+// Every free preview a visitor started, kept after their draft is deleted so
+// the daily limits hold (VSB-80). Device and network are stored hashed.
+model GuestPreview {
+  id        String   @id @default(cuid())
+  device    String
+  network   String
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
+
+// App-wide settings an admin can change, like the visitors' daily preview cap.
+model AppSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
 }

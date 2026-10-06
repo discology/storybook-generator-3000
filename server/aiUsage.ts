@@ -9,8 +9,9 @@ import { SESSION_COOKIE } from "./session";
 
 export type UsageKind = "text" | "image" | "voice";
 // family: a parent or family member asked for it; weekly: the weekly chapter
-// batch; admin: the Vambie team; system: resumed after a restart.
-export type Trigger = "family" | "weekly" | "admin" | "system";
+// batch; admin: the Vambie team; visitor: someone trying Vambie before signing
+// up (server/guests.ts); system: resumed after a restart.
+export type Trigger = "family" | "weekly" | "admin" | "visitor" | "system";
 
 // Standard prices, US dollars per 1M tokens, from https://developers.openai.com/api/docs/pricing.
 // Update these when prices change; each call's cost is stored when it's made, so

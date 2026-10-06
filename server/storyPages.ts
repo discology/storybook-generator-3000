@@ -377,6 +377,8 @@ export interface CreateChapterInput {
   existingChapterId?: string; // replace this chapter's pages (full rewrite)
   revisionRequest?: string;
   castKeys?: string[]; // characters the parent picked for this chapter
+  firstPages?: number; // draw only this many pictures for now (a visitor's preview)
+  noQuestions?: boolean; // a visitor's preview: no Who's who, unplaced people are drawn from the memory
 }
 
 // Plans the pages, saves them with a rule snapshot, runs page checks and the
@@ -459,7 +461,14 @@ export async function createPagedChapter(input: CreateChapterInput) {
   const family = snapshot.family ?? [];
   plan.pages = plan.pages.map((p) => ({ ...p, characters: toPageTokens(p.characters, cast, family) }));
   plan.characters = plan.characters.filter((c) => !findCastMember(cast, c.name) && !findFamily(family, c.name));
-  const { unresolved, appearances } = placePeople(plan.pages, family, plan.unresolved);
+  let { unresolved, appearances } = placePeople(plan.pages, family, plan.unresolved);
+  if (input.noQuestions && unresolved.length) {
+    // A visitor has no family characters to ask about yet: people the planner
+    // couldn't place are drawn from the memory's description instead.
+    const names = new Map(unresolved.map((u) => [u.ref.toLowerCase(), u.suggestedName || u.mention]));
+    plan.pages.forEach((p) => (p.characters = [...new Set(p.characters.map((t) => names.get(t.toLowerCase()) ?? t))]));
+    unresolved = [];
+  }
 
   const content = plan.pages.map((p) => p.text).join("\n\n");
   const chapterData = {
@@ -509,7 +518,7 @@ export async function createPagedChapter(input: CreateChapterInput) {
 
   await checkPages(chapterId);
   await runGuardian(chapterId);
-  if (!unresolved.length) void illustrateChapter(chapterId);
+  if (!unresolved.length) void illustrateChapter(chapterId, { firstPages: input.firstPages });
   return prisma.chapter.findUniqueOrThrow({ where: { id: chapterId }, include: { sources: true, findings: true } });
 }
 
@@ -1099,9 +1108,14 @@ export async function updatePagesStatus(chapterId: string) {
 
 // Character sheet first, then every page in parallel against it. If the sheet
 // fails, page 1 is drawn first and used as the reference instead. Waits while
-// someone in the chapter still needs identifying.
-export async function illustrateChapter(chapterId: string) {
-  const pages = (await prisma.storyPage.findMany({ where: { chapterId }, orderBy: { pageNumber: "asc" } })).filter(hasPicture);
+// someone in the chapter still needs identifying. A visitor's preview draws only
+// its first pages; once they save, the rest are drawn (missingOnly).
+export async function illustrateChapter(chapterId: string, options: { firstPages?: number; missingOnly?: boolean } = {}) {
+  let pages = (
+    await prisma.storyPage.findMany({ where: { chapterId }, orderBy: { pageNumber: "asc" }, include: { assets: { where: { status: "ready" }, take: 1 } } })
+  ).filter(hasPicture);
+  if (options.missingOnly) pages = pages.filter((p) => p.assets.length === 0);
+  if (options.firstPages) pages = pages.filter((p) => p.pageNumber <= options.firstPages!);
   const current = await prisma.chapter.findUniqueOrThrow({ where: { id: chapterId } });
   if (parseUnresolved(current.unresolvedPeople).length) return;
   if (pages.length === 0) return updatePagesStatus(chapterId);

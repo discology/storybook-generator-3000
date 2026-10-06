@@ -4,7 +4,7 @@ import { useAuth } from "../../auth/AuthContext";
 import { IconChat, IconCoins, IconHome, IconLock, IconPeople, IconPlayCircle, IconSettings, IconSmile, IconWarning } from "../../components/icons";
 import { Mascot } from "../../components/ui";
 
-const SETTINGS_PATHS = ["/admin/settings", "/admin/messages", "/admin/ai", "/admin/page-rules"];
+const SETTINGS_PATHS = ["/admin/settings", "/admin/messages", "/admin/ai", "/admin/page-rules", "/admin/visitors"];
 
 export default function AdminLayout() {
   const { user, adminOpen, loading } = useAuth();

@@ -95,7 +95,7 @@ export default function HowItWorks() {
 
   // Signed-out visitors go on to sign up; signed-in families (from Help) go back.
   const leave = useCallback(() => {
-    if (!user) navigate("/sign-in?next=/start");
+    if (!user) navigate("/try");
     else if (window.history.length > 1) navigate(-1);
     else navigate("/");
   }, [user, navigate]);
@@ -185,7 +185,7 @@ export default function HowItWorks() {
             </button>
           ) : (
             <>
-              <Link className="btn btn--lime" to="/sign-in?next=/start">
+              <Link className="btn btn--lime" to="/try">
                 Start our family story <Chev />
               </Link>
               <button type="button" className="tlink tlink--light how-invite" onClick={() => setInvite(true)}>

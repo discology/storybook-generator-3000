@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { apiGet } from "../../lib/api";
+import { apiGet, apiSend } from "../../lib/api";
 import { IconChat, IconChevronRight, IconFileText, IconSearch, IconSettings } from "../../components/icons";
 
 interface Overview {
@@ -184,6 +184,7 @@ export function AdminSettings() {
     { to: "/admin/messages", icon: <IconChat size={24} />, title: "Text messages", sub: "Wording of the welcome, invite, reminder and chapter-ready texts" },
     { to: "/admin/ai", icon: <IconFileText size={24} />, title: "AI instructions", sub: "What the AI is told at each step, and which model it uses" },
     { to: "/admin/page-rules", icon: <IconSettings size={24} />, title: "Page rules", sub: "Reading stages, art direction, image model and quality" },
+    { to: "/admin/visitors", icon: <IconSearch size={24} />, title: "Visitors", sub: "Free story previews before sign-up: the daily cap" },
   ];
   return (
     <div>
@@ -200,6 +201,68 @@ export function AdminSettings() {
             <IconChevronRight size={20} />
           </Link>
         ))}
+      </div>
+    </div>
+  );
+}
+
+// Try before sign-up (server/guests.ts): how many free previews visitors get a day.
+export function AdminVisitors() {
+  const [data, setData] = useState<{ cap: number; previewsToday: number; drafts: number; perDevice: number; keptDays: number } | null>(null);
+  const [cap, setCap] = useState("");
+  const [saved, setSaved] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => {
+    apiGet("/api/admin/visitors").then((d) => {
+      setData(d);
+      setCap(String(d.cap));
+    });
+  }, []);
+  if (!data) return <p>Loading…</p>;
+  const save = async () => {
+    setError(null);
+    try {
+      const r = await apiSend("/api/admin/visitors", "PUT", { cap: Number(cap) });
+      setData({ ...data, cap: r.cap });
+      setSaved("Saved.");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Couldn't save.");
+    }
+  };
+  return (
+    <div>
+      <div className="adm-crumbs">
+        <Link to="/admin/settings">Settings</Link> / Visitors
+      </div>
+      <h1 className="adm-title">Visitors</h1>
+      <p className="adm-sub">People trying Vambie before they sign up get a free three-page preview of their story.</p>
+      <div className="stat-grid" style={{ marginTop: 22 }}>
+        <div className="stat">
+          <div className="stat__n">
+            {data.previewsToday} / {data.cap}
+          </div>
+          <div className="stat__label">Free previews in the last 24 hours</div>
+        </div>
+        <div className="stat">
+          <div className="stat__n">{data.drafts}</div>
+          <div className="stat__label">Unsaved drafts on visitors' devices</div>
+        </div>
+      </div>
+      <div className="adm-panel" style={{ marginTop: 22, maxWidth: 620 }}>
+        <label className="field__label" htmlFor="cap">
+          Free previews a day, across all visitors
+        </label>
+        <div className="hstack" style={{ gap: 12 }}>
+          <input id="cap" className="input" type="number" min={0} max={10000} value={cap} onChange={(e) => { setCap(e.target.value); setSaved(null); }} style={{ maxWidth: 160 }} />
+          <button className="btn btn--purple btn--sm btn--auto" onClick={() => void save()}>
+            Save
+          </button>
+          {saved && <span className="t-small t-muted">{saved}</span>}
+        </div>
+        {error && <p className="error-text">{error}</p>}
+        <p className="field__hint" style={{ marginTop: 12 }}>
+          Each preview costs about $0.40, so {Number(cap) || 0} a day is at most about ${Math.round((Number(cap) || 0) * 0.4)}. Past the cap, visitors can still record and save; their story is made once they verify their number. Each device and network also gets {data.perDevice - 1} preview and {data.perDevice - 1} retry a day, and unsaved drafts are deleted after {data.keptDays} days. 0 pauses free previews.
+        </p>
       </div>
     </div>
   );

@@ -3,13 +3,15 @@ import path from "path";
 import { prisma } from "./db";
 import { getCurrentUser } from "./session";
 import { isAdmin } from "./admin";
+import { GUEST_COOKIE } from "./guests";
 
 // Who may open files under /uploads. The address is normalized first, so a
 // path like /uploads/x/../private/... is judged by where it really leads.
 // - private/, memories/, exports/: never served directly (recordings and
 //   exports go through access-checked API routes; photos are server-only).
 // - pages/ and characters/family/: a family's page pictures and family members'
-//   design pictures, only for that family's members and admins.
+//   design pictures, only for that family's members and admins (and a visitor's
+//   preview pictures for the device that made them, server/guests.ts).
 // - everything else (Vambie artwork, prompt artwork): public.
 
 const UPLOADS = path.join(process.cwd(), "uploads");
@@ -51,11 +53,13 @@ export async function guardUploads(req: Request, res: Response, next: NextFuncti
   if (!FAMILY_FOLDERS.some((folder) => rel.startsWith(folder))) return next();
 
   const user = await getCurrentUser(req);
-  if (!user) return res.status(401).end();
+  const guest = req.cookies?.[GUEST_COOKIE];
+  if (!user && !guest) return res.status(401).end();
   const householdId = await householdOf(`uploads/${rel}`);
   if (!householdId) return res.status(404).end();
   const allowed =
-    isAdmin(user) || (await prisma.contributor.count({ where: { householdId, userId: user.id, inviteStatus: { not: "revoked" } } })) > 0;
+    (user && (isAdmin(user) || (await prisma.contributor.count({ where: { householdId, userId: user.id, inviteStatus: { not: "revoked" } } })) > 0)) ||
+    (guest && (await prisma.household.count({ where: { id: householdId, guestToken: guest, guestExpiresAt: { gt: new Date() } } })) > 0);
   if (!allowed) return res.status(403).end();
   res.sendFile(path.join(UPLOADS, rel), { headers: { "Cache-Control": "private, max-age=86400" } }, (error) => {
     if (error && !res.headersSent) res.status(404).end();

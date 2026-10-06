@@ -35,6 +35,7 @@ export default function SignIn() {
   const { refresh } = useAuth();
 
   const phone = number.trim().startsWith("+") ? number.trim() : `${country}${number.replace(/\D/g, "")}`;
+  const saving = params.get("next") === "/try/save";
 
   useEffect(() => {
     if (resendIn <= 0) return;
@@ -190,21 +191,33 @@ export default function SignIn() {
       <Masthead
         plate="tall"
         title={
-          <>
-            Your
-            <br />
-            family's
-            <br />
-            story
-            <br />
-            starts here.
-          </>
+          saving ? (
+            <>
+              Save
+              <br />
+              your story.
+            </>
+          ) : (
+            <>
+              Your
+              <br />
+              family's
+              <br />
+              story
+              <br />
+              starts here.
+            </>
+          )
         }
         sub={
-          <>
-            Same little moments.
-            <br />A lifetime of stories.
-          </>
+          saving ? (
+            "Everything you've made stays, and it's yours to keep adding to."
+          ) : (
+            <>
+              Same little moments.
+              <br />A lifetime of stories.
+            </>
+          )
         }
         art="book"
         artMode="corner"
@@ -212,9 +225,9 @@ export default function SignIn() {
       <Sheet grow>
         <form onSubmit={sendCode}>
           <h2 className="h-title" style={{ marginBottom: 16 }}>
-            Sign in or create an account
+            {saving ? "Verify your number" : "Sign in or create an account"}
           </h2>
-          <Field label="Mobile number" htmlFor="phone" hint="We'll text you a sign-in code.">
+          <Field label="Mobile number" htmlFor="phone" hint={saving ? "We'll text you a code to keep your story." : "We'll text you a sign-in code."}>
             <div className="phone-field">
               <Select value={country} onChange={setCountry} options={COUNTRY_CODES} ariaLabel="Country code" />
               <input

@@ -61,6 +61,7 @@ docs/                 these guides
 | `aiService.ts`, `aiInstructions.ts` | Calling the AI provider; each AI step's instructions and reply format |
 | `imageQueue.ts` | Pacing image requests to the OpenAI account's per-minute limit |
 | `promptArt.ts` | The prompt card artwork library, and drawing card pictures from a question |
+| `guests.ts` | Trying Vambie before signing up: a visitor's draft family, their memory, the three-page preview and its limits, saving to an account, and the 7-day clean-up |
 | `promptVariables.ts` | Prompt card variables (`<child_name>` and the rest): checking, filling in and samples. Shared with the web app through `src/lib/promptVariables.ts` |
 | `aiUsage.ts`, `costRoutes.ts` | Recording what each AI call costs (prices per model), and the admin Costs page |
 | `messageTemplates.ts` | Text message types, variables and wording |
@@ -73,6 +74,7 @@ The schema is in `prisma/schema.prisma`. Here are the models, grouped by what th
 - **Storybooks and memories:** `Child`, `Storybook` (settings, reminder schedule, reading stage), `Memory`, `TranscriptVersion` (machine and corrected transcripts), `MemoryInterpretation`.
 - **Chapters:** `Chapter` (with its rules snapshot), `ChapterSource` (which memories it came from), `StoryPage`, `PageAsset` (every picture attempt for a page), `GuardianFinding`, `ChapterAccess` and `ChapterShare` (sharing), `ChapterMark` (bookmarks and reading progress), `StoryFeedback`.
 - **Characters:** `Character` and `CharacterArt` (the Vambies), `FamilyCharacter`, `CharacterDesign` (versioned looks per age), `DesignProposal`, `PageAppearance` (which design of a family member is on a page, and what they're wearing).
+- **Visitors:** a visitor's draft is an ordinary `Household` with a guest token (and, for a relative recording before joining, the invitation it came from), holding a storybook with status `guest`. `GuestPreview` logs each free preview for the daily limits, and `AppSetting` holds the daily cap.
 - **Configuration:** `Prompt`, `PromptArtwork` (pictures generated or uploaded for prompt cards), `MessageTemplate`, `AiInstruction`, `GenerationRuleSet` (one row per page rules version).
 - **Exports:** `ExportRequest`.
 - **Costs:** `AiUsage` (one row per AI call: step, model, tokens, cost in dollars, and the family, chapter or memory it was for).

@@ -75,6 +75,15 @@ The Vambie Character Library. Every chapter can include these characters, and AI
 - **3D renders:** the official renders, organized by camera view and expression. Select one to make it the reference art. When the reference art is a render, each page also gets the render matching its mood and camera angle.
 - Editing a card or changing the reference art creates a new version. Chapters keep the version they were made with.
 
+## Visitors
+
+People trying Vambie before they sign up get a free three-page preview of their story. Under Admin → Settings → Visitors:
+
+- **Free previews in the last 24 hours** compared with the cap, and how many unsaved drafts are waiting on visitors' devices.
+- **Free previews a day, across all visitors** (default 100, about $40 at most). 0 pauses free previews. Past the cap, visitors can still record and save, and their story is made once they verify their number.
+
+Each device and network also gets one preview and one retry a day, and unsaved drafts are deleted after 7 days. Visitors' drafts don't appear in Story Review, Families or the Overview counts. On the Costs page, their spend shows under "Started by: Visitor (not signed up)".
+
 ## Costs
 
 What the AI costs to run, from the usage each call reports. Costs are recorded from the day tracking was added, so older chapters are counted but show as *not tracked*.

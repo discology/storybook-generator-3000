@@ -22,6 +22,7 @@ import jobRoutes, { asJob } from "./server/jobs";
 import { guardUploads } from "./server/uploadAccess";
 import { usageFromRequest } from "./server/aiUsage";
 import costRoutes from "./server/costRoutes";
+import guestRoutes, { startGuestCleanup } from "./server/guests";
 
 const production = process.env.NODE_ENV === "production";
 
@@ -88,6 +89,7 @@ app.use("/api", guardianRoutes);
 app.use("/api", exportRoutes);
 app.use("/api", accountRoutes);
 app.use("/api", costRoutes);
+app.use("/api", guestRoutes);
 app.use("/api", jobRoutes);
 
 // In production this server also serves the built web app (npm run build);
@@ -108,6 +110,7 @@ app.listen(PORT, () => {
   void failInterruptedIllustrations();
   void resumeUnfinishedMemories();
   void failInterruptedExports();
+  startGuestCleanup();
   // Weekly chapters are made by the hosted app. A development copy only makes
   // them when asked (WEEKLY_CHAPTERS=on), so two copies don't both spend on one.
   if (production || process.env.WEEKLY_CHAPTERS === "on") startWeeklyChapters();

@@ -8,6 +8,16 @@ Families record short voice memories about their child. Each week, those memorie
 
 The child never appears as themselves. **Baby Vambie stands in for the child on every page**, doing what the child did and feeling what they felt. That keeps the child's likeness out of AI-generated pictures and gives them a little distance to explore big feelings. Baby Vambie is called just "Vambie" from age 4 by default, and families can change that age. Family members appear as themselves, drawn from designs the parent approved.
 
+## 0. Trying it first
+
+New visitors see the value before they sign up. "Start their story" on the splash screen asks only for the child's name or nickname, their age (a birthday, or "on the way") and the visitor's relationship. Then the visitor records or types one memory.
+
+- From that memory, the app writes one complete chapter and draws its first three pages, shown as a swipeable preview. It takes 2 to 3 minutes. The rest of the pages are drawn only after the visitor saves.
+- **Save my story and text me a link** verifies their phone number. That creates the account (or signs in to an existing one) and keeps everything they made. Weekly reminders are a separate choice afterwards, off until they turn them on.
+- Until then, the draft lives only on that device, for 7 days, and then it's deleted.
+- Each device and network gets one preview and one retry a day. There's also a daily cap across all visitors, set under Admin → Settings → Visitors (default 100). Past it, visitors can still record and save, and their story is made once they verify.
+- A relative who opens an invitation can record first too. Their memory joins the family's storybook once they verify their number.
+
 ## 1. Recording a memory
 
 - Anyone in the family can record, for up to 15 minutes, usually in answer to a prompt card such as "What made you smile today?".

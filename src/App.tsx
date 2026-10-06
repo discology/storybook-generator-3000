@@ -25,6 +25,7 @@ import ExportMemories, { ExportStatus } from "./pages/Export";
 import Account, { DeleteAccount, Help } from "./pages/Account";
 import HowItWorks from "./pages/HowItWorks";
 import YourStorybooks from "./pages/YourStorybooks";
+import TryStory, { TrySave } from "./pages/TryStory";
 import AdminLayout from "./pages/admin/AdminLayout";
 import AdminReviewQueue from "./pages/admin/AdminReviewQueue";
 import AdminChapterReview from "./pages/admin/AdminChapterReview";
@@ -37,7 +38,7 @@ import AdminAiInstructionEdit from "./pages/admin/AdminAiInstructionEdit";
 import AdminPageRules from "./pages/admin/AdminPageRules";
 import AdminCharacters from "./pages/admin/AdminCharacters";
 import AdminCharacterEdit from "./pages/admin/AdminCharacterEdit";
-import AdminOverview, { AdminFamilies, AdminSettings } from "./pages/admin/AdminOverview";
+import AdminOverview, { AdminFamilies, AdminSettings, AdminVisitors } from "./pages/admin/AdminOverview";
 import AdminCosts from "./pages/admin/AdminCosts";
 
 export default function App() {
@@ -60,6 +61,7 @@ export default function App() {
           <Route path="characters" element={<AdminCharacters />} />
           <Route path="characters/:id" element={<AdminCharacterEdit />} />
           <Route path="costs" element={<AdminCosts />} />
+          <Route path="visitors" element={<AdminVisitors />} />
         </Route>
 
         <Route
@@ -97,6 +99,8 @@ export default function App() {
                 <Route path="/help" element={<Help />} />
                 <Route path="/how-it-works" element={<HowItWorks />} />
                 <Route path="/storybooks" element={<YourStorybooks />} />
+                <Route path="/try" element={<TryStory />} />
+                <Route path="/try/save" element={<TrySave />} />
               </Routes>
             </div>
           }

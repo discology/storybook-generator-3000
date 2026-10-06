@@ -198,6 +198,11 @@ export default function InvitationAccept() {
           <button className="btn btn--lime btn--caps" onClick={() => void accept()} disabled={busy || (needsName && !name.trim())}>
             {busy ? "Joining…" : "Accept invitation"} <Chev />
           </button>
+          {!user && (
+            <Link className="btn btn--outline" to={`/try?invite=${token}`}>
+              Record a memory first
+            </Link>
+          )}
           <Link className="btn btn--dark" to="/">
             Not now
           </Link>

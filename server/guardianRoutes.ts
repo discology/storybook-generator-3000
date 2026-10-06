@@ -21,8 +21,12 @@ function tabFor(c: { guardianStatus: string; revisionRequested: boolean }, openF
   return "needs_review";
 }
 
+// Visitors' unsaved drafts (server/guests.ts) aren't families yet and stay out of the admin views.
+const familyBook = { status: { not: "guest" } };
+
 router.get("/admin/chapters", async (_req, res) => {
   const chapters = await prisma.chapter.findMany({
+    where: { storybook: familyBook },
     include: {
       storybook: { include: { child: true } },
       findings: { where: { status: "needs_revision" } },
@@ -186,13 +190,13 @@ router.put("/admin/feedback/:id", async (req, res) => {
 router.get("/admin/overview", async (_req, res) => {
   const weekAgo = new Date(Date.now() - 7 * 86400000);
   const [families, memoriesThisWeek, chaptersThisWeek, held, openFeedback, needsAttention, failedMemories, pendingInvites, recentFeedback] = await Promise.all([
-    prisma.storybook.count(),
-    prisma.memory.count({ where: { recordedAt: { gte: weekAgo } } }),
-    prisma.chapter.count({ where: { createdAt: { gte: weekAgo } } }),
-    prisma.chapter.count({ where: { guardianStatus: "needs_revision" } }),
+    prisma.storybook.count({ where: familyBook }),
+    prisma.memory.count({ where: { recordedAt: { gte: weekAgo }, storybook: familyBook } }),
+    prisma.chapter.count({ where: { createdAt: { gte: weekAgo }, storybook: familyBook } }),
+    prisma.chapter.count({ where: { guardianStatus: "needs_revision", storybook: familyBook } }),
     prisma.storyFeedback.count({ where: { status: "open" } }),
-    prisma.chapter.findMany({ where: { pagesStatus: "needs_attention" }, include: { storybook: { include: { child: true } } }, take: 10 }),
-    prisma.memory.count({ where: { status: "failed" } }),
+    prisma.chapter.findMany({ where: { pagesStatus: "needs_attention", storybook: familyBook }, include: { storybook: { include: { child: true } } }, take: 10 }),
+    prisma.memory.count({ where: { status: "failed", storybook: familyBook } }),
     prisma.contributor.count({ where: { inviteStatus: "pending" } }),
     prisma.storyFeedback.findMany({ where: { status: "open" }, include: { chapter: true, contributor: true }, orderBy: { createdAt: "desc" }, take: 5 }),
   ]);
@@ -205,6 +209,7 @@ router.get("/admin/overview", async (_req, res) => {
 
 router.get("/admin/families", async (_req, res) => {
   const storybooks = await prisma.storybook.findMany({
+    where: familyBook,
     include: {
       child: { include: { household: { include: { contributors: true } } } },
       _count: { select: { memories: true, chapters: true } },

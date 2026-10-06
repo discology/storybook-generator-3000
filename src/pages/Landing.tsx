@@ -32,7 +32,7 @@ export default function Landing() {
         </p>
         <Mascot name="book" className="landing-art" />
         <div className="landing-cta">
-          <Link className="btn btn--lime btn--caps" to="/sign-in?next=/start">
+          <Link className="btn btn--lime btn--caps" to="/try">
             Start their story <Chev />
           </Link>
           <p className="t-center" style={{ margin: "12px 0 0" }}>

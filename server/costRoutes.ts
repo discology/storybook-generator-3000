@@ -12,7 +12,7 @@ const router: Router = express.Router();
 const DAY = 86_400_000;
 const WEEK = 7 * DAY;
 const KINDS: UsageKind[] = ["text", "image", "voice"];
-const MADE_BY = ["family", "weekly", "admin", "system"];
+const MADE_BY = ["family", "weekly", "admin", "visitor", "system"];
 const MAX_CHAPTERS = 500;
 
 const instant = (v: unknown) => {
@@ -62,7 +62,7 @@ router.get("/admin/costs", async (req, res) => {
         h.id,
         {
           id: h.id,
-          name: h.children.map((c) => c.displayName).join(" & ") || h.name || "Unnamed family",
+          name: `${h.children.map((c) => c.displayName).join(" & ") || h.name || "Unnamed family"}${h.guestToken ? " (visitor, unsaved)" : ""}`,
           owner: owner?.name ?? h.owner?.name ?? h.owner?.phone ?? null,
           stage: storybook ? effectiveStage(storybook, now) : null,
           createdAt: h.createdAt,
@@ -159,7 +159,7 @@ router.get("/admin/costs", async (req, res) => {
   const costs = tracked.map((c) => c.cost!);
   const familySpend = sum(rows.filter((r) => r.householdId).map((r) => r.costUsd));
   const shownFamilies = families.filter(
-    (f) => (!filters.family || f.id === filters.family) && (!filters.stage || familyInfo.get(f.id)?.stage === filters.stage || chapters.some((c) => c.familyId === f.id))
+    (f) => !f.guestToken && (!filters.family || f.id === filters.family) && (!filters.stage || familyInfo.get(f.id)?.stage === filters.stage || chapters.some((c) => c.familyId === f.id))
   );
   const familyWeeks = sum(shownFamilies.filter((f) => f.createdAt.getTime() < end).map((f) => weeksFor(f.createdAt.getTime())));
   const stepSpend = (steps: string[]) => sum(rows.filter((r) => steps.includes(r.step)).map((r) => r.costUsd));

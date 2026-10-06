@@ -8,6 +8,8 @@ Who can see what, what leaves the app, and how families can take their data or d
 - **Family members** join with an invitation link. They can record memories and read the chapters shared with them.
 - **Admins** are the Vambie team: the phone numbers listed in `ADMIN_PHONES`. They review held chapters, manage prompt cards and characters, and edit the settings that shape every chapter. If `ADMIN_PHONES` is empty, anyone signed in can open the admin panel on a development copy; the hosted app keeps it closed.
 
+- **Visitors** trying Vambie before signing up have a draft tied to their device by a cookie. Only that device can see it: their memory, the recording and the preview pictures. It isn't part of any family until they verify their number, and it's deleted after 7 days if they don't. A relative's memory recorded from an invitation joins the family's storybook only once they verify.
+
 Who can start a storybook on the hosted app is a setting. It's invite-only by default (admins and the numbers in `ALLOWED_PHONES`, with everyone else joining a family through an invitation link), and open to anyone with `OPEN_SIGNUP=on`, which is how the hosted app runs now.
 
 ## What each person can see and do
