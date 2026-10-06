@@ -1,7 +1,7 @@
 import express, { Router } from "express";
 import { prisma } from "./db";
 import { guardianReview } from "./aiService";
-import { createPagedChapter } from "./storyPages";
+import { createPagedChapter, recordedBy } from "./storyPages";
 import { getCurrentUser } from "./session";
 
 const router: Router = express.Router();
@@ -93,7 +93,7 @@ router.post("/admin/chapters/:id/request-revision", async (req, res) => {
     where: { id: req.params.id },
     include: {
       storybook: { include: { child: true } },
-      sources: { include: { memory: { include: { transcripts: true, interpretation: true } } } },
+      sources: { include: { memory: { include: { transcripts: { orderBy: { createdAt: "desc" } }, interpretation: true, contributor: true } } } },
     },
   });
   if (!chapter) return res.status(404).json({ error: "Not found" });
@@ -109,6 +109,7 @@ router.post("/admin/chapters/:id/request-revision", async (req, res) => {
         events: s.memory.interpretation?.events ?? "",
         emotions: s.memory.interpretation?.emotions ?? "",
         themes: s.memory.interpretation?.themes ?? "",
+        recordedBy: recordedBy(s.memory.contributor),
       })),
     });
     res.json(updated);

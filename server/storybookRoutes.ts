@@ -4,7 +4,7 @@ import multer from "multer";
 import path from "path";
 import { prisma } from "./db";
 import { transcribeAudio, interpretMemory } from "./aiService";
-import { createPagedChapter } from "./storyPages";
+import { createPagedChapter, recordedBy } from "./storyPages";
 import { getCurrentUser } from "./session";
 import { normalizePhone } from "./sms";
 
@@ -222,14 +222,14 @@ router.post("/storybooks/:id/chapters", async (req, res) => {
   });
   if (!storybook) return res.status(404).json({ error: "Storybook not found" });
 
-  const { memoryIds } = req.body ?? {};
+  const { memoryIds, castKeys } = req.body ?? {};
   if (!Array.isArray(memoryIds) || memoryIds.length === 0) {
     return res.status(400).json({ error: "memoryIds (non-empty array) is required" });
   }
 
   const memories = await prisma.memory.findMany({
     where: { id: { in: memoryIds }, storybookId: storybook.id },
-    include: { transcripts: { orderBy: { createdAt: "desc" }, take: 1 }, interpretation: true },
+    include: { transcripts: { orderBy: { createdAt: "desc" }, take: 1 }, interpretation: true, contributor: true },
   });
 
   const missingUseConsent = memories.filter((m) => !m.storyUseConsent);
@@ -241,12 +241,14 @@ router.post("/storybooks/:id/chapters", async (req, res) => {
   try {
     chapter = await createPagedChapter({
       storybookId: storybook.id,
+      castKeys: Array.isArray(castKeys) ? castKeys.map(String) : [],
       memories: memories.map((m) => ({
         id: m.id,
         transcript: m.transcripts[0]?.text ?? "",
         events: m.interpretation?.events ?? "",
         emotions: m.interpretation?.emotions ?? "",
         themes: m.interpretation?.themes ?? "",
+        recordedBy: recordedBy(m.contributor),
       })),
     });
   } catch (error: any) {

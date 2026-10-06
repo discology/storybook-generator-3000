@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
 import BottomNav from "../components/BottomNav";
 import Vambie from "../components/Vambie";
 import MemoryRow from "../components/MemoryRow";
-import { apiSend, ApiError } from "../lib/api";
+import { apiGet, apiSend, ApiError } from "../lib/api";
 import { useStorybookData } from "../hooks/useStorybookData";
 import AccessDenied from "../components/AccessDenied";
 
@@ -14,6 +14,12 @@ export default function StorybookDetail() {
   const [selected, setSelected] = useState<string[]>([]);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [characters, setCharacters] = useState<{ key: string; name: string; castingMode: string; referenceImage: string | null }[]>([]);
+  const [picked, setPicked] = useState<string[]>([]);
+
+  useEffect(() => {
+    apiGet("/api/characters").then(setCharacters).catch(() => setCharacters([]));
+  }, []);
 
   const toggleSelected = (memoryId: string, checked: boolean) => {
     setSelected((prev) => (checked ? [...prev, memoryId] : prev.filter((m) => m !== memoryId)));
@@ -24,8 +30,9 @@ export default function StorybookDetail() {
     setGenerating(true);
     setError(null);
     try {
-      await apiSend(`/api/storybooks/${id}/chapters`, "POST", { memoryIds: selected });
+      await apiSend(`/api/storybooks/${id}/chapters`, "POST", { memoryIds: selected, castKeys: picked });
       setSelected([]);
+      setPicked([]);
       reload();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't write the chapter. Try again.");
@@ -104,6 +111,32 @@ export default function StorybookDetail() {
                 onToggleSelected={(checked) => toggleSelected(m.id, checked)}
               />
             ))}
+
+            {characters.length > 0 && (
+              <>
+                <label>Vambies in this chapter</label>
+                <div className="row inline" style={{ flexWrap: "wrap", gap: "0.4rem", marginTop: 0 }}>
+                  {characters.map((c) =>
+                    c.castingMode === "always" ? (
+                      <span key={c.key} className="pill good">
+                        {c.name} · always
+                      </span>
+                    ) : (
+                      <button
+                        key={c.key}
+                        type="button"
+                        className={`btn-small ${picked.includes(c.key) ? "btn-primary" : "btn-secondary"}`}
+                        onClick={() => setPicked((p) => (p.includes(c.key) ? p.filter((k) => k !== c.key) : [...p, c.key]))}
+                      >
+                        {picked.includes(c.key) ? "✓ " : "+ "}
+                        {c.name}
+                      </button>
+                    )
+                  )}
+                </div>
+                <p className="status-line">Pick any Vambies you want in this chapter. Others join only when the memory fits them.</p>
+              </>
+            )}
 
             <div className="row">
               <button className="btn-primary chevron" onClick={generateChapter} disabled={selected.length === 0 || generating}>

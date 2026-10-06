@@ -34,6 +34,9 @@ export default function AdminLayout() {
         <NavLink to="/admin/page-rules" className={linkClass}>
           Page Rules
         </NavLink>
+        <NavLink to="/admin/characters" className={linkClass}>
+          Characters
+        </NavLink>
         <div style={{ flex: 1 }} />
         <div style={{ display: "flex", alignItems: "center", gap: "0.6rem", padding: "0.75rem" }}>
           <Vambie size={28} />

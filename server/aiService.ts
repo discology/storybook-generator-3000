@@ -4,6 +4,7 @@ import { GoogleGenAI } from "@google/genai";
 import OpenAI, { toFile } from "openai";
 import { getAiInstruction } from "./aiInstructions";
 import { fillTemplate } from "./messageTemplates";
+import { characterCardValues } from "./characters";
 
 const GEMINI_MODEL = "gemini-2.5-flash";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5.5";
@@ -21,7 +22,7 @@ const getProvider = (): Provider | null => {
 // GPT-5 family and o-series reasoning models only accept the default temperature.
 const supportsTemperature = (model: string) => /^gpt-4/.test(model);
 
-async function generateJson(provider: Provider, prompt: string, temperature: number, model = OPENAI_MODEL, imageDataUrl?: string): Promise<any> {
+async function generateJson(provider: Provider, prompt: string, temperature: number, model = OPENAI_MODEL, images: string[] = []): Promise<any> {
   let raw: string;
   if (provider.kind === "openai") {
     const response = await provider.client.chat.completions.create({
@@ -29,11 +30,8 @@ async function generateJson(provider: Provider, prompt: string, temperature: num
       messages: [
         {
           role: "user",
-          content: imageDataUrl
-            ? [
-                { type: "text", text: prompt },
-                { type: "image_url", image_url: { url: imageDataUrl } },
-              ]
+          content: images.length
+            ? [{ type: "text", text: prompt }, ...images.map((url) => ({ type: "image_url" as const, image_url: { url } }))]
             : prompt,
         },
       ],
@@ -42,10 +40,13 @@ async function generateJson(provider: Provider, prompt: string, temperature: num
     });
     raw = response.choices[0]?.message?.content ?? "";
   } else {
-    const [, mimeType, data] = imageDataUrl?.match(/^data:(.+?);base64,(.+)$/) ?? [];
+    const imageParts = images.flatMap((url) => {
+      const [, mimeType, data] = url.match(/^data:(.+?);base64,(.+)$/) ?? [];
+      return data ? [{ inlineData: { mimeType, data } }] : [];
+    });
     const response = await provider.client.models.generateContent({
       model: GEMINI_MODEL,
-      contents: data ? [{ role: "user", parts: [{ text: prompt }, { inlineData: { mimeType, data } }] }] : prompt,
+      contents: imageParts.length ? [{ role: "user", parts: [{ text: prompt }, ...imageParts] }] : prompt,
       config: { temperature },
     });
     raw = response.text ?? "";
@@ -59,6 +60,7 @@ const TEMPERATURE: Record<string, number> = {
   page_check: 0.2,
   page_revise: 0.7,
   illustration_check: 0.2,
+  describe_person: 0.2,
   guardian: 0.2,
 };
 
@@ -70,14 +72,18 @@ export interface InstructionOverride {
 
 // Builds the prompt from the admin-editable instructions plus the fixed reply
 // format, then calls the AI. Throws on failure; callers decide the fallback.
-export async function runAiStep(key: string, values: Record<string, string>, override?: InstructionOverride, imageDataUrl?: string) {
+// <character_key> variables come from the Character Library unless `values`
+// supplies them (chapters pass the character cards from their snapshot).
+// `images` are data URLs attached after the prompt, in order.
+export async function runAiStep(key: string, values: Record<string, string>, override?: InstructionOverride, images: string[] = []) {
   const provider = getProvider();
   if (!provider) throw new Error("No AI provider configured");
   const instruction = await getAiInstruction(key);
   const body = override?.body ?? instruction.body;
   const model = (override && "model" in override ? override.model : instruction.model) || OPENAI_MODEL;
-  const prompt = `${fillTemplate(body, values).replace(/\n{3,}/g, "\n\n").trim()}\n\n${instruction.outputFormat}`;
-  const output = await generateJson(provider, prompt, TEMPERATURE[key] ?? 0.7, model, imageDataUrl);
+  const allValues = { ...(await characterCardValues()), ...values };
+  const prompt = `${fillTemplate(body, allValues).replace(/\n{3,}/g, "\n\n").trim()}\n\n${instruction.outputFormat}`;
+  const output = await generateJson(provider, prompt, TEMPERATURE[key] ?? 0.7, model, images);
   return { prompt, output, model: provider.kind === "openai" ? model : GEMINI_MODEL };
 }
 

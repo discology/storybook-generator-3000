@@ -20,7 +20,9 @@ export interface PageRules {
   readingProfiles: Record<string, ReadingProfile>;
   embellishment: EmbellishmentLevel;
   illustrationStyle: string;
-  babyVambieAppearance: string;
+  // Only on rule versions from before the Character Library; character looks
+  // now live on the Characters page.
+  babyVambieAppearance?: string;
   peopleStyle: string;
   imageModel: string;
   imageQuality: "low" | "medium" | "high";
@@ -73,8 +75,6 @@ export const DEFAULT_RULES: PageRules = {
   embellishment: "moderate",
   illustrationStyle:
     "Children's picture-book illustration, soft watercolor and gouache, warm natural light, gentle textures, cozy and calm. No text, letters, numbers or words anywhere in the image.",
-  babyVambieAppearance:
-    "Baby Vambie: a small, soft, round teal-blue creature with a round head, big friendly eyes and two tiny fangs. Smooth skin: no spikes, horns, wings or tail.",
   peopleStyle:
     "Draw family members as warm, simple storybook figures. Do not try to resemble real people, and never make them photorealistic.",
   imageModel: "gpt-image-2",
@@ -109,7 +109,7 @@ export function validateRules(rules: any): string | null {
     if (p.maxWordsPerSentence > p.maxWordsPerPage) return `Ages ${band}: words per sentence can't exceed words per page.`;
   }
   if (!(rules.embellishment in EMBELLISHMENT_LEVELS)) return "Pick an embellishment level.";
-  for (const field of ["illustrationStyle", "babyVambieAppearance", "peopleStyle"] as const) {
+  for (const field of ["illustrationStyle", "peopleStyle"] as const) {
     if (typeof rules[field] !== "string" || !rules[field].trim()) return `${field} can't be empty.`;
   }
   if (!IMAGE_MODELS.includes(rules.imageModel)) return "Pick one of the listed image models.";
@@ -119,8 +119,9 @@ export function validateRules(rules: any): string | null {
 
 export async function saveRules(rules: PageRules): Promise<ActiveRuleSet> {
   const { version } = await getActiveRules();
-  const created = await prisma.generationRuleSet.create({ data: { version: version + 1, rules: JSON.stringify(rules) } });
-  return { version: created.version, rules, createdAt: created.createdAt };
+  const { babyVambieAppearance: _moved, ...current } = rules; // now on the Characters page
+  const created = await prisma.generationRuleSet.create({ data: { version: version + 1, rules: JSON.stringify(current) } });
+  return { version: created.version, rules: current, createdAt: created.createdAt };
 }
 
 export const profileFor = (rules: PageRules, band: string): ReadingProfile =>

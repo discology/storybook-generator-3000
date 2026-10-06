@@ -66,11 +66,12 @@ export const MESSAGE_TYPES: MessageType[] = [
 
 export const getMessageType = (key: string) => MESSAGE_TYPES.find((t) => t.key === key);
 
-const VARIABLE_PATTERN = /<([a-z_]+)>/g;
+const VARIABLE_PATTERN = /<([a-z][a-z0-9_]*)>/g;
 
-// Returns any <variables> in the body that this message type doesn't support.
-export function findUnknownVariables(type: MessageType, body: string): string[] {
-  const allowed = new Set(type.variables.map((x) => x.name));
+// Returns any <variables> in the body that this type doesn't support; `extra`
+// adds names allowed beyond the type's own (e.g. character keys).
+export function findUnknownVariables(type: { variables: { name: string }[] }, body: string, extra: string[] = []): string[] {
+  const allowed = new Set([...type.variables.map((x) => x.name), ...extra]);
   const found = [...body.matchAll(VARIABLE_PATTERN)].map((m) => m[1]);
   return [...new Set(found.filter((name) => !allowed.has(name)))];
 }

@@ -49,6 +49,8 @@ Do not diagnose anyone or state things the parent didn't say. If something is un
       { name: "embellishment_rules", description: "How much fictional storytelling is allowed (set in Page Rules)", sample: "Baby Vambie is the fictional stand-in for the child and may add small actions, sounds and short lines of dialogue that fit the memory's feelings. Never add events, people, places or outcomes that aren't in the memory." },
       { name: "memories", description: "The approved memories: what happened, emotions, themes and the original account", sample: "Memory 1:\nWhat happened: Grandma taught Mia to plant tomatoes; Mia checked every morning until the first sprout appeared.\nEmotions present: patience, excitement, pride\nPossible themes: waiting, grandparent bond, growth\nOriginal account: \"Grandma taught me to plant tomatoes. I checked every morning until the first sprout appeared.\"" },
       { name: "previous_chapters", description: "Titles of the chapters already in the storybook", sample: "Bath Time Splash" },
+      { name: "cast", description: "The chapter's recurring characters from the Character Library: required ones, and optional ones with their casting notes", sample: "- baby_vambie: Baby Vambie. Required in this chapter.\n  Role: Stands in for the child in every story; witnesses feelings rather than fixing them.\n  Look: Teal-blue; oversized rounded head; huge round eyes; tiny fangs; simple body and limbs\n  Never: No spikes, horns, wings or tail.\n  Personality: Curious compassion. Sits beside a feeling rather than fighting it." },
+      { name: "family_cast", description: "The family's saved characters (Our Characters): permanent refs, relationships, aliases, context and approved looks", sample: "- F1: Grandma Rose\n  Relationship to the child: Grandmother (Mom's mother)\n  Also called: Grandma, Nana\n  Context: Lives nearby and keeps a vegetable garden.\n  Approved looks: \"today\" (round face, warm brown skin, short silver curls, round tortoiseshell glasses, small and sturdy)" },
       { name: "revision_request", description: "A reviewer's revision note, or empty on a first draft", sample: "" },
     ],
     defaultBody: `You are the Storyteller for Storybook Generator 3000. Turn a real family memory into the next illustrated chapter of <child_name>'s Vambie storybook, planned page by page.
@@ -58,10 +60,26 @@ Earlier chapters: <previous_chapters>
 
 Source material
 - The memories below are the only factual source. Keep family facts (who, what, where, outcome) exactly as told.
-- Baby Vambie (teal-blue, round head, big eyes, tiny fangs) is the fictional stand-in for <child_name>: whatever <child_name> did, said or felt, Baby Vambie does, says and feels, in both the pictures and the text. Never include <child_name> as a separate human character. Other family members appear as themselves.
-- Baby Vambie feels its feelings honestly; the story sits beside them rather than fixing them. Don't invent other named Vambie characters.
+- <baby_vambie> is the fictional stand-in for <child_name>: whatever <child_name> did, said or felt, Baby Vambie does, says and feels, in both the pictures and the text. Never include <child_name> as a separate human character. Other family members appear as themselves.
+- Baby Vambie feels its feelings honestly; the story sits beside them rather than fixing them.
 - Fictional storytelling allowed: <embellishment_rules>
 - On every page, say in interpretationNote what is fictional or interpreted, so it is never presented as verified family history.
+
+Cast
+These recurring Vambie characters come from the Character Library:
+<cast>
+- Required characters appear in the chapter. An optional character appears only if the memory clearly fits their casting notes, at most one per chapter.
+- Never invent other Vambies. Write and picture cast members exactly as their cards describe: keep their look (no new clothing, hats or accessories; props they hold are fine) and their personality.
+- In each page's "characters" list, name cast members by their key exactly as listed above (for example baby_vambie).
+
+Family characters
+These are the family's saved characters (Our Characters):
+<family_cast>
+- Refer to a family character by their ref (F1, F2…) in each page's "characters" list, and add an "appearances" entry for them on that page: which approved look ("variant") they appear as and what they wear in this scene.
+- Never decide who someone is from a name alone: two people can share an alias like "Grandma". Use relationships, context and who recorded the memory. If you can't tell who someone is, if a family member isn't saved yet, or if the memory needs a look that isn't approved (for example Grandma as a child), don't guess: list them in "unresolved" with one short question for the parent, and refer to them on pages by that unresolved ref (U1, U2…). Still describe what they wear in each scene in plain words (their face and build come later from their approved look).
+- A family character's fixed features never change: face shape, skin tone, eye shape, distinctive features, hair color and usual hairstyle, body proportions, signature glasses or accessories. A scene may change their expression and pose, windblown or wet hair, camera angle and lighting, clothing that suits the activity, and the setting, season and time of day.
+- Keep a family character's outfit the same through one continuous scene. A different day or event can bring different clothes.
+- People who aren't family or regulars (a shopkeeper, kids at the park) are extras: list them in "characters" with a fixed look for this chapter.
 
 Chapter structure
 - Organize the story into an opening, development, a meaningful moment, and an ending. Let the page count follow the story within the reading level's range.
@@ -73,7 +91,7 @@ Page boundaries
 
 Scene and continuity
 - For each page, describe the characters present, the setting, the visible action, the emotional tone and important objects.
-- List every character once in "characters" with a fixed appearance and outfit, and reuse it on every page. Keep clothing, objects and setting details the same across connected scenes, and say what must carry over in "continuity".
+- Keep clothing, objects and setting details the same across connected scenes, and say what must carry over in "continuity".
 
 Shot list
 - Plan every page's camera like a picture-book illustrator: the shot type (wide establishing, medium, close-up, extreme close-up, over-the-shoulder, bird's-eye or low angle), the camera angle, and the one thing the picture focuses on.
@@ -86,7 +104,7 @@ Bottom-of-page text
 <memories>
 
 <revision_request>`,
-    outputFormat: `Respond with ONLY a JSON object, no markdown fences, in this shape: {"title": "chapter title", "characters": [{"name": "...", "appearance": "fixed look and outfit, reused on every page"}], "pages": [{"storyMoment": "...", "characters": ["names from the characters list"], "setting": "...", "visibleAction": "...", "emotionalTone": "...", "continuity": "what must match neighboring pages", "shot": {"type": "wide establishing | medium | close-up | extreme close-up | over-the-shoulder | bird's-eye | low angle", "angle": "e.g. eye level, from behind Grandma", "focus": "the one thing the picture centers on"}, "text": "exact words shown beneath the illustration", "sourceMemory": 1, "sourceQuote": "the words from the memory this page draws on, or empty", "interpretationNote": "what on this page is fictional or interpreted"}]}`,
+    outputFormat: `Respond with ONLY a JSON object, no markdown fences, in this shape: {"title": "chapter title", "characters": [{"name": "an extra: someone who isn't a saved family character", "appearance": "fixed look and outfit for this chapter"}], "unresolved": [{"ref": "U1", "mention": "how the memory refers to them", "kind": "unclear | new | missing_variant", "candidates": ["F1"], "variant": "the look the memory needs, e.g. today or as a child", "question": "one short question for the parent", "suggestedName": "...", "suggestedRelationship": "..."}], "pages": [{"storyMoment": "...", "characters": ["cast keys, family refs (F1), unresolved refs (U1) and extras' names"], "appearances": [{"ref": "F1 or U1", "variant": "today", "outfit": "what they wear in this scene"}], "setting": "...", "visibleAction": "...", "emotionalTone": "...", "continuity": "what must match neighboring pages", "shot": {"type": "wide establishing | medium | close-up | extreme close-up | over-the-shoulder | bird's-eye | low angle", "angle": "e.g. eye level, from behind Grandma", "focus": "the one thing the picture centers on"}, "text": "exact words shown beneath the illustration", "sourceMemory": 1, "sourceQuote": "the words from the memory this page draws on, or empty", "interpretationNote": "what on this page is fictional or interpreted"}]}`,
   },
   {
     key: "page_check",
@@ -97,7 +115,9 @@ Bottom-of-page text
       { name: "reading_level", description: "The reading profile: vocabulary, page count and word limits", sample: "A little more adventure · Ages 4-7. Simple, warm words an early reader can sound out; name feelings directly. Use 6-8 pages. Each page's text: at most 40 words, and no sentence longer than 12 words." },
       { name: "embellishment_rules", description: "How much fictional storytelling is allowed", sample: "Baby Vambie is the fictional stand-in for the child and may add small actions, sounds and short lines of dialogue that fit the memory's feelings. Never add events, people, places or outcomes that aren't in the memory." },
       { name: "memories", description: "The approved memories the chapter is based on", sample: "Memory 1:\nWhat happened: Grandma taught Mia to plant tomatoes; Mia checked every morning until the first sprout appeared.\nEmotions present: patience, excitement, pride\nPossible themes: waiting, grandparent bond, growth\nOriginal account: \"Grandma taught me to plant tomatoes. I checked every morning until the first sprout appeared.\"" },
-      { name: "characters", description: "The chapter's character list with fixed appearances", sample: "Baby Vambie: small round teal-blue creature, big eyes, tiny fangs, wearing a yellow sun hat\nGrandma: silver hair in a bun, round glasses, yellow cardigan, green garden gloves" },
+      { name: "cast", description: "The chapter's recurring characters from the Character Library: required ones, and optional ones with their casting notes", sample: "- baby_vambie: Baby Vambie. Required in this chapter.\n  Role: Stands in for the child in every story; witnesses feelings rather than fixing them.\n  Look: Teal-blue; oversized rounded head; huge round eyes; tiny fangs; simple body and limbs\n  Never: No spikes, horns, wings or tail.\n  Personality: Curious compassion. Sits beside a feeling rather than fighting it." },
+      { name: "family_cast", description: "The family's saved characters (Our Characters): permanent refs, relationships, aliases, context and approved looks", sample: "- F1: Grandma Rose\n  Relationship to the child: Grandmother (Mom's mother)\n  Also called: Grandma, Nana\n  Context: Lives nearby and keeps a vegetable garden.\n  Approved looks: \"today\" (round face, warm brown skin, short silver curls, round tortoiseshell glasses, small and sturdy)" },
+      { name: "characters", description: "The chapter's other characters (family members and people) with fixed appearances", sample: "Grandma: silver hair in a bun, round glasses, green cardigan, flowered garden apron" },
       {
         name: "pages",
         description: "Every page's plan and exact text",
@@ -113,7 +133,13 @@ Fictional storytelling allowed: <embellishment_rules>
 Source memories:
 <memories>
 
-Characters:
+Cast (recurring characters with locked looks and personalities):
+<cast>
+
+Family characters (approved looks; fixed features never change):
+<family_cast>
+
+Extras:
 <characters>
 
 Pages:
@@ -125,6 +151,8 @@ For pages <pages_to_check>, flag a page if:
 - it adds facts, people, places or outcomes not in the memories, beyond the fictional storytelling allowed;
 - it breaks continuity with neighboring pages (outfits, objects, setting, time of day);
 - <child_name> appears as a human character instead of being shown as Baby Vambie;
+- a cast member is pictured or written differently from their card (look or personality), or a Vambie appears who isn't in the cast;
+- a family character's fixed features are contradicted, they appear in a look (variant) the memory doesn't support, or their outfit changes in the middle of one continuous scene;
 - its shot doesn't suit the moment (for example, a key emotional moment or a tiny important object shown only from far away);
 - an interpretation is uncertain and should be confirmed by the parent.
 Otherwise mark it ok. Keep each note to one sentence a parent can act on.`,
@@ -138,7 +166,9 @@ Otherwise mark it ok. Keep each note to one sentence a parent can act on.`,
       { name: "reading_level", description: "The reading profile: vocabulary and word limits", sample: "A little more adventure · Ages 4-7. Simple, warm words an early reader can sound out; name feelings directly. Use 6-8 pages. Each page's text: at most 40 words, and no sentence longer than 12 words." },
       { name: "embellishment_rules", description: "How much fictional storytelling is allowed", sample: "Baby Vambie is the fictional stand-in for the child and may add small actions, sounds and short lines of dialogue that fit the memory's feelings. Never add events, people, places or outcomes that aren't in the memory." },
       { name: "memories", description: "The approved memories the chapter is based on", sample: "Memory 1:\nWhat happened: Grandma taught Mia to plant tomatoes; Mia checked every morning until the first sprout appeared.\nEmotions present: patience, excitement, pride\nPossible themes: waiting, grandparent bond, growth\nOriginal account: \"Grandma taught me to plant tomatoes. I checked every morning until the first sprout appeared.\"" },
-      { name: "characters", description: "The chapter's character list with fixed appearances", sample: "Baby Vambie: small round teal-blue creature, big eyes, tiny fangs, wearing a yellow sun hat\nGrandma: silver hair in a bun, round glasses, yellow cardigan, green garden gloves" },
+      { name: "cast", description: "The chapter's recurring characters from the Character Library: required ones, and optional ones with their casting notes", sample: "- baby_vambie: Baby Vambie. Required in this chapter.\n  Role: Stands in for the child in every story; witnesses feelings rather than fixing them.\n  Look: Teal-blue; oversized rounded head; huge round eyes; tiny fangs; simple body and limbs\n  Never: No spikes, horns, wings or tail.\n  Personality: Curious compassion. Sits beside a feeling rather than fighting it." },
+      { name: "family_cast", description: "The family's saved characters (Our Characters): permanent refs, relationships, aliases, context and approved looks", sample: "- F1: Grandma Rose\n  Relationship to the child: Grandmother (Mom's mother)\n  Also called: Grandma, Nana\n  Context: Lives nearby and keeps a vegetable garden.\n  Approved looks: \"today\" (round face, warm brown skin, short silver curls, round tortoiseshell glasses, small and sturdy)" },
+      { name: "characters", description: "The chapter's other characters (family members and people) with fixed appearances", sample: "Grandma: silver hair in a bun, round glasses, green cardigan, flowered garden apron" },
       { name: "page_number", description: "The page being revised", sample: "3" },
       { name: "current_page", description: "The page's current plan and text", sample: "Story moment: Baby Vambie discovers the first sprout.\nVisible action: Baby Vambie crouches beside a tiny green sprout; Grandma kneels nearby.\nText: \"Every morning, Vambie checked the little patch of earth. Then one day, hello! A tiny green sprout peeked out.\"" },
       { name: "previous_page", description: "The page before, for continuity (or none)", sample: "Page 2: Baby Vambie checks the bare soil each morning, wearing the yellow sun hat." },
@@ -153,7 +183,13 @@ Fictional storytelling allowed: <embellishment_rules>
 Source memories:
 <memories>
 
-Characters (keep these appearances):
+Cast (keep their looks and personalities):
+<cast>
+
+Family characters (refer to them by ref; fixed features never change):
+<family_cast>
+
+Extras (keep these appearances):
 <characters>
 
 Previous page: <previous_page>
@@ -163,8 +199,8 @@ Next page: <next_page>
 
 The parent asked: "<revision_request>"
 
-Rewrite page <page_number> to make that change. Keep it one main action or emotional moment, keep it consistent with the previous and next pages, keep family facts as told, and make sure the scene and the exact text agree. Choose a camera shot that suits the moment and differs from the shot type of the previous and next pages.`,
-    outputFormat: `Respond with ONLY a JSON object, no markdown fences, for the single revised page: {"storyMoment": "...", "characters": ["..."], "setting": "...", "visibleAction": "...", "emotionalTone": "...", "continuity": "...", "shot": {"type": "...", "angle": "...", "focus": "..."}, "text": "exact words shown beneath the illustration", "sourceMemory": 1, "sourceQuote": "...", "interpretationNote": "..."}`,
+Rewrite page <page_number> to make that change. Keep it one main action or emotional moment, keep it consistent with the previous and next pages, keep family facts as told, and make sure the scene and the exact text agree. Choose a camera shot that suits the moment and differs from the shot type of the previous and next pages. In "characters", name cast members by their key and family characters by their ref (F1), and give each family character an "appearances" entry with their look and what they wear in this scene.`,
+    outputFormat: `Respond with ONLY a JSON object, no markdown fences, for the single revised page: {"storyMoment": "...", "characters": ["cast keys, family refs and extras' names"], "appearances": [{"ref": "F1", "variant": "today", "outfit": "..."}], "setting": "...", "visibleAction": "...", "emotionalTone": "...", "continuity": "...", "shot": {"type": "...", "angle": "...", "focus": "..."}, "text": "exact words shown beneath the illustration", "sourceMemory": 1, "sourceQuote": "...", "interpretationNote": "..."}`,
   },
   {
     key: "illustration_check",
@@ -174,6 +210,7 @@ Rewrite page <page_number> to make that change. Keep it one main action or emoti
       { name: "page_text", description: "The exact text shown beneath the illustration", sample: "Every morning, Vambie checked the little patch of earth. Then one day, hello! A tiny green sprout peeked out." },
       { name: "visible_action", description: "What the scene plan says should be visible", sample: "Baby Vambie crouches beside a tiny green sprout; Grandma kneels nearby holding a red watering can." },
       { name: "characters", description: "Who should appear, with their fixed appearances", sample: "Baby Vambie: small round teal-blue creature, big eyes, tiny fangs, wearing a yellow sun hat\nGrandma: silver hair in a bun, round glasses, yellow cardigan, green garden gloves" },
+      { name: "reference_images", description: "Which approved family character designs are attached after the illustration, with their refs", sample: "Image 2 (R1): Grandma Rose's approved design" },
     ],
     defaultBody: `Look at the attached storybook illustration.
 
@@ -182,12 +219,33 @@ Characters who should appear:
 <characters>
 The book will print this text on the page below the picture (it is NOT part of the image, so don't look for it): "<page_text>"
 
+Approved family character designs attached after the illustration, for comparison:
+<reference_images>
+
 Flag it if:
 - a character, action or important object from the scene plan or the text is missing or contradicted in the picture;
 - a character looks clearly different from their description;
+- a family character doesn't match their approved design: different face shape, skin tone, eye shape, hair color or usual hairstyle, build, or missing signature glasses or accessories. (Expression, pose, lighting, windblown hair and scene clothing may differ.) List their refs in "mismatched";
 - the picture itself contains any written words, letters or captions (it shouldn't).
 Small artistic differences are fine.`,
-    outputFormat: `Respond with ONLY a JSON object, no markdown fences: {"status": "ok" | "flagged", "note": "one sentence; empty if ok"}`,
+    outputFormat: `Respond with ONLY a JSON object, no markdown fences: {"status": "ok" | "flagged", "note": "one sentence; empty if ok", "mismatched": ["refs of family characters who don't match their approved design (R1…), or empty"]}`,
+  },
+  {
+    key: "describe_person",
+    name: "Describe person",
+    trigger: "Runs when a parent uploads an optional photo for a family character, to draft their fixed features",
+    variables: [
+      { name: "name", description: "The character's name", sample: "Grandma Rose" },
+      { name: "relationship", description: "Their relationship to the child", sample: "Grandmother (Mom's mother)" },
+    ],
+    defaultBody: `The attached photo shows <name> (<relationship>). A parent wants a children's-book character design that is recognizably them.
+
+Describe only stable, visible features an illustrator needs, in plain words:
+- identity: face shape; skin tone in plain color words; eye shape and color; hair color, length and usual style; build; distinctive features such as freckles, dimples or a beard; glasses or signature accessories.
+- usualClothing: what they're wearing, as a typical outfit.
+
+Don't guess at ethnicity, health, age or anything else that isn't visible. Keep each field to one or two sentences.`,
+    outputFormat: `Respond with ONLY a JSON object, no markdown fences: {"identity": "...", "usualClothing": "..."}`,
   },
   {
     key: "guardian",

@@ -1,10 +1,23 @@
 import { useCallback, useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { Link, useNavigate, useParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
 import { apiGet, apiSend, ApiError } from "../lib/api";
-import type { Chapter, StoryPage } from "../types";
+import type { Chapter, StoryPage, UnresolvedPerson } from "../types";
 
-type ChapterWithPages = Chapter & { pages: StoryPage[] };
+interface FamilyOption {
+  id: string;
+  name: string;
+  relationship: string;
+  approvedVariants: string[];
+}
+
+type ChapterWithPages = Chapter & {
+  pages: StoryPage[];
+  cast?: { key: string; name: string }[];
+  unresolved?: UnresolvedPerson[];
+  familyCharacters?: FamilyOption[];
+};
+type Act = (key: string, run: () => Promise<ChapterWithPages>) => Promise<void>;
 
 const parseList = (json: string | null): string[] => {
   try {
@@ -57,6 +70,7 @@ export default function ChapterPages() {
 
   const approved = chapter.pages.filter((p) => p.approvedAt).length;
   const failed = chapter.pages.filter((p) => !p.assets[0] || p.assets[0].status === "failed").length;
+  const waitingOnPeople = (chapter.unresolved ?? []).length > 0;
   const openFindings = (chapter.findings ?? []).filter((f) => f.status === "needs_revision");
 
   return (
@@ -73,7 +87,8 @@ export default function ChapterPages() {
         </p>
 
         {drawing && <div className="banner info">Drawing illustrations… pages appear as they finish.</div>}
-        {!drawing && failed > 0 && (
+        {waitingOnPeople && <WhoIsWho chapter={chapter} storybookId={id!} busy={busy} act={act} />}
+        {!drawing && !waitingOnPeople && failed > 0 && (
           <div className="banner info">
             {failed} {failed === 1 ? "illustration" : "illustrations"} didn't finish.{" "}
             <button
@@ -98,12 +113,23 @@ export default function ChapterPages() {
         {error && <p className="status-line" style={{ color: "#d94c4c" }}>{error}</p>}
 
         {chapter.pages.map((page) => (
-          <PageCard key={page.id} page={page} busy={busy} act={act} chapterDrawing={chapter.pagesStatus === "illustrating"} />
+          <PageCard
+            key={page.id}
+            page={page}
+            busy={busy}
+            act={act}
+            chapterDrawing={chapter.pagesStatus === "illustrating"}
+            waitingOnPeople={waitingOnPeople}
+            castNames={Object.fromEntries([
+              ...(chapter.cast ?? []).map((c) => [c.key, c.name]),
+              ...(chapter.unresolved ?? []).map((u) => [u.ref, `${u.mention} (who?)`]),
+            ])}
+          />
         ))}
 
         <button
           className="btn-primary chevron"
-          disabled={busy !== null || drawing || failed > 0 || approved === chapter.pages.length}
+          disabled={busy !== null || drawing || waitingOnPeople || failed > 0 || approved === chapter.pages.length}
           onClick={() => act("approve-all", () => apiSend(`/api/chapters/${chapterId}/pages/approve`, "PUT"))}
         >
           {approved === chapter.pages.length ? "All pages approved" : "Approve all pages"}
@@ -114,16 +140,102 @@ export default function ChapterPages() {
   );
 }
 
+// "Who is this?": people the planner couldn't match to a saved family
+// character. Pictures wait until each is answered, instead of inventing a look.
+function WhoIsWho({ chapter, storybookId, busy, act }: { chapter: ChapterWithPages; storybookId: string; busy: string | null; act: Act }) {
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const family = chapter.familyCharacters ?? [];
+  const here = `/storybooks/${storybookId}/chapters/${chapter.id}/pages`;
+  const describeVariant = (v: string) => (v === "today" ? "as they look today" : v);
+
+  const submit = () => {
+    const list = Object.entries(answers)
+      .filter(([, value]) => value)
+      .map(([ref, value]) => {
+        if (value === "extra") return { ref, extra: {} };
+        const [, characterId, variant] = value.split("|");
+        return { ref, characterId, variant };
+      });
+    return act("people", () => apiSend(`/api/chapters/${chapter.id}/people`, "POST", { answers: list }));
+  };
+
+  return (
+    <div className="card" style={{ borderColor: "var(--gold, #e0a622)" }}>
+      <h3 style={{ marginTop: 0 }}>Who's who?</h3>
+      <p className="status-line">
+        Before drawing, tell us who these people are, so they look the same as in every other chapter. Nothing is drawn until you answer.
+      </p>
+      {(chapter.unresolved ?? []).map((u) => {
+        const candidates = [...family].sort((a, b) => Number(u.candidates.includes(b.id)) - Number(u.candidates.includes(a.id)));
+        const missingFor = u.kind === "missing_variant" ? family.find((f) => f.id === u.candidates[0]) : undefined;
+        return (
+          <div key={u.ref} style={{ borderTop: "1px solid rgba(0,0,0,0.08)", paddingTop: "0.75rem", marginTop: "0.75rem" }}>
+            <strong>“{u.mention}”</strong>{" "}
+            <span className="status-line">
+              on page{u.appearances.length === 1 ? "" : "s"} {u.appearances.map((a) => a.pageNumber).join(", ")}
+            </span>
+            <p className="status-line" style={{ margin: "0.25rem 0" }}>
+              {u.question}
+            </p>
+            <select value={answers[u.ref] ?? ""} onChange={(e) => setAnswers({ ...answers, [u.ref]: e.target.value })}>
+              <option value="">Choose…</option>
+              {candidates.flatMap((c) =>
+                c.approvedVariants.map((v) => (
+                  <option key={`${c.id}|${v}`} value={`char|${c.id}|${v}`}>
+                    {c.name} — {describeVariant(v)}
+                  </option>
+                ))
+              )}
+              <option value="extra">Someone else: draw them just for this chapter</option>
+            </select>
+            <div className="row inline" style={{ flexWrap: "wrap", gap: "0.75rem", marginTop: "0.4rem" }}>
+              {missingFor ? (
+                <Link
+                  className="btn-link"
+                  to={`/storybooks/${storybookId}/characters/${missingFor.id}?variant=${encodeURIComponent(u.variant)}&back=${encodeURIComponent(here)}`}
+                >
+                  Design {missingFor.name} {u.variant === "today" ? "" : u.variant}
+                </Link>
+              ) : (
+                <Link
+                  className="btn-link"
+                  to={`/storybooks/${storybookId}/characters?new=1&name=${encodeURIComponent(u.suggestedName || u.mention)}&relationship=${encodeURIComponent(
+                    u.suggestedRelationship
+                  )}&alias=${encodeURIComponent(u.mention)}&back=${encodeURIComponent(here)}`}
+                >
+                  Add {u.suggestedName || u.mention} to Our Characters
+                </Link>
+              )}
+            </div>
+          </div>
+        );
+      })}
+      <button
+        className="btn-primary chevron"
+        style={{ marginTop: "1rem" }}
+        disabled={busy !== null || !Object.values(answers).some(Boolean)}
+        onClick={submit}
+      >
+        {busy === "people" ? "Saving…" : "Save answers"}
+      </button>
+    </div>
+  );
+}
+
 function PageCard({
   page,
   busy,
   act,
   chapterDrawing,
+  waitingOnPeople,
+  castNames,
 }: {
   page: StoryPage;
   busy: string | null;
-  act: (key: string, run: () => Promise<ChapterWithPages>) => Promise<void>;
+  act: Act;
   chapterDrawing: boolean;
+  waitingOnPeople: boolean;
+  castNames: Record<string, string>; // character key or ref → name
 }) {
   const [mode, setMode] = useState<"view" | "edit" | "revise">("view");
   const [text, setText] = useState(page.text);
@@ -159,12 +271,12 @@ function PageCard({
             Drawing page {page.pageNumber}…
           </div>
         )}
-        {!asset && chapterDrawing && (
-          <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center" }} className="status-line">
-            Waiting to be drawn…
+        {!asset && (chapterDrawing || waitingOnPeople) && (
+          <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", padding: "1rem", textAlign: "center" }} className="status-line">
+            {waitingOnPeople ? "Waiting for your answers to “Who's who?”" : "Waiting to be drawn…"}
           </div>
         )}
-        {((!asset && !chapterDrawing) || asset?.status === "failed") && (
+        {((!asset && !chapterDrawing && !waitingOnPeople) || asset?.status === "failed") && (
           <div style={{ position: "absolute", inset: 0, display: "grid", placeItems: "center", padding: "1rem", textAlign: "center" }}>
             <div>
               <p className="status-line">{asset?.error ?? "No illustration yet."}</p>
@@ -224,6 +336,35 @@ function PageCard({
           </p>
         )}
 
+        {(page.appearances ?? []).length > 0 && (
+          <div style={{ marginTop: "0.5rem" }}>
+            {page.appearances!.map((a) => (
+              <div key={a.id} style={{ margin: "0.5rem 0" }}>
+                <div style={{ display: "flex", gap: "0.5rem", alignItems: "flex-start" }}>
+                  {a.design.portraitPath && (
+                    <img src={`/${a.design.portraitPath}`} alt="" style={{ width: 36, height: 36, borderRadius: 8, objectFit: "cover", flexShrink: 0 }} />
+                  )}
+                  <span className="status-line" style={{ margin: 0 }}>
+                    <strong>{a.familyCharacter.name}</strong>
+                    {a.design.variant !== "today" ? ` (${a.design.variant})` : ""} · look v{a.design.version}
+                    {a.outfit ? ` · wearing ${a.outfit}` : ""}
+                  </span>
+                </div>
+                {ready && (
+                  <button
+                    className="btn-small btn-secondary"
+                    style={{ marginTop: "0.35rem" }}
+                    disabled={disabled}
+                    onClick={() => act(`fix-${page.id}`, () => apiSend(`/api/pages/${page.id}/illustration`, "POST", { fixCharacterIds: [a.familyCharacterId] }))}
+                  >
+                    {a.familyCharacter.name.split(" ")[0]} doesn't look right
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
         <details style={{ marginTop: "0.5rem" }}>
           <summary className="status-line" style={{ cursor: "pointer" }}>
             Scene plan and sources
@@ -232,7 +373,7 @@ function PageCard({
             <dt><strong>Story moment</strong></dt>
             <dd>{page.storyMoment}</dd>
             <dt><strong>Characters</strong></dt>
-            <dd>{parseList(page.characters).join(", ")}</dd>
+            <dd>{parseList(page.characters).map((c) => castNames[c] ?? c).join(", ")}</dd>
             <dt><strong>Setting</strong></dt>
             <dd>{page.setting}</dd>
             <dt><strong>What the picture shows</strong></dt>

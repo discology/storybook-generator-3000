@@ -2,14 +2,18 @@ import express, { Request, Response, Router } from "express";
 import { prisma } from "./db";
 import { getCurrentUser } from "./session";
 import {
+  PersonAnswer,
   approvePages,
   checkPages,
   editPageText,
   generateIllustration,
   illustrateChapter,
+  parseUnresolved,
+  resolvePeople,
   revisePage,
   updatePagesStatus,
 } from "./storyPages";
+import { approvedVariants } from "./familyCharacters";
 import { DEFAULT_RULES, EMBELLISHMENT_LEVELS, IMAGE_MODELS, getActiveRules, saveRules, validateRules } from "./pageRules";
 
 const router: Router = express.Router();
@@ -48,16 +52,51 @@ async function pageForRequest(req: Request, res: Response) {
 const fail = (res: Response, error: any) => res.status(502).json({ error: error?.message ?? "Something went wrong. Try again." });
 
 export async function chapterWithPages(chapterId: string) {
-  return prisma.chapter.findUniqueOrThrow({
+  const chapter = await prisma.chapter.findUniqueOrThrow({
     where: { id: chapterId },
     include: {
       findings: true,
+      storybook: { include: { child: true } },
       pages: {
         orderBy: { pageNumber: "asc" },
-        include: { assets: { orderBy: { version: "desc" } } },
+        include: {
+          assets: { orderBy: { version: "desc" } },
+          appearances: {
+            include: {
+              familyCharacter: { select: { id: true, name: true } },
+              design: { select: { id: true, variant: true, version: true, portraitPath: true, status: true } },
+            },
+          },
+        },
       },
     },
   });
+  // Names for the keys and refs pages store: the Character Library cast and the
+  // chapter's family characters.
+  const snapshot = JSON.parse(chapter.generationSnapshot ?? "null");
+  const cast = [
+    ...(snapshot?.cast ?? []).map((c: { key: string; name: string }) => ({ key: c.key, name: c.name })),
+    ...(snapshot?.family ?? []).map((f: { ref: string; name: string }) => ({ key: f.ref, name: f.name })),
+  ];
+  // For answering "who is this?": the family's characters and their approved looks.
+  const familyCharacters = await prisma.familyCharacter.findMany({
+    where: { householdId: chapter.storybook.child.householdId },
+    include: { designs: true },
+    orderBy: { createdAt: "asc" },
+  });
+  const { storybook, ...rest } = chapter;
+  return {
+    ...rest,
+    storybookId: storybook.id,
+    cast,
+    unresolved: parseUnresolved(chapter.unresolvedPeople),
+    familyCharacters: familyCharacters.map((c) => ({
+      id: c.id,
+      name: c.name,
+      relationship: c.relationship,
+      approvedVariants: [...approvedVariants(c.designs).keys()],
+    })),
+  };
 }
 
 router.get("/chapters/:id/pages", async (req, res) => {
@@ -78,14 +117,16 @@ router.put("/pages/:pageId/text", async (req, res) => {
   }
 });
 
-// Regenerate or retry this page's illustration; the text is untouched.
+// Regenerate or retry this page's illustration; the text is untouched. Pass
+// fixCharacterIds when a family character doesn't look like their approved design.
 router.post("/pages/:pageId/illustration", async (req, res) => {
   const page = await pageForRequest(req, res);
   if (!page) return;
   const generating = await prisma.pageAsset.count({ where: { pageId: page.id, status: "generating" } });
   if (generating) return res.status(409).json({ error: "This page's illustration is already being drawn." });
+  const fixCharacterIds = Array.isArray(req.body?.fixCharacterIds) ? req.body.fixCharacterIds.map(String) : undefined;
   await prisma.chapter.update({ where: { id: page.chapterId }, data: { pagesStatus: "illustrating" } });
-  void generateIllustration(page.id).then(() => updatePagesStatus(page.chapterId));
+  void generateIllustration(page.id, { fixCharacterIds }).then(() => updatePagesStatus(page.chapterId));
   // Give the new "generating" version a moment to exist before responding.
   await new Promise((r) => setTimeout(r, 300));
   res.status(202).json(await chapterWithPages(page.chapterId));
@@ -101,6 +142,19 @@ router.post("/pages/:pageId/revise", async (req, res) => {
     res.json(await chapterWithPages(page.chapterId));
   } catch (error) {
     fail(res, error);
+  }
+});
+
+// The parent's answers to "who is this?" for people the planner couldn't identify.
+router.post("/chapters/:id/people", async (req, res) => {
+  if (!(await requireChapterAccess(req, res, req.params.id))) return;
+  const answers = Array.isArray(req.body?.answers) ? (req.body.answers as PersonAnswer[]) : [];
+  if (!answers.length) return res.status(400).json({ error: "Answer at least one question." });
+  try {
+    await resolvePeople(req.params.id, answers);
+    res.json(await chapterWithPages(req.params.id));
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
   }
 });
 

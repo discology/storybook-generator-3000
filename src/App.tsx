@@ -8,6 +8,8 @@ import Reader from "./pages/Reader";
 import Family from "./pages/Family";
 import ShareChapter from "./pages/ShareChapter";
 import ChapterPages from "./pages/ChapterPages";
+import OurCharacters from "./pages/OurCharacters";
+import FamilyCharacterDetail from "./pages/FamilyCharacterDetail";
 import InvitationAccept from "./pages/InvitationAccept";
 import Settings from "./pages/Settings";
 import SettingsReminders from "./pages/SettingsReminders";
@@ -23,6 +25,8 @@ import AdminMessageEdit from "./pages/admin/AdminMessageEdit";
 import AdminAiInstructions from "./pages/admin/AdminAiInstructions";
 import AdminAiInstructionEdit from "./pages/admin/AdminAiInstructionEdit";
 import AdminPageRules from "./pages/admin/AdminPageRules";
+import AdminCharacters from "./pages/admin/AdminCharacters";
+import AdminCharacterEdit from "./pages/admin/AdminCharacterEdit";
 
 export default function App() {
   return (
@@ -39,6 +43,8 @@ export default function App() {
           <Route path="ai" element={<AdminAiInstructions />} />
           <Route path="ai/:key" element={<AdminAiInstructionEdit />} />
           <Route path="page-rules" element={<AdminPageRules />} />
+          <Route path="characters" element={<AdminCharacters />} />
+          <Route path="characters/:id" element={<AdminCharacterEdit />} />
         </Route>
 
         <Route
@@ -55,6 +61,8 @@ export default function App() {
                 <Route path="/storybooks/:id/family" element={<Family />} />
                 <Route path="/storybooks/:id/chapters/:chapterId/share" element={<ShareChapter />} />
                 <Route path="/storybooks/:id/chapters/:chapterId/pages" element={<ChapterPages />} />
+                <Route path="/storybooks/:id/characters" element={<OurCharacters />} />
+                <Route path="/storybooks/:id/characters/:characterId" element={<FamilyCharacterDetail />} />
                 <Route path="/storybooks/:id/settings" element={<Settings />} />
                 <Route path="/storybooks/:id/settings/reminders" element={<SettingsReminders />} />
                 <Route path="/storybooks/:id/settings/story-preferences" element={<SettingsStoryPreferences />} />

@@ -48,6 +48,7 @@ model Household {
   contributors Contributor[]
   children    Child[]
   invitations Invitation[]
+  familyCharacters FamilyCharacter[]
   createdAt   DateTime     @default(now())
 }
 
@@ -219,7 +220,8 @@ model Chapter {
   generationSnapshot String? // JSON: rules, reading profile and AI instructions used
   characterSheet     String? // JSON: [{ name, appearance }] reused in every illustration
   characterSheetImage String? // character reference picture used for every page's illustration
-  pagesStatus        String  @default("none") // none | illustrating | ready | needs_attention
+  pagesStatus        String  @default("none") // none | needs_characters | illustrating | ready | needs_attention
+  unresolvedPeople   String? // JSON: people the planner couldn't match to a family character, awaiting the parent
   createdAt   DateTime @default(now())
 }
 
@@ -279,6 +281,7 @@ model StoryPage {
   checkNotes         String? // JSON string[]
   approvedAt         DateTime?
   assets             PageAsset[]
+  appearances        PageAppearance[]
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
 
@@ -298,5 +301,108 @@ model PageAsset {
   error       String?
   checkStatus String    @default("unchecked") // unchecked | ok | flagged
   checkNote   String?
+  fixNote     String? // set when this version was drawn to correct a character who didn't match
   createdAt   DateTime  @default(now())
+}
+
+// Recurring characters (the Vambies) shared by every storybook. AI instructions
+// reference them as <key>; each chapter snapshots the versions it was made with.
+model Character {
+  id             String         @id @default(cuid())
+  key            String         @unique // variable name: baby_vambie → <baby_vambie>; never changes
+  name           String
+  group          String?
+  storyRole      String         @default("") // what they do in stories
+  personality    String         @default("") // how they act and speak
+  appearance     String         @default("") // locked look used in every illustration
+  neverRules     String         @default("") // what must never change or appear
+  castingMode    String         @default("when_it_fits") // always | when_it_fits | only_when_picked
+  castingNotes   String         @default("") // when a story should include them
+  status         String         @default("draft") // draft | active | retired
+  version        Int            @default(1) // bumps when the card or reference art changes
+  referenceArtId String?
+  importedFrom   String? // e.g. "voot:baby-vambie"
+  art            CharacterArt[]
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+}
+
+// Uploaded or generated artwork; the character's reference art is attached to
+// every illustration they appear in.
+model CharacterArt {
+  id          String    @id @default(cuid())
+  characterId String
+  character   Character @relation(fields: [characterId], references: [id], onDelete: Cascade)
+  imagePath   String
+  source      String // upload | generated | render
+  prompt      String?
+  // Official 3D renders: which camera view and facial expression this image
+  // shows, so illustrations can attach the one matching each page.
+  view        String? // front | angle | side
+  expression  String? // happy | sad | excited | angry | surprised | in_love | amused
+  artSet      String    @default("") // "" for the character's usual look, or e.g. "with guitar"
+  fileHash    String? // to recognize the same image uploaded twice
+  createdAt   DateTime  @default(now())
+}
+
+// People (and pets) in a family's stories. Each has a permanent ID; how they
+// look lives in approved, versioned designs, one line of versions per age variant.
+model FamilyCharacter {
+  id           String            @id @default(cuid())
+  householdId  String
+  household    Household         @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  name         String // e.g. "Grandma Rose"
+  relationship String            @default("") // to the child, e.g. "Grandmother (Mom's mother)"
+  aliases      String            @default("[]") // JSON string[]: what people call them, e.g. ["Grandma", "Nana"]
+  context      String            @default("") // details that tell them apart from others with the same alias
+  designs      CharacterDesign[]
+  appearances  PageAppearance[]
+  createdAt    DateTime          @default(now())
+  updatedAt    DateTime          @updatedAt
+}
+
+// One version of a character's look for one age variant. Approved designs are
+// never edited: a change creates a new version, so pages that used the old one keep it.
+model CharacterDesign {
+  id                String           @id @default(cuid())
+  familyCharacterId String
+  familyCharacter   FamilyCharacter  @relation(fields: [familyCharacterId], references: [id], onDelete: Cascade)
+  variant           String           @default("today") // e.g. "today", "as a child"
+  version           Int // per character and variant
+  status            String           @default("draft") // draft | approved | superseded
+  identity          String           @default("") // fixed features: face, skin tone, eyes, hair, build, signature accessories
+  usualClothing     String           @default("") // a typical outfit; scenes may dress them differently
+  changeNote        String           @default("") // what this version changes from the last
+  styleSnapshot     String           @default("") // illustration style when approved
+  photoPath         String? // private reference photo: never served publicly or sent with page illustrations
+  portraitPath      String? // the approved design picture
+  sheetPath         String? // turnaround and expressions reference sheet
+  sheetStatus       String           @default("none") // none | generating | ready | failed
+  approvedAt        DateTime?
+  proposals         DesignProposal[]
+  appearances       PageAppearance[]
+  createdAt         DateTime         @default(now())
+}
+
+model DesignProposal {
+  id        String          @id @default(cuid())
+  designId  String
+  design    CharacterDesign @relation(fields: [designId], references: [id], onDelete: Cascade)
+  imagePath String
+  createdAt DateTime        @default(now())
+}
+
+// Which design of a family character appears on a page, and how they're dressed there.
+model PageAppearance {
+  id                String          @id @default(cuid())
+  pageId            String
+  page              StoryPage       @relation(fields: [pageId], references: [id], onDelete: Cascade)
+  familyCharacterId String
+  familyCharacter   FamilyCharacter @relation(fields: [familyCharacterId], references: [id], onDelete: Cascade)
+  designId          String
+  design            CharacterDesign @relation(fields: [designId], references: [id])
+  outfit            String          @default("")
+  details           String          @default("")
+
+  @@unique([pageId, familyCharacterId])
 }

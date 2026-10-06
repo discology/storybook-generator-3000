@@ -14,6 +14,6 @@ export function smsLength(text: string) {
 }
 
 export const fillTemplate = (body: string, values: Record<string, string>) =>
-  body.replace(/<([a-z_]+)>/g, (match, name) => values[name] ?? match);
+  body.replace(/<([a-z][a-z0-9_]*)>/g, (match, name) => values[name] ?? match);
 
-export const templateVariables = (body: string) => [...new Set([...body.matchAll(/<([a-z_]+)>/g)].map((m) => m[1]))];
+export const templateVariables = (body: string) => [...new Set([...body.matchAll(/<([a-z][a-z0-9_]*)>/g)].map((m) => m[1]))];

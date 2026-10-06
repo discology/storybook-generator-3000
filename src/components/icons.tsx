@@ -32,6 +32,14 @@ export const IconPeople = ({ size, className }: IconProps) => (
   </svg>
 );
 
+export const IconSmile = ({ size, className }: IconProps) => (
+  <svg {...base(size)} className={className}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M8.5 14.5c.9 1.2 2.1 1.8 3.5 1.8s2.6-.6 3.5-1.8" />
+    <path d="M9 9.5h.01M15 9.5h.01" />
+  </svg>
+);
+
 export const IconMenu = ({ size, className }: IconProps) => (
   <svg {...base(size)} className={className}>
     <path d="M4 6h16M4 12h16M4 18h16" />

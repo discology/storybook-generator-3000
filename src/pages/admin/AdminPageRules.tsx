@@ -14,7 +14,6 @@ interface PageRules {
   readingProfiles: Record<string, ReadingProfile>;
   embellishment: string;
   illustrationStyle: string;
-  babyVambieAppearance: string;
   peopleStyle: string;
   imageModel: string;
   imageQuality: string;
@@ -162,8 +161,6 @@ export default function AdminPageRules() {
         <h3 style={{ marginTop: 0 }}>Illustrations</h3>
         <label htmlFor="style">Art style</label>
         <textarea id="style" rows={3} value={rules.illustrationStyle} onChange={(e) => update({ ...rules, illustrationStyle: e.target.value })} />
-        <label htmlFor="vambie">How Baby Vambie looks</label>
-        <textarea id="vambie" rows={2} value={rules.babyVambieAppearance} onChange={(e) => update({ ...rules, babyVambieAppearance: e.target.value })} />
         <label htmlFor="people">How family members are drawn</label>
         <textarea id="people" rows={2} value={rules.peopleStyle} onChange={(e) => update({ ...rules, peopleStyle: e.target.value })} />
         <div className="row">
@@ -184,7 +181,10 @@ export default function AdminPageRules() {
             </select>
           </div>
         </div>
-        <p className="status-line">Pictures are 1536×1024 (landscape). Every page after the first uses page 1's picture as a reference so characters stay consistent.</p>
+        <p className="status-line">
+          Pictures are 1536×1024 (landscape). How Baby Vambie and the other Vambies look is set on the Characters page, and their reference art is
+          attached to every picture they're in.
+        </p>
       </div>
 
       {JSON.stringify(rules) !== JSON.stringify(data.defaults) && (

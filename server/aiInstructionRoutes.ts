@@ -4,6 +4,7 @@ import { getCurrentUser } from "./session";
 import { AI_STEPS, getAiStep, getAiInstruction } from "./aiInstructions";
 import { findUnknownVariables } from "./messageTemplates";
 import { runAiStep } from "./aiService";
+import { characterVariables } from "./characters";
 
 const router: Router = express.Router();
 
@@ -19,6 +20,8 @@ const withModels = async (key: string) => ({
   ...(await getAiInstruction(key)),
   models: AI_MODELS,
   defaultModel: process.env.OPENAI_MODEL || "gpt-5.5",
+  // Every Character Library character can be referenced as <key> in any step.
+  characterVariables: await characterVariables(),
 });
 
 router.get("/admin/ai-instructions", async (_req, res) => {
@@ -31,11 +34,14 @@ router.get("/admin/ai-instructions/:key", async (req, res) => {
 });
 
 // Checks edited instructions; returns an error message or null.
-function validate(key: string, body: unknown, model: unknown): string | null {
+async function validate(key: string, body: unknown, model: unknown): Promise<string | null> {
   const step = getAiStep(key)!;
   if (typeof body !== "string" || !body.trim()) return "The instructions can't be empty.";
-  const unknown = findUnknownVariables(step, body);
-  if (unknown.length) return `This step doesn't support ${unknown.map((n) => `<${n}>`).join(", ")}. Use one of the variables listed.`;
+  const characterKeys = (await characterVariables()).map((v) => v.name);
+  const unknown = findUnknownVariables(step, body, characterKeys);
+  if (unknown.length) {
+    return `This step doesn't support ${unknown.map((n) => `<${n}>`).join(", ")}. Use one of the variables listed, or add the character on the Characters page first.`;
+  }
   if (model !== null && model !== undefined && !AI_MODELS.includes(String(model))) return "Pick one of the listed models.";
   return null;
 }
@@ -45,7 +51,7 @@ router.put("/admin/ai-instructions/:key", async (req, res) => {
   if (!step) return res.status(404).json({ error: "Not found" });
   const body = typeof req.body?.body === "string" ? req.body.body.trim() : req.body?.body;
   const model = req.body?.model || null;
-  const error = validate(step.key, body, model);
+  const error = await validate(step.key, body, model);
   if (error) return res.status(400).json({ error });
 
   await prisma.aiInstruction.upsert({
@@ -62,7 +68,7 @@ router.post("/admin/ai-instructions/:key/test", async (req, res) => {
   if (!step) return res.status(404).json({ error: "Not found" });
   const body = typeof req.body?.body === "string" ? req.body.body.trim() : req.body?.body;
   const model = req.body?.model || null;
-  const error = validate(step.key, body, model);
+  const error = await validate(step.key, body, model);
   if (error) return res.status(400).json({ error });
 
   const values = Object.fromEntries(step.variables.map((v) => [v.name, v.sample]));

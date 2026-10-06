@@ -9,6 +9,8 @@ import promptRoutes from "./server/promptRoutes";
 import messageRoutes from "./server/messageRoutes";
 import aiInstructionRoutes from "./server/aiInstructionRoutes";
 import pageRoutes from "./server/pageRoutes";
+import characterRoutes from "./server/characterRoutes";
+import familyCharacterRoutes from "./server/familyCharacterRoutes";
 import { failInterruptedIllustrations } from "./server/storyPages";
 import guardianRoutes from "./server/guardianRoutes";
 import exportRoutes from "./server/exportRoutes";
@@ -16,6 +18,8 @@ import exportRoutes from "./server/exportRoutes";
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
+// Family reference photos are private: never served, only read by the server.
+app.use("/uploads/private", (_req, res) => res.status(404).end());
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 app.use("/api", authRoutes);
 app.use("/api", storybookRoutes);
@@ -24,6 +28,8 @@ app.use("/api", promptRoutes);
 app.use("/api", messageRoutes);
 app.use("/api", aiInstructionRoutes);
 app.use("/api", pageRoutes);
+app.use("/api", characterRoutes);
+app.use("/api", familyCharacterRoutes);
 app.use("/api", guardianRoutes);
 app.use("/api", exportRoutes);
 

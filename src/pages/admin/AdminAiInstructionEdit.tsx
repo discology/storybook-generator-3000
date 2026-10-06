@@ -34,7 +34,7 @@ export default function AdminAiInstructionEdit() {
   if (!step) return <p>Loading…</p>;
 
   const dirty = body !== step.body || model !== step.model;
-  const allowed = new Set(step.variables.map((v) => v.name));
+  const allowed = new Set([...step.variables, ...step.characterVariables].map((v) => v.name));
   const unknown = templateVariables(body).filter((name) => !allowed.has(name));
 
   const edit = (next: string) => {
@@ -158,6 +158,30 @@ export default function AdminAiInstructionEdit() {
               ))}
             </tbody>
           </table>
+
+          {step.characterVariables.length > 0 && (
+            <>
+              <label>Characters — click to insert</label>
+              <p className="status-line">
+                Each turns into that character's card from the Characters page (look, never rules, personality, role). Chapters use the version of
+                each character they were made with.
+              </p>
+              <table className="admin-table">
+                <tbody>
+                  {step.characterVariables.map((v) => (
+                    <tr key={v.name}>
+                      <td style={{ whiteSpace: "nowrap" }}>
+                        <button type="button" className="btn-small btn-secondary" onClick={() => insertVariable(v.name)}>
+                          &lt;{v.name}&gt;
+                        </button>
+                      </td>
+                      <td>{v.description}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
 
           {body !== step.defaultBody && (
             <button type="button" className="btn-link" style={{ marginTop: "1rem" }} onClick={() => edit(step.defaultBody)}>
