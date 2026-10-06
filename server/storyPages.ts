@@ -18,6 +18,7 @@ import {
 } from "./familyCharacters";
 import { getOpenAI } from "./openaiClient";
 import { MAX_REFERENCE_IMAGES, withImageRateLimit } from "./imageQueue";
+import { linkUsage, recordImage } from "./aiUsage";
 import { effectiveStage, vambieName } from "./readingStages";
 import {
   EMBELLISHMENT_LEVELS,
@@ -417,11 +418,12 @@ export async function createPagedChapter(input: CreateChapterInput) {
 
   let plan: { title: string; characters: CharacterSheetEntry[]; pages: PlannedPage[]; unresolved: any[] };
   let isMock = false;
+  let planUsageId: string | null = null;
   if (!isAiConfigured()) {
     plan = mockPlan(storybook.child.displayName, input.memories, profile);
     isMock = true;
   } else {
-    const { output } = await runAiStep(
+    const { output, usageId } = await runAiStep(
       "page_plan",
       namedValues(snapshot, {
         child_name: storybook.child.displayName,
@@ -432,8 +434,11 @@ export async function createPagedChapter(input: CreateChapterInput) {
         revision_request: input.revisionRequest ? `A reviewer asked for this revision: "${input.revisionRequest}"` : "",
         ...snapshotCharacterValues(snapshot),
       }),
-      { body: named(snapshot, snapshot.instructions.page_plan) }
+      { body: named(snapshot, snapshot.instructions.page_plan) },
+      [],
+      { chapterId: existing?.id ?? null, householdId: storybook.child.householdId }
     );
+    planUsageId = usageId;
     const pages = Array.isArray(output?.pages)
       ? output.pages.map(normalizePage).filter((p: PlannedPage) => p.text || p.pictureSize === "wordless")
       : [];
@@ -487,6 +492,7 @@ export async function createPagedChapter(input: CreateChapterInput) {
     });
     chapterId = created.id;
   }
+  await linkUsage(planUsageId, chapterId);
 
   await prisma.storyPage.createMany({
     data: plan.pages.map((p, i) => ({ chapterId, pageNumber: i + 1, ...pageData(p, input.memories) })),
@@ -510,6 +516,7 @@ export async function createPagedChapter(input: CreateChapterInput) {
 async function runGuardian(chapterId: string) {
   const chapter = await prisma.chapter.findUniqueOrThrow({ where: { id: chapterId }, include: { storybook: { include: { chapters: true } } } });
   const review = await guardianReview({
+    chapterId,
     chapterContent: chapter.content,
     readerAgeBand: chapter.storybook.readerAgeBand,
     priorChapterTitles: chapter.storybook.chapters.filter((c) => c.status === "published" && c.id !== chapterId).map((c) => c.title),
@@ -660,7 +667,9 @@ export async function checkPages(chapterId: string, pageNumbers?: number[]) {
           pages_to_check: targets.map((p) => p.pageNumber).join(", "),
           ...snapshotCharacterValues(snapshot),
         }),
-        { body: named(snapshot, snapshot.instructions.page_check) }
+        { body: named(snapshot, snapshot.instructions.page_check) },
+        [],
+        { chapterId }
       );
       for (const result of Array.isArray(output?.pages) ? output.pages : []) {
         if (result?.status === "flagged" && str(result.note)) notes.get(Number(result.pageNumber))?.push(str(result.note));
@@ -723,7 +732,9 @@ export async function revisePage(pageId: string, request: string) {
       revision_request: request,
       ...snapshotCharacterValues(snapshot),
     }),
-    { body: named(snapshot, snapshot.instructions.page_revise) }
+    { body: named(snapshot, snapshot.instructions.page_revise) },
+    [],
+    { chapterId: target.chapterId }
   );
   const revised = normalizePage(output);
   // Keep the page's picture size unless the revision chose one.
@@ -928,6 +939,7 @@ export async function generateCharacterSheet(chapterId: string): Promise<string 
         ? client.images.edit({ ...common, image: await Promise.all(references.map((r) => toUpload(r.path))) })
         : client.images.generate(common)
     );
+    await recordImage("chapter_sheet", common.model, response, common, { chapterId });
     const b64 = response.data?.[0]?.b64_json;
     if (!b64) throw new Error("The image service returned no image.");
     const imagePath = saveImage(b64, `${chapterId}-characters-${Date.now()}.jpg`);
@@ -1005,6 +1017,8 @@ export async function generateIllustration(pageId: string, options: Illustration
         ? client.images.edit({ ...common, image: await Promise.all(references.map((r) => toUpload(r.path))) })
         : client.images.generate(common)
     );
+    const step = fixNote ? "page_fix" : asset.version > 1 ? "page_redraw" : "page_picture";
+    await recordImage(step, common.model, response, common, { chapterId: page.chapterId });
     const b64 = response.data?.[0]?.b64_json;
     if (!b64) throw new Error("The image service returned no image.");
     const imagePath = saveImage(b64, `${pageId}-v${asset.version}.jpg`);
@@ -1042,7 +1056,8 @@ async function checkIllustration(assetId: string): Promise<string[]> {
           : "(none)",
       },
       snapshot ? { body: snapshot.instructions.illustration_check } : undefined,
-      [`data:image/jpeg;base64,${image}`, ...appearanceDataUrls(appearances)]
+      [`data:image/jpeg;base64,${image}`, ...appearanceDataUrls(appearances)],
+      { chapterId: asset.page.chapterId }
     );
     const mismatched = (Array.isArray(output?.mismatched) ? output.mismatched : [])
       .map((ref: unknown) => appearances[Number(String(ref).replace(/\D/g, "")) - 1]?.familyCharacterId)

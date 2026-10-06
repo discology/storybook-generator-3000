@@ -212,6 +212,15 @@ export const IconDatabase = icon(() => (
   </>
 ));
 
+export const IconCoins = icon(() => (
+  <>
+    <ellipse cx="9" cy="7" rx="6" ry="2.6" />
+    <path d="M3 7v4c0 1.4 2.7 2.6 6 2.6s6-1.2 6-2.6V7" />
+    <path d="M9 13.6v3.8c0 1.4 2.7 2.6 6 2.6s6-1.2 6-2.6v-4" />
+    <path d="M15 11c3.3 0 6 1.2 6 2.6s-2.7 2.6-6 2.6-6-1.2-6-2.6" />
+  </>
+));
+
 export const IconCalendar = icon(() => (
   <>
     <rect x="3.5" y="5" width="17" height="15.5" rx="2.2" />

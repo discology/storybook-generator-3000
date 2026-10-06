@@ -1,5 +1,6 @@
 import { prisma } from "./db";
 import { createPagedChapter, recordedBy } from "./storyPages";
+import { withUsage } from "./aiUsage";
 
 // Each week's memories become one chapter, made at 6 AM (the family's time)
 // the morning after their weekly reminder, so memories recorded in answer to
@@ -122,7 +123,7 @@ async function tick() {
   for (const sb of storybooks) {
     const due = lastScheduledBatch(sb, now);
     if (due <= (sb.lastBatchAt ?? sb.createdAt)) continue;
-    await makeWeeklyChapter(sb.id).catch(() => undefined);
+    await withUsage({ trigger: "weekly" }, () => makeWeeklyChapter(sb.id)).catch(() => undefined);
   }
 }
 

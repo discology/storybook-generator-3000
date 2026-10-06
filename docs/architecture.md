@@ -60,6 +60,7 @@ docs/                 these guides
 | `characters.ts`, `familyCharacters.ts` | Character cards, casting, reference art and render choice, design proposals |
 | `aiService.ts`, `aiInstructions.ts` | Calling the AI provider; each AI step's instructions and reply format |
 | `imageQueue.ts` | Pacing image requests to the OpenAI account's per-minute limit |
+| `aiUsage.ts`, `costRoutes.ts` | Recording what each AI call costs (prices per model), and the admin Costs page |
 | `messageTemplates.ts` | Text message types, variables and wording |
 
 ## Data model
@@ -72,6 +73,7 @@ The schema is in `prisma/schema.prisma`. Here are the models, grouped by what th
 - **Characters:** `Character` and `CharacterArt` (the Vambies), `FamilyCharacter`, `CharacterDesign` (versioned looks per age), `DesignProposal`, `PageAppearance` (which design of a family member is on a page, and what they're wearing).
 - **Configuration:** `Prompt`, `MessageTemplate`, `AiInstruction`, `GenerationRuleSet` (one row per page rules version).
 - **Exports:** `ExportRequest`.
+- **Costs:** `AiUsage` (one row per AI call: step, model, tokens, cost in dollars, and the family, chapter or memory it was for).
 
 ## Background work
 
@@ -101,6 +103,12 @@ Each step's instructions can be edited under Admin → Settings → AI instructi
 | `guardian` | After planning, or when an admin re-runs it | Findings for continuity, reader fit and private details |
 
 Transcription uses `OPENAI_TRANSCRIBE_MODEL` (`gpt-4o-transcribe`). Pictures use the image model and quality from Page Rules (`gpt-image-2`, medium).
+
+### What each call costs
+
+Every AI call records the usage the API reports in `AiUsage`, priced with the table in `server/aiUsage.ts` (standard OpenAI prices per million tokens). The cost is saved when the call is made, so a later price change only affects new calls. Update the table and `PRICES_CHECKED` when OpenAI changes its prices. A model missing from the table is priced like the default for its kind, and its rows are marked as estimates.
+
+Each row is tagged with what it was for. Call sites pass the chapter, memory or family (`runAiStep(..., tags)`, `recordImage(...)`), and the request, the weekly batch or an admin test run sets who started it (`usageFromRequest`, `withUsage`). A chapter's first call happens before the chapter exists, so it's linked afterwards (`linkUsage`). Recording never throws: a failed record is logged and the call carries on.
 
 ## Files on disk
 

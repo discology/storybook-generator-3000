@@ -108,6 +108,7 @@ router.post("/admin/chapters/:id/run-guardian", async (req, res) => {
   if (!chapter) return res.status(404).json({ error: "Not found" });
 
   const result = await guardianReview({
+    chapterId: chapter.id,
     chapterContent: chapter.content,
     readerAgeBand: chapter.storybook.readerAgeBand,
     priorChapterTitles: chapter.storybook.chapters.filter((c) => c.id !== chapter.id).map((c) => c.title),

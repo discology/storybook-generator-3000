@@ -470,3 +470,29 @@ model ChapterShare {
   message        String   @default("")
   createdAt      DateTime @default(now())
 }
+
+// What one AI call cost and what it was for (server/aiUsage.ts). Rows hold only
+// ids and numbers, never content. When a family deletes their account their ids
+// are cleared, so the spend still counts in totals but no longer points at them.
+model AiUsage {
+  id           String   @id @default(cuid())
+  kind         String // text | image | voice
+  step         String // page_plan, page_picture, transcribe… (STEP_LABELS in server/aiUsage.ts)
+  model        String
+  inputTokens  Int      @default(0) // text or audio input, not counting cached tokens
+  cachedTokens Int      @default(0)
+  imageTokens  Int      @default(0) // reference pictures sent with an image request
+  outputTokens Int      @default(0)
+  costUsd      Float
+  estimated    Boolean  @default(false) // the API reported no usage: priced from size and quality
+  trigger      String   @default("system") // family | weekly | admin | system
+  householdId  String?
+  chapterId    String?
+  memoryId     String?
+  userId       String? // who asked for it, when someone did
+  createdAt    DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([chapterId])
+  @@index([householdId])
+}

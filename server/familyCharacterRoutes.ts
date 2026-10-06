@@ -5,6 +5,7 @@ import multer from "multer";
 import { prisma } from "./db";
 import { getCurrentUser } from "./session";
 import { asJob } from "./jobs";
+import { usageFromRequest } from "./aiUsage";
 import {
   ALLOWED_VARIATIONS,
   ApprovalScope,
@@ -238,7 +239,7 @@ router.delete("/designs/:designId", async (req, res) => {
 // --- The optional reference photo (private) ---
 
 // The upload is received first; describing the photo then finishes in the background.
-router.post("/designs/:designId/photo", upload.single("photo"), asJob, async (req, res) => {
+router.post("/designs/:designId/photo", upload.single("photo"), usageFromRequest("family"), asJob, async (req, res) => {
   const design = await designForRequest(req, res);
   if (!design || !draftOnly(res, design)) return;
   const extension = req.file ? IMAGE_TYPES[req.file.mimetype] : undefined;

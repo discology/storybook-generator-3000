@@ -8,6 +8,7 @@ import { getActiveRules } from "./pageRules";
 import { toFile } from "openai";
 import { getOpenAI } from "./openaiClient";
 import { withImageRateLimit } from "./imageQueue";
+import { recordImage } from "./aiUsage";
 
 // The Character Library: recurring characters (the Vambies) with locked looks,
 // personalities and reference art. AI instructions reference a character as
@@ -246,6 +247,7 @@ export async function generateCharacterArt(characterId: string) {
   const response = await withImageRateLimit(0, () =>
     client.images.generate({ model: rules.imageModel, prompt, size: "1024x1024", quality: "high", output_format: "png" })
   );
+  await recordImage("library_art", rules.imageModel, response, { size: "1024x1024", quality: "high" });
   const b64 = response.data?.[0]?.b64_json;
   if (!b64) throw new Error("The image service returned no image.");
   const imagePath = saveCharacterImage(Buffer.from(b64, "base64"), `${character.key}-${Date.now()}.png`);
@@ -282,6 +284,7 @@ export async function restyleCharacterArt(characterId: string) {
       output_format: "png",
     })
   );
+  await recordImage("library_art", rules.imageModel, response, { size: "1024x1024", quality: "high" });
   const b64 = response.data?.[0]?.b64_json;
   if (!b64) throw new Error("The image service returned no image.");
   const imagePath = saveCharacterImage(Buffer.from(b64, "base64"), `${character.key}-book-style-${Date.now()}.png`);

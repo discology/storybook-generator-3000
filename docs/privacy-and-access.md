@@ -68,7 +68,8 @@ Anyone in the family can download a copy of their data from Privacy settings. An
 - **An account.** The app shows what will be removed and asks for "DELETE" to be typed. Everything goes in one step, or nothing does:
   - storybooks the person started are deleted for everyone, with all their memories, chapters, pictures and family characters;
   - in storybooks they joined, their own memories and recordings are deleted, and chapters made from them are held for review;
-  - their account and sign-in sessions are deleted.
+  - their account and sign-in sessions are deleted;
+  - the record of what their AI use cost stays, so the admin totals stay right, but it's no longer tied to them. These rows never hold words, recordings or pictures, only the step, model, token counts and cost.
 - Copies that were already downloaded or printed can't be recalled. The app says so before anything is deleted.
 
 ## Files

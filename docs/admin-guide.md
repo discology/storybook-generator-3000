@@ -60,6 +60,21 @@ The Vambie Character Library. Every chapter can include these characters, and AI
 - **3D renders:** the official renders, organized by camera view and expression. Select one to make it the reference art. When the reference art is a render, each page also gets the render matching its mood and camera angle.
 - Editing a card or changing the reference art creates a new version. Chapters keep the version they were made with.
 
+## Costs
+
+What the AI costs to run, from the usage each call reports. Costs are recorded from the day tracking was added, so older chapters are counted but show as *not tracked*.
+
+- **Filters:** the period (last 7, 30 or 90 days, this month, last month, all time or custom dates), one family, a reading stage, who started the work (the family, the weekly batch, the Vambie team, or a resume after a restart) and the cost type (pictures, writing and checks, voice). Filters are kept in the address, so a filtered view can be bookmarked or shared with the team.
+- **Headline numbers:** total spend, average cost per chapter (with the median and the highest), all-in cost per chapter (adding each family's memories and character designs), chapters made, chapters per family per week, a month's spend at this pace, the cost of one page picture, and the share of picture spend that went on redraws.
+- **Week by week:** spend per week split into pictures, writing and voice, with the number of chapters made above each bar.
+- **Where the money goes:** each AI step with its number of calls, cost per call, cost per chapter and total.
+- **By reading stage:** average chapter cost per stage. Stages that draw more pictures cost more.
+- **Families:** chapters, chapters a week, cost per chapter, spend on chapters, memories and character designs, and a month at this pace. Select a family's name to filter the page to it.
+- **Chapters:** every chapter in the period with its pages, pictures drawn (including redraws), and cost split into writing and pictures. **Download CSV** saves this table.
+- **Prices used:** the price table behind the numbers, and when it was last checked.
+
+A chapter's cost is everything ever spent on it, including later redraws and rewrites. Spend in the period counts each call on the day it was made. Spend that isn't tied to a family (Vambie library art, admin test runs, families who deleted their account) is in the totals and noted under the Families table.
+
 ## Settings
 
 ### Text messages

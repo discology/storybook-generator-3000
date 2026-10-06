@@ -12,6 +12,7 @@ import { interpret, processMemory } from "./memoryPipeline";
 import { canStartStorybook } from "./admin";
 import { STAGE_KEYS, ageInYears, effectiveStage, stageForAge, vambieName } from "./readingStages";
 import { eligibleMemories, isGenerating, lastBatchError, makeWeeklyChapter, nextScheduledBatch, TIMEZONES } from "./weeklyChapters";
+import { usageFromRequest } from "./aiUsage";
 
 const UPLOAD_DIR = path.join(process.cwd(), "uploads", "memories");
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -302,7 +303,7 @@ router.post("/storybooks/:id/memories", async (req, res) => {
   res.status(201).json(memory);
 });
 
-router.post("/memories/:id/audio", upload.single("audio"), async (req, res) => {
+router.post("/memories/:id/audio", upload.single("audio"), usageFromRequest("family"), async (req, res) => {
   const member = await memberForMemory(req, res, req.params.id);
   if (!member) return;
   if (member.memory.contributorId !== member.me.id) return res.status(403).json({ error: "access_denied" });

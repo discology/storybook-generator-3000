@@ -124,6 +124,8 @@ These are estimates from measured token usage at OpenAI's prices in October 2026
 
 Pictures are most of the cost: about $0.05 to draw each one, plus about $0.008 for each reference image attached. Redrawing a picture costs about $0.09, and revising a page about $0.12. Designing a family member's look costs about $0.40, once. The image model and quality are set in Page Rules, and each AI step's model under AI instructions.
 
+The real costs are recorded for every AI call. Admin → Costs shows them per chapter, per family and week by week (see the [admin guide](admin-guide.md#costs)).
+
 ## Not built yet
 
 - Text messages other than sign-in codes: invites, reminders, chapter links and "your chapter is ready" alerts. The app shows the message for the person to send themselves.

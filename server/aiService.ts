@@ -6,6 +6,7 @@ import { getAiInstruction } from "./aiInstructions";
 import { fillTemplate } from "./messageTemplates";
 import { characterCardValues } from "./characters";
 import { stageInfo } from "./readingStages";
+import { geminiTextUsage, openAiTextUsage, recordText, recordUsage, recordVoice, type TextUsage, type UsageTags } from "./aiUsage";
 
 const GEMINI_MODEL = "gemini-2.5-flash";
 const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5.5";
@@ -23,8 +24,10 @@ const getProvider = (): Provider | null => {
 // GPT-5 family and o-series reasoning models only accept the default temperature.
 const supportsTemperature = (model: string) => /^gpt-4/.test(model);
 
-async function generateJson(provider: Provider, prompt: string, temperature: number, model = OPENAI_MODEL, images: string[] = []): Promise<any> {
+// Returns the reply unparsed, so a reply that isn't JSON is still recorded as spent.
+async function generateJson(provider: Provider, prompt: string, temperature: number, model = OPENAI_MODEL, images: string[] = []): Promise<{ raw: string; usage: TextUsage | null }> {
   let raw: string;
+  let usage: TextUsage | null;
   if (provider.kind === "openai") {
     const response = await provider.client.chat.completions.create({
       model,
@@ -40,6 +43,7 @@ async function generateJson(provider: Provider, prompt: string, temperature: num
       ...(supportsTemperature(model) ? { temperature } : {}),
     });
     raw = response.choices[0]?.message?.content ?? "";
+    usage = openAiTextUsage(response.usage);
   } else {
     const imageParts = images.flatMap((url) => {
       const [, mimeType, data] = url.match(/^data:(.+?);base64,(.+)$/) ?? [];
@@ -51,9 +55,12 @@ async function generateJson(provider: Provider, prompt: string, temperature: num
       config: { temperature },
     });
     raw = response.text ?? "";
+    usage = geminiTextUsage(response.usageMetadata);
   }
-  return JSON.parse(raw.trim().replace(/^```json\s*|```$/g, ""));
+  return { raw, usage };
 }
+
+const parseJson = (raw: string) => JSON.parse(raw.trim().replace(/^```json\s*|```$/g, ""));
 
 const TEMPERATURE: Record<string, number> = {
   interpret: 0.4,
@@ -75,8 +82,9 @@ export interface InstructionOverride {
 // format, then calls the AI. Throws on failure; callers decide the fallback.
 // <character_key> variables come from the Character Library unless `values`
 // supplies them (chapters pass the character cards from their snapshot).
-// `images` are data URLs attached after the prompt, in order.
-export async function runAiStep(key: string, values: Record<string, string>, override?: InstructionOverride, images: string[] = []) {
+// `images` are data URLs attached after the prompt, in order. `tags` say which
+// chapter, memory or family the call's cost belongs to (server/aiUsage.ts).
+export async function runAiStep(key: string, values: Record<string, string>, override?: InstructionOverride, images: string[] = [], tags?: UsageTags) {
   const provider = getProvider();
   if (!provider) throw new Error("No AI provider configured");
   const instruction = await getAiInstruction(key);
@@ -84,8 +92,10 @@ export async function runAiStep(key: string, values: Record<string, string>, ove
   const model = (override && "model" in override ? override.model : instruction.model) || OPENAI_MODEL;
   const allValues = { ...(await characterCardValues()), ...values };
   const prompt = `${fillTemplate(body, allValues).replace(/\n{3,}/g, "\n\n").trim()}\n\n${instruction.outputFormat}`;
-  const output = await generateJson(provider, prompt, TEMPERATURE[key] ?? 0.7, model, images);
-  return { prompt, output, model: provider.kind === "openai" ? model : GEMINI_MODEL };
+  const usedModel = provider.kind === "openai" ? model : GEMINI_MODEL;
+  const { raw, usage } = await generateJson(provider, prompt, TEMPERATURE[key] ?? 0.7, model, images);
+  const usageId = await recordText(key, usedModel, usage, tags);
+  return { prompt, output: parseJson(raw), model: usedModel, usageId };
 }
 
 export const isAiConfigured = () => getProvider() !== null;
@@ -96,7 +106,7 @@ export interface TranscribeResult {
   reason?: string;
 }
 
-export async function transcribeAudio(filePath: string, mimeType: string): Promise<TranscribeResult> {
+export async function transcribeAudio(filePath: string, mimeType: string, audioSeconds: number | null = null, tags?: UsageTags): Promise<TranscribeResult> {
   const provider = getProvider();
   if (!provider) {
     return { text: null, isMock: true, reason: "No AI provider configured — enter the transcript manually below." };
@@ -105,6 +115,7 @@ export async function transcribeAudio(filePath: string, mimeType: string): Promi
     if (provider.kind === "openai") {
       const file = await toFile(fs.createReadStream(filePath), path.basename(filePath), { type: mimeType });
       const response = await provider.client.audio.transcriptions.create({ model: OPENAI_TRANSCRIBE_MODEL, file });
+      await recordVoice(OPENAI_TRANSCRIBE_MODEL, response.usage, audioSeconds, tags);
       const text = response.text?.trim();
       if (!text) return { text: null, isMock: true, reason: "Transcription returned empty — enter it manually." };
       return { text, isMock: false };
@@ -122,6 +133,8 @@ export async function transcribeAudio(filePath: string, mimeType: string): Promi
         },
       ],
     });
+    const usage = geminiTextUsage(response.usageMetadata);
+    await recordUsage({ kind: "voice", step: "transcribe", model: GEMINI_MODEL, inputTokens: usage?.input, outputTokens: usage?.output, estimated: !usage, tags });
     const text = response.text?.trim();
     if (!text) return { text: null, isMock: true, reason: "Transcription returned empty — enter it manually." };
     return { text, isMock: false };
@@ -138,11 +151,11 @@ export interface InterpretResult {
   isMock: boolean;
 }
 
-export async function interpretMemory(transcript: string): Promise<InterpretResult> {
+export async function interpretMemory(transcript: string, tags?: UsageTags): Promise<InterpretResult> {
   const fallback = { title: "", events: transcript.slice(0, 160), emotions: "", themes: "", isMock: true };
   if (!getProvider()) return fallback;
   try {
-    const { output } = await runAiStep("interpret", { transcript });
+    const { output } = await runAiStep("interpret", { transcript }, undefined, [], tags);
     return {
       title: typeof output.title === "string" ? output.title.trim().replace(/[.!]+$/, "") : "",
       events: output.events ?? "",
@@ -166,6 +179,7 @@ export interface GuardianReviewInput {
   chapterContent: string;
   readerAgeBand: string;
   priorChapterTitles: string[];
+  chapterId?: string; // the chapter the review's cost belongs to
 }
 
 export async function guardianReview(input: GuardianReviewInput): Promise<{ findings: GuardianFindingResult[]; isMock: boolean }> {
@@ -188,7 +202,7 @@ export async function guardianReview(input: GuardianReviewInput): Promise<{ find
       reader_level: readerAgeBandToInstruction(input.readerAgeBand),
       previous_chapters: input.priorChapterTitles.join(", ") || "(none yet — this is the first chapter)",
       chapter_text: input.chapterContent,
-    });
+    }, undefined, [], { chapterId: input.chapterId });
     const findings = (Array.isArray(output) ? output : output.findings) as GuardianFindingResult[];
     if (!Array.isArray(findings) || findings.length === 0) throw new Error("reply had no findings");
     return { isMock: false, findings };

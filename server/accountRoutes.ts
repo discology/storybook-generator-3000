@@ -104,6 +104,11 @@ export async function deleteAccount(userId: string) {
       designs.forEach((d) => files.push(d.photoPath, d.portraitPath, d.sheetPath, ...d.proposals.map((p) => p.imagePath)));
       // Contributors, invitations and family characters go with the household.
       await tx.household.delete({ where: { id: book.householdId } });
+      // What their AI use cost stays in the admin totals, no longer tied to them.
+      await tx.aiUsage.updateMany({
+        where: { householdId: book.householdId },
+        data: { householdId: null, chapterId: null, memoryId: null, userId: null },
+      });
     }
 
     for (const place of plan.contributing) {
@@ -120,6 +125,7 @@ export async function deleteAccount(userId: string) {
         await tx.chapter.update({ where: { id: chapterId }, data: { guardianStatus: "needs_revision", status: "guardian_review" } });
       }
       files.push(...memories.map((m) => m.audioUrl));
+      await tx.aiUsage.updateMany({ where: { memoryId: { in: memories.map((m) => m.id) } }, data: { memoryId: null } });
       await tx.memory.deleteMany({ where: { contributorId: place.contributorId } });
       const exports = await tx.exportRequest.findMany({ where: { contributorId: place.contributorId } });
       files.push(...exports.map((e) => e.filePath));
@@ -133,6 +139,7 @@ export async function deleteAccount(userId: string) {
       if ((await tx.memory.count({ where: { contributorId: c.id } })) === 0) await tx.contributor.delete({ where: { id: c.id } });
       else await tx.contributor.update({ where: { id: c.id }, data: { userId: null } });
     }
+    await tx.aiUsage.updateMany({ where: { userId }, data: { userId: null } });
     await tx.user.delete({ where: { id: userId } }); // sessions go with it
   });
 

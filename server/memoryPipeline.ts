@@ -20,14 +20,15 @@ export async function processMemory(memoryId: string) {
   try {
     let memory = await prisma.memory.findUniqueOrThrow({
       where: { id: memoryId },
-      include: { storybook: true, transcripts: { orderBy: { createdAt: "desc" }, take: 1 } },
+      include: { storybook: true, contributor: true, transcripts: { orderBy: { createdAt: "desc" }, take: 1 } },
     });
+    const tags = { memoryId, userId: memory.contributor.userId };
 
     if (!memory.transcripts[0]) {
       if (!memory.audioUrl) return;
       await prisma.memory.update({ where: { id: memoryId }, data: { status: "transcribing", processingError: null } });
       const filePath = path.join(process.cwd(), memory.audioUrl.replace(/^\//, ""));
-      const result = await transcribeAudio(filePath, mimeFor(filePath));
+      const result = await transcribeAudio(filePath, mimeFor(filePath), memory.durationSec, tags);
       if (!result.text) {
         await prisma.memory.update({ where: { id: memoryId }, data: { status: "failed", processingError: result.reason ?? "We couldn't make out the words." } });
         return;
@@ -37,7 +38,7 @@ export async function processMemory(memoryId: string) {
       if (!memory.storybook.keepRecordings) await removeAudio(memoryId, memory.audioUrl);
       memory = await prisma.memory.findUniqueOrThrow({
         where: { id: memoryId },
-        include: { storybook: true, transcripts: { orderBy: { createdAt: "desc" }, take: 1 } },
+        include: { storybook: true, contributor: true, transcripts: { orderBy: { createdAt: "desc" }, take: 1 } },
       });
     }
 
@@ -54,7 +55,7 @@ export async function processMemory(memoryId: string) {
 
 // (Re)interprets after a transcript is saved or corrected.
 export async function interpret(memoryId: string, transcript: string, setTitle: boolean) {
-  const result = await interpretMemory(transcript);
+  const result = await interpretMemory(transcript, { memoryId });
   await prisma.memoryInterpretation.upsert({
     where: { memoryId },
     update: { events: result.events, emotions: result.emotions, themes: result.themes, isMock: result.isMock },

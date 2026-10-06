@@ -20,6 +20,8 @@ import exportRoutes, { failInterruptedExports } from "./server/exportRoutes";
 import accountRoutes from "./server/accountRoutes";
 import jobRoutes, { asJob } from "./server/jobs";
 import { guardUploads } from "./server/uploadAccess";
+import { usageFromRequest } from "./server/aiUsage";
+import costRoutes from "./server/costRoutes";
 
 const production = process.env.NODE_ENV === "production";
 
@@ -45,6 +47,10 @@ app.get("/api/health", (_req, res) => res.json({ ok: true }));
 // family's pictures only to its members (server/uploadAccess.ts).
 app.use("/uploads", guardUploads);
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+
+// AI calls made while answering a request record who asked (server/aiUsage.ts).
+app.use("/api", usageFromRequest("family"));
+app.use("/api/admin", usageFromRequest("admin"));
 
 app.use("/api/admin", requireAdmin);
 app.use("/api/prompts", (req, res, next) => (req.method === "GET" ? next() : requireAdmin(req, res, next)));
@@ -80,6 +86,7 @@ app.use("/api", familyCharacterRoutes);
 app.use("/api", guardianRoutes);
 app.use("/api", exportRoutes);
 app.use("/api", accountRoutes);
+app.use("/api", costRoutes);
 app.use("/api", jobRoutes);
 
 // In production this server also serves the built web app (npm run build);

@@ -36,6 +36,7 @@ import AdminPageRules from "./pages/admin/AdminPageRules";
 import AdminCharacters from "./pages/admin/AdminCharacters";
 import AdminCharacterEdit from "./pages/admin/AdminCharacterEdit";
 import AdminOverview, { AdminFamilies, AdminSettings } from "./pages/admin/AdminOverview";
+import AdminCosts from "./pages/admin/AdminCosts";
 
 export default function App() {
   return (
@@ -56,6 +57,7 @@ export default function App() {
           <Route path="page-rules" element={<AdminPageRules />} />
           <Route path="characters" element={<AdminCharacters />} />
           <Route path="characters/:id" element={<AdminCharacterEdit />} />
+          <Route path="costs" element={<AdminCosts />} />
         </Route>
 
         <Route

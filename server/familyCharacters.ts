@@ -7,6 +7,7 @@ import { getActiveRules } from "./pageRules";
 import { getOpenAI } from "./openaiClient";
 import { runAiStep } from "./aiService";
 import { withImageRateLimit } from "./imageQueue";
+import { recordImage } from "./aiUsage";
 
 // "Our Characters": each family's recurring people (and pets). A character has a
 // permanent ID; their look lives in approved, versioned designs, one line per age
@@ -177,6 +178,7 @@ export async function generateProposal(designId: string) {
   const response = await withImageRateLimit(references.length, async () =>
     references.length ? client.images.edit({ ...common, image: await Promise.all(references.map(toUpload)) }) : client.images.generate(common)
   );
+  await recordImage("design_proposal", common.model, response, common, { householdId: character.householdId });
   const b64 = response.data?.[0]?.b64_json;
   if (!b64) throw new Error("The image service returned no image.");
   const imagePath = saveFile(DESIGNS_DIR, `${design.id}-proposal-${Date.now()}.png`, Buffer.from(b64, "base64"));
@@ -191,7 +193,8 @@ export async function describePhoto(designId: string) {
     "describe_person",
     { name: design.familyCharacter.name, relationship: design.familyCharacter.relationship || "family member" },
     undefined,
-    [dataUrl(design.photoPath)]
+    [dataUrl(design.photoPath)],
+    { householdId: design.familyCharacter.householdId }
   );
   return {
     identity: typeof output?.identity === "string" ? output.identity.trim() : "",
@@ -266,6 +269,7 @@ export async function generateReferenceSheet(designId: string) {
       quality: "high",
       output_format: "png",
     }));
+    await recordImage("reference_sheet", rules.imageModel, response, { size: "1536x1024", quality: "high" }, { householdId: design.familyCharacter.householdId });
     const b64 = response.data?.[0]?.b64_json;
     if (!b64) throw new Error("The image service returned no image.");
     const sheetPath = saveFile(DESIGNS_DIR, `${design.id}-sheet-${Date.now()}.png`, Buffer.from(b64, "base64"));

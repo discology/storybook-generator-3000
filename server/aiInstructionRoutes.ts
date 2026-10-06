@@ -4,6 +4,7 @@ import { getCurrentUser } from "./session";
 import { AI_STEPS, getAiStep, getAiInstruction } from "./aiInstructions";
 import { findUnknownVariables } from "./messageTemplates";
 import { runAiStep } from "./aiService";
+import { withUsage } from "./aiUsage";
 import { characterVariables } from "./characters";
 
 const router: Router = express.Router();
@@ -74,7 +75,7 @@ router.post("/admin/ai-instructions/:key/test", async (req, res) => {
   const values = Object.fromEntries(step.variables.map((v) => [v.name, v.sample]));
   const started = Date.now();
   try {
-    const result = await runAiStep(step.key, values, { body, model });
+    const result = await withUsage({ step: "admin_test" }, () => runAiStep(step.key, values, { body, model }));
     res.json({ ...result, seconds: Math.round((Date.now() - started) / 100) / 10 });
   } catch (err: any) {
     res.status(502).json({ error: `The AI call failed: ${err?.message ?? "unknown error"}` });
