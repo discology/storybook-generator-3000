@@ -335,6 +335,7 @@ export interface StorybookMemory {
   mine: boolean;
   favorite: boolean;
   excerpt: string | null;
+  words: string; // the full transcript, for search
   chapterIds: string[];
   audioSrc: string | null;
   promptText: string | null;
@@ -436,7 +437,7 @@ export interface MemoryDetail {
   storyUseConsent: boolean;
   promptText: string | null;
   audioSrc: string | null;
-  hadRecording: boolean;
+  recordingKept: boolean; // false when the family keeps only the words
   favorite: boolean;
   mine: boolean;
   contributor: { id: string; name: string; relationship: string | null };
@@ -444,6 +445,8 @@ export interface MemoryDetail {
   interpretation: MemoryInterpretation | null;
   chapters: { id: string; title: string; sequence: number; status: string; cover: string | null }[];
   storybook: { id: string; title: string; childName: string };
+  nextChapterAt: string;
+  canDelete: boolean;
 }
 
 export interface ReaderChapter {

@@ -5,8 +5,12 @@ import SignIn from "./pages/SignIn";
 import StorybookHome from "./pages/StorybookHome";
 import Setup from "./pages/Setup";
 import ThisWeek from "./pages/ThisWeek";
+import Memories from "./pages/Memories";
+import MemoryDetail from "./pages/MemoryDetail";
+import MemoryDelete from "./pages/MemoryDelete";
 import Recorder from "./pages/Recorder";
-import Reader from "./pages/Reader";
+import Reader, { ReadLatest } from "./pages/Reader";
+import StoryFeedback from "./pages/StoryFeedback";
 import Family from "./pages/Family";
 import ShareChapter from "./pages/ShareChapter";
 import ChapterPages from "./pages/ChapterPages";
@@ -61,7 +65,12 @@ export default function App() {
                 <Route path="/storybooks/:id" element={<StorybookHome />} />
                 <Route path="/storybooks/:id/record" element={<Recorder />} />
                 <Route path="/storybooks/:id/this-week" element={<ThisWeek />} />
-                <Route path="/storybooks/:id/read" element={<Reader />} />
+                <Route path="/storybooks/:id/memories" element={<Memories />} />
+                <Route path="/storybooks/:id/memories/:memoryId" element={<MemoryDetail />} />
+                <Route path="/storybooks/:id/memories/:memoryId/delete" element={<MemoryDelete />} />
+                <Route path="/storybooks/:id/read" element={<ReadLatest />} />
+                <Route path="/storybooks/:id/read/:chapterId" element={<Reader />} />
+                <Route path="/storybooks/:id/chapters/:chapterId/feedback" element={<StoryFeedback />} />
                 <Route path="/storybooks/:id/family" element={<Family />} />
                 <Route path="/storybooks/:id/chapters/:chapterId/share" element={<ShareChapter />} />
                 <Route path="/storybooks/:id/chapters/:chapterId/pages" element={<ChapterPages />} />

@@ -4,6 +4,7 @@ import fs from "fs";
 import path from "path";
 import { prisma } from "./db";
 import { getCurrentUser } from "./session";
+import { memberForMemory } from "./access";
 
 const EXPORT_DIR = path.join(process.cwd(), "uploads", "exports");
 fs.mkdirSync(EXPORT_DIR, { recursive: true });
@@ -97,52 +98,88 @@ router.post("/storybooks/:id/export", async (req, res) => {
 });
 
 // --- Memory deletion ---
+// The recorder can delete their memory, and the storybook's owner can delete any.
+async function deletableMemory(req: express.Request, res: express.Response) {
+  const member = await memberForMemory(req, res, req.params.id);
+  if (!member) return null;
+  if (member.memory.contributorId !== member.me.id && member.me.role !== "owner") {
+    res.status(403).json({ error: "Only the person who recorded this memory can delete it." });
+    return null;
+  }
+  return member;
+}
+
 router.get("/memories/:id/deletion-preview", async (req, res) => {
-  const memory = await prisma.memory.findUnique({
-    where: { id: req.params.id },
-    include: { chapterSources: { include: { chapter: true } } },
+  const member = await deletableMemory(req, res);
+  if (!member) return;
+  const memory = await prisma.memory.findUniqueOrThrow({
+    where: { id: member.memory.id },
+    include: {
+      transcripts: { take: 1 },
+      chapterSources: {
+        include: { chapter: { include: { pages: { orderBy: { pageNumber: "asc" }, take: 1, include: { assets: { where: { status: "ready" }, orderBy: { version: "desc" }, take: 1 } } } } } },
+      },
+    },
   });
-  if (!memory) return res.status(404).json({ error: "Not found" });
   res.json({
-    memory,
-    connectedChapters: memory.chapterSources.map((cs) => cs.chapter),
+    memory: { id: memory.id, title: memory.title, recordedAt: memory.recordedAt, hasAudio: Boolean(memory.audioUrl), hasTranscript: memory.transcripts.length > 0, mine: memory.contributorId === member.me.id },
+    connectedChapters: memory.chapterSources.map(({ chapter: c }) => ({
+      id: c.id,
+      title: c.title,
+      sequence: c.sequence,
+      status: c.status,
+      cover: c.pages[0]?.assets[0]?.imagePath ?? null,
+    })),
   });
 });
 
 router.delete("/memories/:id", async (req, res) => {
-  const user = await getCurrentUser(req);
-  if (!user) return res.status(401).json({ error: "Sign in first" });
-
-  const memory = await prisma.memory.findUnique({
-    where: { id: req.params.id },
-    include: { chapterSources: true },
-  });
-  if (!memory) return res.status(404).json({ error: "Not found" });
-
+  const member = await deletableMemory(req, res);
+  if (!member) return;
+  const memory = await prisma.memory.findUniqueOrThrow({ where: { id: member.memory.id }, include: { chapterSources: true } });
   const affectedChapterIds = memory.chapterSources.map((cs) => cs.chapterId);
 
+  // Chapters built on this memory are held until the Vambie team reviews them.
   for (const chapterId of affectedChapterIds) {
     await prisma.guardianFinding.create({
       data: {
         chapterId,
         category: "source_removed",
         status: "needs_revision",
-        note: "A source memory for this chapter was deleted. Review before it can be published again.",
+        note: "A memory this chapter was made from was deleted. Remove its influence and review the chapter before it can be published again.",
       },
     });
-    await prisma.chapter.update({
-      where: { id: chapterId },
-      data: { guardianStatus: "needs_revision", status: "guardian_review" },
-    });
+    await prisma.chapter.update({ where: { id: chapterId }, data: { guardianStatus: "needs_revision", status: "guardian_review" } });
   }
 
   if (memory.audioUrl) {
     const absPath = path.join(process.cwd(), memory.audioUrl.replace(/^\//, ""));
     if (fs.existsSync(absPath)) fs.unlinkSync(absPath);
   }
-
   await prisma.memory.delete({ where: { id: memory.id } });
   res.json({ ok: true, affectedChapterIds });
+});
+
+// One memory's recording and words, for keeping a copy before deleting it.
+router.get("/memories/:id/export", async (req, res) => {
+  const member = await memberForMemory(req, res, req.params.id);
+  if (!member) return;
+  const memory = await prisma.memory.findUniqueOrThrow({
+    where: { id: member.memory.id },
+    include: { transcripts: { orderBy: { createdAt: "desc" }, take: 1 }, contributor: true },
+  });
+  const slug = (memory.title || "memory").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "memory";
+  res.setHeader("Content-Type", "application/zip");
+  res.setHeader("Content-Disposition", `attachment; filename="${slug}.zip"`);
+  const archive = new ZipArchive({ zlib: { level: 9 } });
+  archive.pipe(res);
+  if (memory.audioUrl) {
+    const absPath = path.join(process.cwd(), memory.audioUrl.replace(/^\//, ""));
+    if (fs.existsSync(absPath)) archive.file(absPath, { name: `${slug}${path.extname(absPath)}` });
+  }
+  const date = (memory.eventDate ?? memory.recordedAt).toISOString().slice(0, 10);
+  archive.append(`${memory.title || "Untitled memory"}\nRecorded by ${memory.contributor.name} · ${date}\n\n${memory.transcripts[0]?.text ?? "(no transcript)"}\n`, { name: `${slug}.txt` });
+  await archive.finalize();
 });
 
 export default router;

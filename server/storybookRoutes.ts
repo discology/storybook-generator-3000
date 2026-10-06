@@ -146,6 +146,7 @@ router.get("/storybooks/:id", async (req, res) => {
       mine: m.contributorId === me.id,
       favorite: parseIds(favoritedBy).includes(me.id),
       excerpt: transcripts[0]?.text.slice(0, 220) ?? null,
+      words: transcripts[0]?.text ?? "",
       chapterIds: chapterSources.map((s) => s.chapterId),
     }));
 
@@ -334,7 +335,7 @@ router.get("/memories/:id", async (req, res) => {
   res.json({
     ...rest,
     audioSrc: audioSrc(memory),
-    hadRecording: Boolean(audioUrl) || !member.storybook.keepRecordings,
+    recordingKept: member.storybook.keepRecordings,
     favorite: parseIds(favoritedBy).includes(member.me.id),
     mine: memory.contributorId === member.me.id,
     contributor: { id: contributor.id, name: contributor.name, relationship: contributor.relationship },
@@ -344,6 +345,8 @@ router.get("/memories/:id", async (req, res) => {
       .filter((c) => canSeeChapter(c, member.me))
       .map((c) => ({ id: c.id, title: c.title, sequence: c.sequence, status: c.status, cover: c.pages[0]?.assets[0]?.imagePath ?? null })),
     storybook: { id: member.storybook.id, title: member.storybook.title, childName: member.storybook.child.displayName },
+    nextChapterAt: nextScheduledBatch(member.storybook),
+    canDelete: memory.contributorId === member.me.id || isOwner(member.me),
   });
 });
 
