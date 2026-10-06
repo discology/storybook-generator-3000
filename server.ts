@@ -18,16 +18,56 @@ import { startWeeklyChapters } from "./server/weeklyChapters";
 import guardianRoutes from "./server/guardianRoutes";
 import exportRoutes, { failInterruptedExports } from "./server/exportRoutes";
 import accountRoutes from "./server/accountRoutes";
+import jobRoutes, { asJob } from "./server/jobs";
+import { guardUploads } from "./server/uploadAccess";
+
+const production = process.env.NODE_ENV === "production";
 
 const app = express();
+app.disable("x-powered-by");
+if (production) {
+  // Behind Fly.io's proxy: requests arrive over HTTPS at the edge.
+  app.set("trust proxy", 1);
+  app.use((_req, res, next) => {
+    res.setHeader("Strict-Transport-Security", "max-age=15552000");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.setHeader("X-Frame-Options", "DENY");
+    res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+    next();
+  });
+}
 app.use(express.json());
 app.use(cookieParser());
-// Family reference photos, recordings and exports are private: photos are only
-// read by the server; recordings and exports go through access-checked routes.
-app.use(["/uploads/private", "/uploads/memories", "/uploads/exports"], (_req, res) => res.status(404).end());
+
+app.get("/api/health", (_req, res) => res.json({ ok: true }));
+
+// Recordings, exports and reference photos are never served directly, and a
+// family's pictures only to its members (server/uploadAccess.ts).
+app.use("/uploads", guardUploads);
 app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
+
 app.use("/api/admin", requireAdmin);
 app.use("/api/prompts", (req, res, next) => (req.method === "GET" ? next() : requireAdmin(req, res, next)));
+
+// Actions that can take longer than a proxy keeps a quiet connection open
+// answer right away and finish in the background (server/jobs.ts).
+app.post(
+  [
+    "/api/admin/chapters/:id/request-revision",
+    "/api/admin/chapters/:id/run-guardian",
+    "/api/admin/ai-instructions/:key/test",
+    "/api/admin/characters/:id/art/generate",
+    "/api/admin/characters/:id/art/restyle",
+    "/api/designs/:designId/proposals",
+    "/api/pages/:pageId/revise",
+    "/api/chapters/:id/people",
+    "/api/chapters/:id/pages/recheck",
+    "/api/storybooks/:id/chapters",
+  ],
+  asJob
+);
+app.put("/api/pages/:pageId/text", asJob);
+
 app.use("/api", authRoutes);
 app.use("/api", storybookRoutes);
 app.use("/api", familyRoutes);
@@ -40,6 +80,19 @@ app.use("/api", familyCharacterRoutes);
 app.use("/api", guardianRoutes);
 app.use("/api", exportRoutes);
 app.use("/api", accountRoutes);
+app.use("/api", jobRoutes);
+
+// In production this server also serves the built web app (npm run build);
+// in development Vite serves it.
+if (production) {
+  const dist = path.join(process.cwd(), "dist");
+  app.use("/assets", express.static(path.join(dist, "assets"), { immutable: true, maxAge: "1y" }));
+  app.use(express.static(dist, { index: false, maxAge: "1h" }));
+  app.get(/^\/(?!api\/|uploads\/).*/, (_req, res) => res.sendFile(path.join(dist, "index.html"), { headers: { "Cache-Control": "no-cache" } }));
+}
+
+// One failed request shouldn't take the whole server down.
+process.on("unhandledRejection", (error) => console.error("Unhandled error:", error));
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3002;
 app.listen(PORT, () => {
@@ -47,5 +100,8 @@ app.listen(PORT, () => {
   void failInterruptedIllustrations();
   void resumeUnfinishedMemories();
   void failInterruptedExports();
-  startWeeklyChapters();
+  // Weekly chapters are made by the hosted app. A development copy only makes
+  // them when asked (WEEKLY_CHAPTERS=on), so two copies don't both spend on one.
+  if (production || process.env.WEEKLY_CHAPTERS === "on") startWeeklyChapters();
+  else console.log("Weekly chapters are off in development (set WEEKLY_CHAPTERS=on to turn them on).");
 });

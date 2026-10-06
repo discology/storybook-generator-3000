@@ -35,7 +35,7 @@ const guessTimezone = () => {
 
 // Creating a storybook: who it's for, how it reads, and the reminder rhythm.
 export default function Setup() {
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
   const [busy, setBusy] = useState(false);
@@ -111,6 +111,34 @@ export default function Setup() {
   };
 
   if (loading || !user) return <Loading />;
+
+  if (user.canStart === false) {
+    return (
+      <div className="page">
+        <TopBar back="/" wordmark />
+        <Masthead title={<>Vambie is<br />invite-only for now.</>} art="envelope" artMode="corner" />
+        <Sheet grow>
+          <h2 className="h-title">Joining someone's storybook?</h2>
+          <p className="t-body t-muted" style={{ marginTop: 8 }}>
+            Open the invitation link they sent you. It brings you straight to their child's story.
+          </p>
+          <p className="t-body t-muted" style={{ marginTop: 12 }}>
+            Want to start a storybook of your own? We're opening Vambie to more families soon.
+          </p>
+          <button
+            className="btn btn--outline"
+            style={{ marginTop: 22 }}
+            onClick={async () => {
+              await logout();
+              navigate("/", { replace: true });
+            }}
+          >
+            Sign out
+          </button>
+        </Sheet>
+      </div>
+    );
+  }
 
   const step1Valid = form.childName.trim() && form.parentName.trim() && form.relationship;
 

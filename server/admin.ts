@@ -3,19 +3,33 @@ import { getCurrentUser } from "./session";
 import { normalizePhone } from "./sms";
 
 // Who can open the admin panel: the phone numbers listed in ADMIN_PHONES
-// (comma-separated, in .env). Without that setting, anyone signed in can,
-// which is only meant for local development; the panel shows a warning.
+// (comma-separated, in .env). Without that setting, anyone signed in can, but
+// only in development (the panel shows a warning); in production it stays closed.
 
-const adminPhones = () =>
-  (process.env.ADMIN_PHONES ?? "")
+const production = () => process.env.NODE_ENV === "production";
+
+const phoneList = (value: string | undefined) =>
+  (value ?? "")
     .split(",")
     .map((p) => normalizePhone(p))
     .filter((p): p is string => Boolean(p));
 
-export const adminIsOpen = () => adminPhones().length === 0;
+const adminPhones = () => phoneList(process.env.ADMIN_PHONES);
+
+export const adminIsOpen = () => adminPhones().length === 0 && !production();
 
 export const isAdmin = (user: { phone: string | null } | null) =>
   Boolean(user) && (adminIsOpen() || (!!user!.phone && adminPhones().includes(user!.phone)));
+
+// Who can start a new storybook. In production it's invite-only unless
+// OPEN_SIGNUP=on: admins and the numbers in ALLOWED_PHONES can start one, and
+// everyone else joins a family through an invitation link. This keeps strangers
+// from running up AI costs.
+export const canStartStorybook = (user: { phone: string | null } | null) => {
+  if (!user) return false;
+  if (!production() || process.env.OPEN_SIGNUP === "on" || isAdmin(user)) return true;
+  return !!user.phone && phoneList(process.env.ALLOWED_PHONES).includes(user.phone);
+};
 
 export async function requireAdmin(req: Request, res: Response, next: NextFunction) {
   const user = await getCurrentUser(req);

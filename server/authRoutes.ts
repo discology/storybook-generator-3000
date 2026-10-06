@@ -1,7 +1,7 @@
 import express, { Router } from "express";
 import { prisma } from "./db";
 import { SESSION_COOKIE, generateOtp, generateToken, getCurrentUser } from "./session";
-import { adminIsOpen, isAdmin } from "./admin";
+import { adminIsOpen, canStartStorybook, isAdmin } from "./admin";
 import { isSmsConfigured, normalizePhone, sendVerificationCode, checkVerificationCode } from "./sms";
 
 const router: Router = express.Router();
@@ -10,6 +10,8 @@ const INVALID_PHONE = "Enter a full mobile number, like +1 555 123 4567.";
 
 // With Twilio configured, Twilio Verify texts and checks the code. Otherwise
 // dev mode: the code is stored locally and returned in the response instead.
+// Dev mode never runs in production, where it would let anyone sign in as anyone.
+const production = process.env.NODE_ENV === "production";
 router.post("/auth/send-code", async (req, res) => {
   const phone = normalizePhone(String(req.body?.phone ?? ""));
   if (!phone) return res.status(400).json({ error: INVALID_PHONE });
@@ -19,6 +21,8 @@ router.post("/auth/send-code", async (req, res) => {
     if (!result.ok) return res.status(502).json({ error: result.error });
     return res.json({ sent: true, devMode: false });
   }
+
+  if (production) return res.status(503).json({ error: "Sign-in isn't available right now. Try again later." });
 
   const code = generateOtp();
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000);
@@ -51,14 +55,17 @@ router.post("/auth/verify", async (req, res) => {
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   await prisma.session.create({ data: { userId: user.id, token, expiresAt } });
 
-  res.cookie(SESSION_COOKIE, token, { httpOnly: true, expires: expiresAt, sameSite: "lax" });
+  res.cookie(SESSION_COOKIE, token, { httpOnly: true, expires: expiresAt, sameSite: "lax", secure: production });
   res.json({ user });
 });
 
 router.get("/auth/me", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return res.status(401).json({ error: "Not signed in" });
-  res.json({ user: { id: user.id, phone: user.phone, name: user.name, isAdmin: isAdmin(user) }, adminOpen: adminIsOpen() });
+  res.json({
+    user: { id: user.id, phone: user.phone, name: user.name, isAdmin: isAdmin(user), canStart: canStartStorybook(user) },
+    adminOpen: adminIsOpen(),
+  });
 });
 
 router.post("/auth/logout", async (req, res) => {

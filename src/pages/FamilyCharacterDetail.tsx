@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
 import BottomNav from "../components/BottomNav";
-import { apiGet, apiSend, ApiError } from "../lib/api";
+import { apiGet, apiSend, ApiError, settle } from "../lib/api";
 import type { CharacterDesign, FamilyCharacterDetail as Detail } from "../types";
 
 type Act = (key: string, run: () => Promise<Detail>) => Promise<Detail | null>;
@@ -308,7 +308,7 @@ function DraftEditor({
     body.append("photo", file);
     const updated = await act("photo", async () => {
       if (dirty) await save();
-      const res = await fetch(`/api/designs/${design.id}/photo`, { method: "POST", body });
+      const res = await settle(await fetch(`/api/designs/${design.id}/photo`, { method: "POST", body }));
       const data = await res.json();
       if (!res.ok) throw new ApiError(res.status, data.error || "Upload failed.");
       return data;

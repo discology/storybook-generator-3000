@@ -5,6 +5,7 @@ export interface AuthUser {
   phone: string | null;
   name: string | null;
   isAdmin?: boolean;
+  canStart?: boolean; // may start a new storybook (production is invite-only)
 }
 
 interface AuthState {

@@ -9,6 +9,7 @@ import { normalizePhone } from "./sms";
 import { appUrl, renderMessage } from "./messageTemplates";
 import { audioSrc, canSeeChapter, canSeeMemory, isOwner, memberForChapter, memberForMemory, parseIds, requireMember } from "./access";
 import { interpret, processMemory } from "./memoryPipeline";
+import { canStartStorybook } from "./admin";
 import { STAGE_KEYS, ageInYears, effectiveStage, stageForAge, vambieName } from "./readingStages";
 import { eligibleMemories, isGenerating, lastBatchError, makeWeeklyChapter, nextScheduledBatch, TIMEZONES } from "./weeklyChapters";
 
@@ -41,6 +42,9 @@ const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", 
 router.post("/storybooks", async (req, res) => {
   const user = await getCurrentUser(req);
   if (!user) return res.status(401).json({ error: "Sign in first" });
+  if (!canStartStorybook(user)) {
+    return res.status(403).json({ error: "Vambie is invite-only for now. If someone invited you, open the link they sent." });
+  }
 
   const b = req.body ?? {};
   const childName = String(b.childName ?? "").trim();
