@@ -52,6 +52,11 @@ export const IMAGE_MODELS = ["gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt
 export const INK_AND_WASH_STYLE =
   "Art direction: a classic picture book drawn in expressive pen-and-ink line with fine cross-hatching, finished with transparent watercolor washes. Ink first, wash second: no 3D shading, glossy surfaces or smooth gradients. A muted, earthy palette (sage, olive, ochre, warm browns; dusky blue and violet for night and big feelings), in which the Vambies' signature colors, like Baby Vambie's aqua, are the only clear, bright colors. Warm cream paper texture. Simple faces; feelings show through posture and small gestures. Keep faces and the key action inside the central 80% of the frame. No text, letters, numbers or words anywhere in the image.";
 
+// Everyone in the book is a Vambie in their own skin tone (VSB-86). Baby Vambie
+// alone is teal-blue. Family-member designs follow this too.
+export const PEOPLE_AS_VAMBIES =
+  "Everyone in this world is a Vambie, never a human. Draw every person with the same creature design as Baby Vambie: an oversized round head on a small simple body with short arms and legs (about two and a half heads tall), huge round eyes with dark shadowy rings and small dark pupils, and two tiny fangs. Keep those Vambie proportions for everyone: grown-ups are only a little taller than children, and words like tall or broad change their size a little, never into human proportions. Each keeps their own skin tone, the same shade, and who they are shows through their skin tone, hair, glasses, clothes and accessories. Anyone whose skin tone isn't given has the classic Vambie pale gray-white skin. Teal-blue belongs to Baby Vambie alone: no one else is teal, blue or aqua. A description that says man, woman, child or person still means a Vambie of that age. Pets and other animals keep their own body, coat and markings and stand the way that animal does, with the Vambie eyes and tiny fangs. Never photorealistic.";
+
 export const DEFAULT_RULES: PageRules = {
   readingProfiles: {
     read_to_me: {
@@ -102,8 +107,7 @@ export const DEFAULT_RULES: PageRules = {
   },
   embellishment: "moderate",
   illustrationStyle: INK_AND_WASH_STYLE,
-  peopleStyle:
-    "Draw family members as warm, simple storybook figures. Do not try to resemble real people, and never make them photorealistic.",
+  peopleStyle: PEOPLE_AS_VAMBIES,
   imageModel: "gpt-image-2",
   imageQuality: "medium",
 };

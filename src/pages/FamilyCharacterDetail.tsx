@@ -135,6 +135,7 @@ export default function FamilyCharacterDetail() {
                   canChange={!draft}
                   olderStyle={Boolean(character.currentStyle && approved.styleSnapshot && approved.styleSnapshot !== character.currentStyle)}
                   onChange={() => act(`change-${variant}`, () => apiSend(`/api/family-characters/${characterId}/designs`, "POST", { variant }))}
+                  onVambie={() => act(`vambie-${variant}`, () => apiSend(`/api/family-characters/${characterId}/designs`, "POST", { variant, vambie: true }))}
                   onRestyle={() =>
                     act(`restyle-${variant}`, () =>
                       apiSend(`/api/family-characters/${characterId}/designs`, "POST", {
@@ -210,6 +211,7 @@ function ApprovedDesign({
   olderStyle,
   onChange,
   onRestyle,
+  onVambie,
 }: {
   design: CharacterDesign;
   name: string;
@@ -219,7 +221,10 @@ function ApprovedDesign({
   olderStyle: boolean;
   onChange: () => void;
   onRestyle: () => void;
+  onVambie: () => void;
 }) {
+  // Looks approved before everyone became a Vambie stay until the parent redraws them.
+  const asPerson = design.look === "person";
   return (
     <div className="card">
       <div className="row inline" style={{ justifyContent: "space-between", marginTop: 0 }}>
@@ -258,12 +263,22 @@ function ApprovedDesign({
           <strong>Usually wears:</strong> {design.usualClothing}
         </p>
       )}
-      {olderStyle && (
-        <p className="status-line">This look was approved in an earlier art style. Redraw it so {name} matches the book's current style.</p>
+      {asPerson ? (
+        canChange && <p className="status-line">
+          {name} was drawn as a person. Everyone else in the book is now a Vambie: redraw {name} as one, in their own skin tone, with their hair, glasses and
+          clothes. Pages already made keep this look.
+        </p>
+      ) : (
+        olderStyle && <p className="status-line">This look was approved in an earlier art style. Redraw it so {name} matches the book's current style.</p>
       )}
       {canChange && (
         <div className="row inline" style={{ flexWrap: "wrap" }}>
-          {olderStyle && (
+          {asPerson && (
+            <button className="btn-small btn-primary" disabled={busy !== null} onClick={onVambie}>
+              Redraw as a Vambie
+            </button>
+          )}
+          {olderStyle && !asPerson && (
             <button className="btn-small btn-primary" disabled={busy !== null} onClick={onRestyle}>
               Redraw in the book's style
             </button>
@@ -348,7 +363,7 @@ function DraftEditor({
       />
       <p className="status-line">
         {isVariant
-          ? "Face shape, skin tone, eyes and distinctive features carry over from today's look; hair, height, glasses and clothes follow the age."
+          ? "Skin tone and distinctive features carry over from today's look; hair, height, glasses and clothes follow the age."
           : `Include ${fixedIdentity}.`}
       </p>
       <label htmlFor={`clothing-${design.id}`}>What they usually wear (scenes can change it)</label>

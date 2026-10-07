@@ -76,7 +76,7 @@ It follows these rules:
   4. family members' reference sheets;
   5. when a Vambie's reference art is one of its official 3D renders, the render that matches the page's mood and camera angle.
 - **Pacing.** OpenAI limits how many reference images an account may send per minute. Requests wait their turn instead of failing, are retried after a rate limit, and are retried once after a timeout.
-- **Checking each picture.** The `illustration_check` AI step compares the picture with the page plan. It flags missing characters or actions, written words in the picture, and family members who don't match their approved design. A family member who doesn't match is redrawn automatically once; after that, the page is flagged for the parent.
+- **Checking each picture.** The `illustration_check` AI step compares the picture with the page plan. It flags missing characters or actions, written words in the picture, anyone not drawn the way the page rules draw people (for example a person drawn as a human), and family members who don't match their approved design. A family member who doesn't match is redrawn automatically once; after that, the page is flagged for the parent.
 
 ### Review and publishing
 
@@ -113,7 +113,7 @@ Pages made before picture sizes existed keep their original wide format.
 ## Characters
 
 - **The Vambies** live in the Character Library in the admin panel. Each has a permanent key (for example `<baby_vambie>`), a locked look, "never" rules, a personality, a role in stories, reference art and labeled 3D renders. Casting decides when they appear: in every chapter, when the memory fits their casting notes, or only when a parent picks them.
-- **Family members** are added under Family → Who's in the pictures. Each has a permanent ID, the names people call them ("Grandma", "Nana"), and approved looks for different ages, such as "today" and "as a child". A look can be designed from a description or from an optional private photo. Changing a look creates a new version, and pages that are already published keep the version they were drawn with.
+- **Family members** are added under Family → Who's in the pictures. Each has a permanent ID, the names people call them ("Grandma", "Nana"), and approved looks for different ages, such as "today" and "as a child". A look can be designed from a description or from an optional private photo. Everyone is drawn as a Vambie in their own skin tone, recognizable by their hair, glasses, clothes and accessories; pets keep their own coat with the Vambie eyes and fangs. Looks approved as people before this (VSB-86) stay until the parent presses "Redraw as a Vambie". Changing a look creates a new version, and pages that are already published keep the version they were drawn with.
 
 ## Reading and sharing
 

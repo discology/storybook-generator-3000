@@ -469,7 +469,24 @@ export async function createPagedChapter(input: CreateChapterInput) {
     // A visitor has no family characters to ask about yet: people the planner
     // couldn't place are drawn from the memory's description instead.
     const names = new Map(unresolved.map((u) => [u.ref.toLowerCase(), u.suggestedName || u.mention]));
-    plan.pages.forEach((p) => (p.characters = [...new Set(p.characters.map((t) => names.get(t.toLowerCase()) ?? t))]));
+    const named = (text: string) => text.replace(/\bU\d+\b/g, (ref) => names.get(ref.toLowerCase()) ?? ref);
+    for (const p of plan.pages) {
+      p.characters = [...new Set(p.characters.map((t) => names.get(t.toLowerCase()) ?? t))];
+      p.storyMoment = named(p.storyMoment);
+      p.setting = named(p.setting);
+      p.visibleAction = named(p.visibleAction);
+      p.emotionalTone = named(p.emotionalTone);
+      p.continuity = named(p.continuity);
+      if (p.shot) p.shot = { ...p.shot, angle: named(p.shot.angle), focus: named(p.shot.focus) };
+    }
+    // They join the chapter's extras, so the character sheet fixes one look for
+    // every page.
+    for (const u of unresolved) {
+      const name = u.suggestedName || u.mention;
+      if (plan.characters.some((c) => c.name.toLowerCase() === name.toLowerCase())) continue;
+      const outfit = u.appearances.find((a) => a.outfit)?.outfit;
+      plan.characters.push({ name, appearance: [u.suggestedRelationship || "family member", outfit && `wearing ${outfit}`].filter(Boolean).join(", ") });
+    }
     unresolved = [];
   }
 
@@ -1063,6 +1080,7 @@ async function checkIllustration(assetId: string): Promise<string[]> {
         page_text: asset.page.text,
         visible_action: asset.page.visibleAction,
         characters: describePageCharacters(tokens, ctx).join("\n"),
+        people_style: ctx.rules?.peopleStyle ?? "",
         reference_images: appearances.length
           ? appearances.map((a, i) => `Image ${i + 2} (R${i + 1}): ${a.familyCharacter.name}'s approved design`).join("\n")
           : "(none)",

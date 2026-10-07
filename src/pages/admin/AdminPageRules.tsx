@@ -166,8 +166,8 @@ export default function AdminPageRules() {
         <h3 style={{ marginTop: 0 }}>Illustrations</h3>
         <label htmlFor="style">Art style</label>
         <textarea id="style" rows={3} value={rules.illustrationStyle} onChange={(e) => update({ ...rules, illustrationStyle: e.target.value })} />
-        <label htmlFor="people">How family members are drawn</label>
-        <textarea id="people" rows={2} value={rules.peopleStyle} onChange={(e) => update({ ...rules, peopleStyle: e.target.value })} />
+        <label htmlFor="people">How people are drawn</label>
+        <textarea id="people" rows={4} value={rules.peopleStyle} onChange={(e) => update({ ...rules, peopleStyle: e.target.value })} />
         <div className="row">
           <div style={{ flex: 1 }}>
             <label htmlFor="model">Image model</label>

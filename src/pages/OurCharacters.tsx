@@ -71,7 +71,7 @@ export default function OurCharacters() {
         style={{ paddingTop: 0 }}
       />
       <div className="screen-pad">
-        <p className="t-small t-muted-dark" style={{ margin: "0 0 14px" }}>{data.childName} appears as Baby Vambie, so you don't need to add them.</p>
+        <p className="t-small t-muted-dark" style={{ margin: "0 0 14px" }}>{data.childName} appears as Baby Vambie, so you don't need to add them. Everyone else is drawn as a Vambie too, in their own skin tone, with their hair, glasses and clothes.</p>
 
         {data.characters.map((c) => (
           <Link
@@ -123,7 +123,7 @@ export default function OurCharacters() {
               id="identity"
               rows={3}
               {...field("identity")}
-              placeholder="Face shape, skin tone, eyes, hair color and style, build, glasses or a signature accessory. Or upload a photo on the next screen."
+              placeholder="Skin tone, hair color and style, height and build, glasses or a signature accessory. Or upload a photo on the next screen."
             />
             <label htmlFor="clothing">What they usually wear (can change)</label>
             <input id="clothing" {...field("usualClothing")} placeholder="e.g. a green cardigan and comfortable trousers" />

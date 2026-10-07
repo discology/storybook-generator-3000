@@ -125,6 +125,6 @@ The rules every new chapter is made with.
 
 - **Reading stages:** page counts, words per page and per sentence, vocabulary, and each stage's picture pattern.
 - **Fictional embellishment:** minimal, moderate or imaginative.
-- **Illustrations:** the art style, how family members are drawn, and the image model and quality.
+- **Illustrations:** the art style, how people are drawn (by default everyone is a Vambie in their own skin tone, and Baby Vambie alone is teal-blue), and the image model and quality.
 
 Saving creates a new version, and only new chapters use it. The version history shows how many chapters were made with each version.

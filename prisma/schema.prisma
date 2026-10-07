@@ -415,7 +415,8 @@ model CharacterDesign {
   variant           String           @default("today") // e.g. "today", "as a child"
   version           Int // per character and variant
   status            String           @default("draft") // draft | approved | superseded
-  identity          String           @default("") // fixed features: face, skin tone, eyes, hair, build, signature accessories
+  identity          String           @default("") // fixed features: skin tone, hair, build, distinctive features, signature accessories
+  look              String           @default("vambie") // vambie | person (drawn as a human before VSB-86), copied from the approved proposal
   usualClothing     String           @default("") // a typical outfit; scenes may dress them differently
   changeNote        String           @default("") // what this version changes from the last
   styleSnapshot     String           @default("") // illustration style when approved
@@ -434,6 +435,7 @@ model DesignProposal {
   designId  String
   design    CharacterDesign @relation(fields: [designId], references: [id], onDelete: Cascade)
   imagePath String
+  look      String          @default("vambie") // vambie | person
   createdAt DateTime        @default(now())
 }
 

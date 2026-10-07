@@ -96,7 +96,7 @@ The world
 
 Truth and texture
 - The memories below are the only source of facts. Who was there, what happened, where, and how it ended stay exactly as told.
-- <baby_vambie> stands in for <child_name>: whatever <child_name> did, said or felt, Baby Vambie does, says and feels, in the text and in the pictures. Never show <child_name> as a separate human character. Other family members appear as themselves.
+- <baby_vambie> stands in for <child_name>: whatever <child_name> did, said or felt, Baby Vambie does, says and feels, in the text and in the pictures. Never show <child_name> as a separate human character. Everyone else appears as themselves in the words and as a Vambie in the pictures, in their own skin tone.
 - Fictional storytelling allowed: <embellishment_rules>
 - Texture is free: light, weather, sound, smell, the feel of a blanket, the inner weather of a feeling, a refrain, a metaphor, a drum far off, the way a room holds its breath. Use it on every page. Texture is not a fact and needs no apology.
 - interpretationNote lists only interpreted facts: anything about events, people, places or outcomes that the memory does not say. Texture does not belong there.
@@ -124,7 +124,7 @@ Cast
 These recurring Vambie characters come from the Character Library:
 <cast>
 - Required characters appear in the chapter. An optional character appears only if the memory clearly fits their casting notes, at most one per chapter.
-- Never invent other Vambies. Write and picture cast members exactly as their cards describe: keep their look (no new clothing, hats or accessories; props they hold are fine) and their personality.
+- Never bring in other characters from the Vambie world (named Vambies, the band) beyond this cast. Write and picture cast members exactly as their cards describe: keep their look (no new clothing, hats or accessories; props they hold are fine) and their personality.
 - In each page's "characters" list, name cast members by their key exactly as listed above (for example baby_vambie).
 
 Family characters
@@ -132,9 +132,9 @@ These are the family's saved characters (Our Characters):
 <family_cast>
 - Refer to a family character by their ref (F1, F2…) in each page's "characters" list, and add an "appearances" entry for them on that page: which approved look ("variant") they appear as and what they wear in this scene.
 - Never decide who someone is from a name alone: two people can share an alias like "Grandma". Use relationships, context and who recorded the memory. If you can't tell who someone is, if a family member isn't saved yet, or if the memory needs a look that isn't approved (for example Grandma as a child), don't guess: list them in "unresolved" with one short question for the parent, and refer to them on pages by that unresolved ref (U1, U2…). Still describe what they wear in each scene in plain words (their face and build come later from their approved look).
-- A family character's fixed features never change: face shape, skin tone, eye shape, distinctive features, hair color and usual hairstyle, body proportions, signature glasses or accessories. A scene may change their expression and pose, windblown or wet hair, camera angle and lighting, clothing that suits the activity, and the setting, season and time of day.
+- A family character's fixed features never change: skin tone, distinctive features, hair color and usual hairstyle, height and build, signature glasses or accessories. A scene may change their expression and pose, windblown or wet hair, camera angle and lighting, clothing that suits the activity, and the setting, season and time of day.
 - Keep a family character's outfit the same through one continuous scene. A different day or event can bring different clothes.
-- People who aren't family or regulars (a shopkeeper, kids at the park) are extras: list them in "characters" with a fixed look for this chapter.
+- People who aren't family or regulars (a shopkeeper, kids at the park) are extras: list them in "characters" with a fixed look for this chapter. They are Vambies too: describe their skin tone, hair, clothes and size, never a human face.
 
 Page boundaries
 - Each page shows one main action or emotional moment.
@@ -278,6 +278,7 @@ Rewrite page <page_number> to make that change. Keep it one main action or emoti
       { name: "visible_action", description: "What the scene plan says should be visible", sample: "Baby Vambie crouches beside a tiny green sprout; Grandma kneels nearby holding a red watering can." },
       { name: "characters", description: "Who should appear, with their fixed appearances", sample: "Baby Vambie: small round teal-blue creature, big eyes, tiny fangs, wearing a yellow sun hat\nGrandma: silver hair in a bun, round glasses, yellow cardigan, green garden gloves" },
       { name: "reference_images", description: "Which approved family character designs are attached after the illustration, with their refs", sample: "Image 2 (R1): Grandma Rose's approved design" },
+      { name: "people_style", description: "How people are drawn (from the chapter's Page Rules)", sample: "Everyone in this world is a Vambie, never a human. Draw every person with the same creature design as Baby Vambie..." },
     ],
     defaultBody: `Look at the attached storybook illustration.
 
@@ -285,6 +286,7 @@ It should show: <visible_action>
 Characters who should appear:
 <characters>
 The book will print this text on the page below the picture (it is NOT part of the image, so don't look for it): "<page_text>"
+How this book draws people: <people_style>
 
 Approved family character designs attached after the illustration, for comparison:
 <reference_images>
@@ -292,7 +294,8 @@ Approved family character designs attached after the illustration, for compariso
 Flag it if:
 - a character, action or important object from the scene plan or the text is missing or contradicted in the picture;
 - a character looks clearly different from their description;
-- a family character doesn't match their approved design: different face shape, skin tone, eye shape, hair color or usual hairstyle, build, or missing signature glasses or accessories. (Expression, pose, lighting, windblown hair and scene clothing may differ.) List their refs in "mismatched";
+- someone isn't drawn the way this book draws people (for example a person drawn as a human when everyone is a Vambie);
+- a family character doesn't match their approved design: different skin tone, hair color or usual hairstyle, build, or missing signature glasses or accessories. (Expression, pose, lighting, windblown hair and scene clothing may differ.) List their refs in "mismatched";
 - the picture itself contains any written words, letters or captions (it shouldn't).
 Small artistic differences are fine.`,
     outputFormat: `Respond with ONLY a JSON object, no markdown fences: {"status": "ok" | "flagged", "note": "one sentence; empty if ok", "mismatched": ["refs of family characters who don't match their approved design (R1…), or empty"]}`,
@@ -305,10 +308,10 @@ Small artistic differences are fine.`,
       { name: "name", description: "The character's name", sample: "Grandma Rose" },
       { name: "relationship", description: "Their relationship to the child", sample: "Grandmother (Mom's mother)" },
     ],
-    defaultBody: `The attached photo shows <name> (<relationship>). A parent wants a children's-book character design that is recognizably them.
+    defaultBody: `The attached photo shows <name> (<relationship>). A parent wants them in their child's storybook, where everyone is drawn as a Vambie (a small storybook creature with big round eyes and tiny fangs) who is recognizably them through their skin tone, hair, build and accessories.
 
 Describe only stable, visible features an illustrator needs, in plain words:
-- identity: face shape; skin tone in plain color words; eye shape and color; hair color, length and usual style; build; distinctive features such as freckles, dimples or a beard; glasses or signature accessories.
+- identity: skin tone in plain color words; hair color, length and usual style; height and build; distinctive features such as freckles, dimples or a beard; glasses or signature accessories.
 - usualClothing: what they're wearing, as a typical outfit.
 
 Don't guess at ethnicity, health, age or anything else that isn't visible. Keep each field to one or two sentences.`,

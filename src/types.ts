@@ -260,6 +260,7 @@ export interface CharacterDesign {
   variant: string;
   version: number;
   status: "draft" | "approved" | "superseded";
+  look: "vambie" | "person";
   identity: string;
   usualClothing: string;
   changeNote: string;

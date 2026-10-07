@@ -10,6 +10,7 @@ import {
   ALLOWED_VARIATIONS,
   ApprovalScope,
   FIXED_IDENTITY,
+  VAMBIE_REDRAW_NOTE,
   approveDesign,
   approvedVariants,
   describePhoto,
@@ -185,8 +186,8 @@ router.put("/family-characters/:characterId", async (req, res) => {
   res.json(await present(character.id));
 });
 
-// "Change appearance" or "Add an age variant": a new draft version of one
-// variant, starting from its current approved look.
+// "Change appearance", "Redraw as a Vambie" or "Add an age variant": a new draft
+// version of one variant, starting from its current approved look.
 router.post("/family-characters/:characterId/designs", async (req, res) => {
   const character = await characterForRequest(req, res);
   if (!character) return;
@@ -207,7 +208,7 @@ router.post("/family-characters/:characterId/designs", async (req, res) => {
       version: latest + 1,
       identity: current?.identity ?? "",
       usualClothing: current?.usualClothing ?? "",
-      changeNote: String(req.body?.changeNote ?? "").trim(),
+      changeNote: req.body?.vambie === true ? VAMBIE_REDRAW_NOTE : String(req.body?.changeNote ?? "").trim(),
     },
   });
   res.status(201).json(await present(character.id));

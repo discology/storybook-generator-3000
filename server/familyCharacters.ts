@@ -8,10 +8,11 @@ import { getOpenAI } from "./openaiClient";
 import { runAiStep } from "./aiService";
 import { withImageRateLimit } from "./imageQueue";
 import { recordImage } from "./aiUsage";
+import { referenceImageOf } from "./characters";
 
-// "Our Characters": each family's recurring people (and pets). A character has a
-// permanent ID; their look lives in approved, versioned designs, one line per age
-// variant. Every illustration a character appears in gets their approved design
+// "Our Characters": each family's recurring people (and pets), drawn as Vambies in
+// their own skin tones. A character has a permanent ID; their look lives in
+// approved, versioned designs, one line per age variant. Every illustration a character appears in gets their approved design
 // and reference sheet attached, and each page records the design version it used,
 // so approving a new look never silently changes existing pages.
 
@@ -19,9 +20,10 @@ const DESIGNS_DIR = path.join("uploads", "characters", "family");
 // Under uploads/private, which server.ts refuses to serve.
 const PHOTOS_DIR = path.join("uploads", "private", "photos");
 
-// What must never change about a character, and what a scene may change.
+// What must never change about a character, and what a scene may change. Every
+// Vambie shares the same head, eyes and fangs, so who they are is the rest.
 export const FIXED_IDENTITY =
-  "face shape, skin tone, eye shape and distinctive features; hair color and usual hairstyle; body proportions; signature glasses or accessories; the approved illustration style";
+  "skin tone and distinctive features; hair color and usual hairstyle; height and build; signature glasses or accessories; the approved illustration style";
 export const ALLOWED_VARIATIONS =
   "facial expression and pose; windblown or wet hair; camera angle and lighting; clothing that suits the activity; setting, season and time of day";
 
@@ -139,6 +141,19 @@ async function baseDesignFor(design: { id: string; familyCharacterId: string; va
   return approved.find((d) => d.variant === design.variant) ?? approved.find((d) => d.variant === "today") ?? approved[0] ?? null;
 }
 
+// Baby Vambie's art from the Character Library: the creature design every family
+// Vambie shares.
+async function vambieReference() {
+  const baby = await prisma.character.findUnique({ where: { key: "baby_vambie" }, include: { art: true } });
+  const art = baby && referenceImageOf(baby);
+  return art && fs.existsSync(path.join(process.cwd(), art)) ? art : null;
+}
+
+// The note on a draft started with "Redraw as a Vambie".
+export const VAMBIE_REDRAW_NOTE = "Redraw as a Vambie in their own skin tone";
+
+// Draws one candidate look for a draft. Proposals are always Vambies; a design
+// drawn as a person before VSB-86 is redrawn as one, keeping what makes them them.
 export async function generateProposal(designId: string) {
   const design = await loadDesign(designId);
   if (design.status !== "draft") throw new Error("Only a draft design can get new proposals.");
@@ -147,42 +162,63 @@ export async function generateProposal(designId: string) {
   const { rules } = await getActiveRules();
   const character = design.familyCharacter;
   const base = await baseDesignFor(design);
-  const references: string[] = [];
+  const references: { path: string; label: string }[] = [];
+  const creature = await vambieReference();
+  if (creature) {
+    references.push({
+      path: creature,
+      label: "Baby Vambie, in this book's art style: the Vambie creature design (head, eyes, fangs, body and proportions) that every character shares. Don't copy Baby Vambie's teal-blue color, and don't draw Baby Vambie.",
+    });
+  }
+  const ownLook =
+    "match their skin tone exactly (the same shade, not lighter or yellower) and copy their hair color and style, distinctive features such as freckles or a beard, and any glasses or signature accessories, but not their human face or body proportions";
   let source = "";
 
   if (design.photoPath) {
-    references.push(design.photoPath);
-    source = `The attached photo shows ${character.name}. Turn them into a storybook character who is recognizably them: same face shape, skin tone, eye shape, hair color and style, distinctive features, and any glasses or signature accessories, simplified into the illustration style. Never photorealistic. Ignore the photo's background, lighting and clothing.`;
+    references.push({ path: design.photoPath, label: `A private photo of ${character.name}.` });
+    source = `Draw ${character.name} from the photo as a Vambie who is recognizably them: ${ownLook}. Ignore the photo's background, lighting and clothing.`;
   } else if (base?.portraitPath) {
-    references.push(base.portraitPath);
-    source =
-      design.variant !== base.variant
-        ? `The attached image is ${character.name}'s approved design ("${base.variant}"). Draw the same person ${design.variant}, clearly recognizable as them. Keep what stays with a person over the years: face shape, skin tone, eye shape and color, and distinctive features${
-            base.identity ? ` (${base.variant}: ${base.identity})` : ""
-          }. Change what age changes: hair color and style (hair that is silver now would be its natural younger color), skin texture, height and body proportions, and clothes suited to that age and time. Keep glasses or accessories only if they would have had them then.`
-        : `The attached image is ${character.name}'s approved design. ${design.changeNote ? `Change only this: ${design.changeNote}.` : ""} Everything else stays exactly the same.`;
+    const asPerson = base.look === "person";
+    references.push({
+      path: base.portraitPath,
+      label: `${character.name}'s approved design${base.variant !== "today" ? ` ("${base.variant}")` : ""}${asPerson ? ", drawn as a person before everyone in the book became a Vambie" : ""}.`,
+    });
+    const change = design.changeNote && design.changeNote !== VAMBIE_REDRAW_NOTE ? ` Change only this: ${design.changeNote}.` : "";
+    if (design.variant !== base.variant) {
+      source = `Draw ${character.name} ${design.variant} as a Vambie, clearly recognizable as them. Keep what stays with a person over the years: skin tone and distinctive features${
+        base.identity ? ` (${base.variant}: ${base.identity})` : ""
+      }. Change what age changes: hair color and style (hair that is silver now would be its natural younger color), height and size (a child is child-sized like Baby Vambie), and clothes suited to that age and time. Keep glasses or accessories only if they would have had them then.${
+        asPerson ? " From their design, copy only what fits: not their human face or body." : ""
+      }`;
+    } else if (asPerson) {
+      source = `Redraw ${character.name} as a Vambie who is recognizably them: ${ownLook}. Keep their clothes.${change}`;
+    } else {
+      source = `Draw ${character.name} exactly as in their approved design.${change} Everything else stays exactly the same.`;
+    }
   }
 
   const prompt = [
     rules.illustrationStyle,
+    rules.peopleStyle,
+    references.length ? `Attached images, in order:\n${references.map((r, i) => `${i + 1}. ${r.label}`).join("\n")}` : "",
     source,
-    `Character design for a children's picture book: ${character.name}${character.relationship ? `, ${character.relationship}` : ""}${design.variant !== "today" ? `, ${design.variant}` : ""}. Show them once, full body, front view, relaxed neutral pose, gentle expression, centered on a plain warm-cream background. No scenery, no props, no labels.`,
-    design.identity && (base && base.variant !== design.variant ? `At this age: ${design.identity}` : `Fixed features to show clearly: ${design.identity}`),
+    `Character design for a children's picture book: ${character.name}${character.relationship ? `, ${character.relationship}` : ""}${design.variant !== "today" ? `, ${design.variant}` : ""}, as a Vambie. Show only ${character.name}, once: no other people or animals. Full body, front view, relaxed neutral pose (if ${character.name} is a pet, standing the way that animal does), gentle expression, centered on a plain warm-cream background. No scenery, no props, no labels.`,
+    design.identity && (base && base.variant !== design.variant ? `At this age: ${design.identity}` : `Their features (the Vambie head, eyes and fangs stay the same): ${design.identity}`),
     design.usualClothing && `Clothing: ${design.usualClothing}`,
-    "A warm storybook figure, never photorealistic. Do not include any text, letters or words in the image.",
+    "Do not include any text, letters or words in the image.",
   ]
     .filter(Boolean)
     .join("\n\n");
 
   const common = { model: rules.imageModel, prompt, size: "1024x1024", quality: "high" as const, output_format: "png" as const };
   const response = await withImageRateLimit(references.length, async () =>
-    references.length ? client.images.edit({ ...common, image: await Promise.all(references.map(toUpload)) }) : client.images.generate(common)
+    references.length ? client.images.edit({ ...common, image: await Promise.all(references.map((r) => toUpload(r.path))) }) : client.images.generate(common)
   );
   await recordImage("design_proposal", common.model, response, common, { householdId: character.householdId });
   const b64 = response.data?.[0]?.b64_json;
   if (!b64) throw new Error("The image service returned no image.");
   const imagePath = saveFile(DESIGNS_DIR, `${design.id}-proposal-${Date.now()}.png`, Buffer.from(b64, "base64"));
-  return prisma.designProposal.create({ data: { designId: design.id, imagePath } });
+  return prisma.designProposal.create({ data: { designId: design.id, imagePath, look: "vambie" } });
 }
 
 // Drafts the fixed-identity notes from the private photo, for the parent to edit.
@@ -224,6 +260,7 @@ export async function approveDesign(designId: string, proposalId: string, scope:
     where: { id: designId },
     data: {
       status: "approved",
+      look: proposal.look,
       portraitPath: proposal.imagePath,
       styleSnapshot: rules.illustrationStyle,
       approvedAt: new Date(),
@@ -300,11 +337,12 @@ export function appearanceReferences(a: AppearanceWithDesign) {
   return refs;
 }
 
-// One line per family character for an image prompt or an illustration check.
+// One line per family character for an image prompt or an illustration check. A
+// look approved as a person stays a person until the family redraws it.
 export const describeAppearance = (a: AppearanceWithDesign) =>
   `${a.familyCharacter.name}${a.design.variant !== "today" ? ` (${a.design.variant})` : ""}: fixed features: ${a.design.identity || "as in their approved design"}.${
-    a.outfit ? ` Wearing in this scene: ${a.outfit}.` : ""
-  }${a.details ? ` ${a.details}.` : ""} May vary: ${ALLOWED_VARIATIONS}.`;
+    a.design.look === "person" ? " Their approved design shows them as a person: draw them that way, not as a Vambie." : ""
+  }${a.outfit ? ` Wearing in this scene: ${a.outfit}.` : ""}${a.details ? ` ${a.details}.` : ""} May vary: ${ALLOWED_VARIATIONS}.`;
 
 export const appearanceDataUrls = (appearances: AppearanceWithDesign[]) =>
   appearances.filter((a) => a.design.portraitPath).map((a) => dataUrl(a.design.portraitPath!));
