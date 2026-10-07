@@ -12,6 +12,7 @@ import { buildCast, describeCast } from "../server/characters";
 import { buildFamilyCast, describeFamilyCast } from "../server/familyCharacters";
 import { EMBELLISHMENT_LEVELS, describeProfile, getActiveRules, profileFor } from "../server/pageRules";
 import { formatMemories, recordedBy, type SourceMemory } from "../server/storyPages";
+import { interpretMemory } from "../server/aiService";
 
 const arg = (name: string, fallback = "") => {
   const i = process.argv.indexOf(`--${name}`);
@@ -35,8 +36,15 @@ async function main() {
   fs.mkdirSync(outDir, { recursive: true });
   const proposedBody = proposedPath ? fs.readFileSync(proposedPath, "utf8") : "";
   const active = await getActiveRules();
+  // A memory from a file without an interpretation goes through the real interpret step first.
+  const fromFile = memoryJsonPath ? JSON.parse(fs.readFileSync(memoryJsonPath, "utf8")) : null;
+  if (fromFile && !fromFile.events) {
+    const r = await interpretMemory(fromFile.transcript);
+    Object.assign(fromFile, { events: r.events, emotions: r.emotions, themes: r.themes });
+    console.log("[interpret]", JSON.stringify({ events: r.events, emotions: r.emotions, themes: r.themes }));
+  }
   const memories: any[] = memoryJsonPath
-    ? [JSON.parse(fs.readFileSync(memoryJsonPath, "utf8"))].map((m: any) => ({
+    ? [fromFile].map((m: any) => ({
         id: m.id ?? "file", title: m.title, contributor: null, interpretation: { events: m.events, emotions: m.emotions, themes: m.themes },
         transcripts: [{ text: m.transcript }], storybook: { child: { displayName: m.childName, householdId: m.householdId } }, recordedByText: m.recordedBy,
       }))
