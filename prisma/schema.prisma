@@ -26,6 +26,8 @@ model User {
   textsOptedOut    Boolean   @default(false)
   textsOptedOutAt  DateTime?
   texts            TextMessage[]
+  flags            Flag[]
+  actionItems      ActionItem[]
   contributors Contributor[]
   sessions    Session[]
   ownedHouseholds Household[]
@@ -269,6 +271,7 @@ model Chapter {
   pages       StoryPage[]
   marks       ChapterMark[]
   feedback    StoryFeedback[]
+  flags       Flag[]
   shares      ChapterShare[]
   // Page generation (empty for chapters created before illustrated pages existed).
   ruleSetVersion     Int?
@@ -338,6 +341,7 @@ model StoryPage {
   approvedAt         DateTime?
   assets             PageAsset[]
   appearances        PageAppearance[]
+  flags              Flag[]
   createdAt          DateTime    @default(now())
   updatedAt          DateTime    @updatedAt
 
@@ -568,4 +572,63 @@ model TextMessage {
   updatedAt    DateTime @updatedAt
 
   @@index([createdAt])
+}
+
+// A flag on a page's picture and/or words (VSB-95), from the team, or copied from
+// a parent's chapter feedback. The snapshot keeps what was judged (prompt, model,
+// page plan, words, rules version) even if the page changes later.
+model Flag {
+  id           String       @id @default(cuid())
+  chapterId    String
+  chapter      Chapter      @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  pageId       String? // null for chapter-level family feedback
+  page         StoryPage?   @relation(fields: [pageId], references: [id], onDelete: SetNull)
+  assetId      String? // the picture version flagged
+  target       String // picture | words | both | chapter
+  categories   String       @default("[]") // JSON array of category keys (server/flagCategories.ts)
+  note         String       @default("")
+  shouldBe     String       @default("")
+  source       String // team | family
+  feedbackId   String?      @unique // the StoryFeedback a family flag came from
+  createdById  String?
+  createdBy    User?        @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  status       String       @default("new") // new | reviewed | action | dismissed
+  actionItemId String?
+  actionItem   ActionItem?  @relation(fields: [actionItemId], references: [id], onDelete: SetNull)
+  snapshot     String       @default("{}") // JSON
+  redraws      FlagRedraw[]
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([createdAt])
+}
+
+// What the team decided to change because of flags (VSB-96).
+model ActionItem {
+  id          String   @id @default(cuid())
+  title       String
+  area        String // picture_prompt | page_rules | planner | characters | other
+  details     String   @default("")
+  status      String   @default("open") // open | done
+  jiraKey     String?
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  flags       Flag[]
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}
+
+// A flagged page drawn again with the rules of the day, to compare (VSB-97).
+// Never shown to the family.
+model FlagRedraw {
+  id             String   @id @default(cuid())
+  flagId         String
+  flag           Flag     @relation(fields: [flagId], references: [id], onDelete: Cascade)
+  status         String   @default("drawing") // drawing | ready | failed
+  imagePath      String?
+  prompt         String   @default("")
+  model          String?
+  ruleSetVersion Int?
+  error          String?
+  createdAt      DateTime @default(now())
 }

@@ -5333,3 +5333,78 @@ input[type="radio"] {
 .text-consent {
   line-height: 1.45;
 }
+
+/* Feedback: flagging pages and the review queue (VSB-94). */
+.adm-modal--auto {
+  height: auto;
+  max-height: min(860px, calc(100vh - 48px));
+}
+.adm-modal--auto .adm-modal__body {
+  grid-template-columns: minmax(0, 1fr) 360px;
+}
+.flag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.flag-chip {
+  border: 1.5px solid #d8d4c8;
+  background: #fff;
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-family: var(--font-body);
+  font-size: 14px;
+  cursor: pointer;
+}
+.flag-chip--on {
+  background: var(--purple);
+  border-color: var(--purple);
+  color: var(--white);
+}
+.fb-card {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 18px;
+  padding: 16px;
+  border-radius: 16px;
+  background: #fff;
+  border: 1px solid #e7e2d6;
+}
+.fb-card + .fb-card {
+  margin-top: 12px;
+}
+.fb-card img {
+  width: 100%;
+  border-radius: 10px;
+  display: block;
+}
+.fb-compare {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-top: 10px;
+}
+.fb-counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 10px 0 16px;
+}
+.fb-pre {
+  white-space: pre-wrap;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  background: #f6f2e8;
+  padding: 10px;
+  border-radius: 8px;
+  max-height: 260px;
+  overflow: auto;
+}
+@media (max-width: 760px) {
+  .fb-card,
+  .adm-modal--auto .adm-modal__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

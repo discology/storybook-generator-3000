@@ -119,6 +119,16 @@ const toCastMember = (c: CharacterWithArt, required: boolean): CastMember => ({
   required,
 });
 
+// The Character Library's current version of each cast member, for drawing a
+// page again with today's art (VSB-97).
+export async function currentCast(cast: CastMember[]): Promise<CastMember[]> {
+  const library = await prisma.character.findMany({ where: { key: { in: cast.map((m) => m.key) } }, include: { art: true } });
+  return cast.map((m) => {
+    const c = library.find((x) => x.key === m.key);
+    return c ? toCastMember(c, m.required) : m;
+  });
+}
+
 // --- Picking renders for a page ---
 
 // The first of these feelings named in a page's emotional tone (or, failing

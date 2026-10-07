@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { apiGet, apiSend, ApiError } from "../../lib/api";
 import { IconCheck, IconChevronDown, IconHold, IconInfo, IconRefresh, IconSend } from "../../components/icons";
 import { REASON_LABEL, statusPill } from "./AdminReviewQueue";
+import FlagDialog from "./FlagDialog";
 
 interface Finding {
   id: string;
@@ -70,6 +71,8 @@ export default function AdminChapterReview() {
   const [instructions, setInstructions] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [flagging, setFlagging] = useState<ChapterDetail["pages"][number] | null>(null);
+  const [flagged, setFlagged] = useState<Record<string, number>>({});
 
   const load = useCallback(() => {
     apiGet(`/api/admin/chapters/${chapterId}`).then(setChapter);
@@ -138,6 +141,14 @@ export default function AdminChapterReview() {
                     {p.pictureSize ? ` · ${p.pictureSize === "none" ? "text only" : p.pictureSize}` : ""}
                   </span>
                   <p className="draft-page__text">{p.text ? highlight(p.text, quotes) : <em className="t-muted">No words on this page: the picture tells it.</em>}</p>
+                  <button className="tlink" style={{ fontSize: 14, marginTop: 6 }} onClick={() => setFlagging(p)}>
+                    Flag this page
+                  </button>
+                  {flagged[p.id] ? (
+                    <span className="t-xs t-muted" style={{ marginLeft: 10 }}>
+                      Flagged{flagged[p.id] > 1 ? ` ×${flagged[p.id]}` : ""} · <Link to="/admin/feedback">Feedback</Link>
+                    </span>
+                  ) : null}
                 </div>
               </div>
             ))
@@ -269,6 +280,16 @@ export default function AdminChapterReview() {
           </div>
         </aside>
       </div>
+      {flagging && (
+        <FlagDialog
+          page={flagging}
+          onClose={() => setFlagging(null)}
+          onSaved={() => {
+            setFlagged((f) => ({ ...f, [flagging.id]: (f[flagging.id] ?? 0) + 1 }));
+            setFlagging(null);
+          }}
+        />
+      )}
     </div>
   );
 }

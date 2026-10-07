@@ -24,6 +24,7 @@ import { usageFromRequest } from "./server/aiUsage";
 import costRoutes from "./server/costRoutes";
 import guestRoutes, { startGuestCleanup } from "./server/guests";
 import textRoutes from "./server/textRoutes";
+import feedbackRoutes from "./server/feedbackRoutes";
 import { startTextCleanup } from "./server/texts";
 import { startReminders } from "./server/reminders";
 
@@ -71,6 +72,7 @@ app.post(
     "/api/admin/characters/:id/art/generate",
     "/api/admin/characters/:id/art/restyle",
     "/api/admin/characters/:id/art/expressions",
+    "/api/admin/flags/:id/redraw",
     "/api/designs/:designId/proposals",
     "/api/prompts/:id/artwork/generate",
     "/api/pages/:pageId/revise",
@@ -98,6 +100,7 @@ app.use("/api", costRoutes);
 app.use("/api", guestRoutes);
 app.use("/api", jobRoutes);
 app.use("/api", textRoutes);
+app.use("/api", feedbackRoutes);
 
 // In production this server also serves the built web app (npm run build);
 // in development Vite serves it.

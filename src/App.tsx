@@ -25,6 +25,7 @@ import ExportMemories, { ExportStatus } from "./pages/Export";
 import Account, { DeleteAccount, Help } from "./pages/Account";
 import HowItWorks from "./pages/HowItWorks";
 import { Privacy, Terms } from "./pages/Legal";
+import AdminFeedback from "./pages/admin/AdminFeedback";
 import YourStorybooks from "./pages/YourStorybooks";
 import TryStory, { TrySave } from "./pages/TryStory";
 import AdminLayout from "./pages/admin/AdminLayout";
@@ -63,6 +64,7 @@ export default function App() {
           <Route path="characters/:id" element={<AdminCharacterEdit />} />
           <Route path="costs" element={<AdminCosts />} />
           <Route path="visitors" element={<AdminVisitors />} />
+          <Route path="feedback" element={<AdminFeedback />} />
         </Route>
 
         <Route

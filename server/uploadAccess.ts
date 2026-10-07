@@ -12,6 +12,7 @@ import { GUEST_COOKIE } from "./guests";
 // - pages/ and characters/family/: a family's page pictures and family members'
 //   design pictures, only for that family's members and admins (and a visitor's
 //   preview pictures for the device that made them, server/guests.ts).
+// - feedback/: pictures redrawn to compare with flagged ones (VSB-97), admins only.
 // - everything else (Vambie artwork, prompt artwork): public.
 
 const UPLOADS = path.join(process.cwd(), "uploads");
@@ -50,6 +51,14 @@ export async function guardUploads(req: Request, res: Response, next: NextFuncti
   }
   if (rel.startsWith("..") || rel.includes("\0")) return res.status(404).end();
   if (PRIVATE_FOLDERS.includes(rel.split("/")[0])) return res.status(404).end();
+  if (rel.startsWith("feedback/")) {
+    const admin = await getCurrentUser(req);
+    if (!admin) return res.status(401).end();
+    if (!isAdmin(admin)) return res.status(403).end();
+    return res.sendFile(path.join(UPLOADS, rel), { headers: { "Cache-Control": "private, max-age=86400" } }, (error) => {
+      if (error && !res.headersSent) res.status(404).end();
+    });
+  }
   if (!FAMILY_FOLDERS.some((folder) => rel.startsWith(folder))) return next();
 
   const user = await getCurrentUser(req);

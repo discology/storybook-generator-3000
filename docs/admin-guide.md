@@ -60,6 +60,18 @@ Prompt cards are the questions families see when they record.
   - New artwork reaches families when you publish the card, like the other fields.
 - **Save draft** saves the card as a draft, which takes it out of the families' deck until you publish it. **Publish changes** updates the card for families. Memories already recorded keep the question as it was worded when they were recorded.
 
+## Feedback
+
+Where the team learns from what went wrong in pictures and words.
+
+- **Flag a page** from Story Review: "Flag this page" under any page. Pick the picture, the words or both, one or more categories (camera/framing, composition, expression, character off-model, wrong action or continuity, text in the picture, art style; voice, reading level, facts, pacing, title), say what's wrong and, optionally, what it should be. The picture's exact prompt and model, the page plan (camera, action, mood) and the words are saved with the flag, so later changes don't lose what was judged.
+- **Parents' feedback** ("something's off" on a chapter) appears in the same queue, labeled by relationship.
+- **The queue** filters by picture or words, category, team or families, status, reading stage and date. The counts above it show which problems come up most; click one to filter by it.
+- **Redraw to compare** draws a flagged picture again from the same page plan with today's Page Rules and Character Library art, and shows the two side by side. The family's chapter never changes. About $0.06–0.08 a picture, counted as an admin cost.
+- **Re-test all with today's rules** (after filtering by a picture category) redraws every open flag in that category, after showing how many and the estimated cost. Use it after changing Page Rules or AI instructions to see whether the change helped.
+- **Action items**: select flags and make an action item (what to change: picture prompt / camera and acting, Page Rules, planner wording, character art, other). The Action items tab tracks them as open or done. **Send to Jira** creates a VSB ticket (Story for development work, Task otherwise), once Jira is connected (see [deployment settings](deployment.md#settings)).
+- **Export** downloads the flags in the current filter as JSON: categories, notes, prompts, page plans, words, rules versions, picture links and redraws. Families are named by relationship only.
+
 ## Families
 
 Every storybook: the child, who started it, how many people have joined or are invited, the reading stage, the number of memories and chapters, and when the last memory was recorded. Recordings and transcripts aren't shown here.
@@ -106,7 +118,7 @@ A chapter's cost is everything ever spent on it, including later redraws and rew
 
 The wording of the welcome, family invite, memory reminder and new-chapter texts. Write variables like `<child_name>` or `<record_url>` in angle brackets; the editor lists the ones each message supports and previews the result. It also counts characters, so you can see how many texts a message takes. Each message can be turned off, or reset to the default wording.
 
-Today, only sign-in codes are actually texted. Invites and chapter links use this wording, and the app shows the message for the person to send themselves.
+The page also shows the texting mode (off, test or live), a "Text me a test" button for each message, and the log of recent texts with their delivery status. Every text starts "Vambie Storybook:". Invitations are never texted by the app, since carriers need the person's own consent: the parent shares the link.
 
 ### AI instructions
 

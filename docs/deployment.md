@@ -42,6 +42,10 @@ Secret settings are stored with Fly and never in the repository:
 | `ADMIN_PHONES` | Phone numbers that can open the admin panel |
 | `ALLOWED_PHONES` | Optional: more phone numbers allowed to start a storybook |
 | `OPEN_SIGNUP` | Optional: `on` lets anyone start a storybook |
+| `TWILIO_MESSAGING_SERVICE_SID` | Optional: the Twilio Messaging Service that sends the app's texts. Without it, nothing is texted except sign-in codes |
+| `TEXTS_MODE` | Optional: `live` texts everyone who verified their number. Anything else is test mode: only `ADMIN_PHONES` and `TEXT_TEST_PHONES` get texts |
+| `TEXT_TEST_PHONES` | Optional: more phone numbers that get texts in test mode |
+| `JIRA_SITE`, `JIRA_EMAIL`, `JIRA_API_TOKEN` | Optional: lets Admin → Feedback send action items to Jira (site like `discologyinc.atlassian.net`; an Atlassian API token from id.atlassian.com → Security → API tokens). `JIRA_PROJECT` defaults to `VSB` |
 
 Non-secret settings live in [fly.toml](../fly.toml) (`APP_URL`) and the [Dockerfile](../Dockerfile) (`NODE_ENV`, `PORT`, `DATABASE_URL`).
 

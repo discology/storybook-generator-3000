@@ -8,6 +8,7 @@ import { getCurrentUser } from "./session";
 import { normalizePhone } from "./sms";
 import { appUrl, renderMessage } from "./messageTemplates";
 import { sendText } from "./texts";
+import { flagFromFeedback } from "./feedbackRoutes";
 import { audioSrc, canSeeChapter, canSeeMemory, isOwner, memberForChapter, memberForMemory, parseIds, requireMember } from "./access";
 import { interpret, processMemory } from "./memoryPipeline";
 import { canStartStorybook } from "./admin";
@@ -490,6 +491,8 @@ router.post("/chapters/:id/feedback", async (req, res) => {
   const feedback = await prisma.storyFeedback.create({
     data: { chapterId: member.chapter.id, contributorId: member.me.id, reason, note: String(req.body?.note ?? "").slice(0, 1000) },
   });
+  // It also joins the team's feedback queue (VSB-95).
+  await flagFromFeedback(feedback.id).catch((e) => console.error("Feedback flag:", e?.message));
   res.status(201).json(feedback);
 });
 

@@ -4,7 +4,7 @@ import { toFile } from "openai";
 import { prisma } from "./db";
 import { runAiStep, isAiConfigured, guardianReview } from "./aiService";
 import { getAiInstruction } from "./aiInstructions";
-import { CastMember, buildCast, characterCardValues, describeCast, moodArt, renderReferences } from "./characters";
+import { CastMember, buildCast, characterCardValues, currentCast, describeCast, moodArt, renderReferences } from "./characters";
 import {
   AppearanceWithDesign,
   FamilyCastEntry,
@@ -36,6 +36,7 @@ import {
 // changes in the admin panel never alter existing books.
 
 const PAGES_DIR = path.join(process.cwd(), "uploads", "pages");
+const FEEDBACK_DIR = path.join(process.cwd(), "uploads", "feedback");
 const ILLUSTRATION_CONCURRENCY = 3;
 
 export interface SourceMemory {
@@ -1014,14 +1015,16 @@ export interface IllustrationOptions {
   fixCharacterIds?: string[];
 }
 
-// Generates a new illustration version for one page. Never touches the text.
-export async function generateIllustration(pageId: string, options: IllustrationOptions = {}) {
-  const page = await prisma.storyPage.findUniqueOrThrow({ where: { id: pageId } });
-  if (!hasPicture(page)) return;
-  const { chapter, snapshot, characterSheet } = await loadChapter(page.chapterId);
-  const rules = snapshot?.rules;
-  const cast = snapshot?.cast ?? [];
-  const appearances = await pageAppearances(pageId);
+// Everything a page picture is drawn from: its references (most important first)
+// and its prompt, with the given rules and cast.
+async function composePagePicture(
+  page: PageRow,
+  chapter: Awaited<ReturnType<typeof loadChapter>>["chapter"],
+  base: { rules: PageRules | undefined; cast: CastMember[]; family: FamilyCastEntry[]; people: CharacterSheetEntry[] },
+  options: IllustrationOptions = {}
+) {
+  const { rules, cast } = base;
+  const appearances = await pageAppearances(page.id);
   // References, most important first, since a request can only carry a few:
   // each character's own art and family portraits, then the chapter's character
   // sheet (chapters made before sheets existed use page 1 instead, so their
@@ -1051,8 +1054,23 @@ export async function generateIllustration(pageId: string, options: Illustration
   const correction = fixNote
     ? `Correction: in the previous version of this page, ${fixNote} didn't look like their approved design. Match the attached approved design exactly: same face shape, skin tone, eyes, hair, build and signature accessories.`
     : undefined;
-  const ctx = { rules: rules!, cast, family: snapshot?.family ?? [], people: characterSheet, appearances };
+  const ctx = { rules: rules!, cast, family: base.family, people: base.people, appearances };
   const prompt = rules ? buildImagePrompt(page, ctx, references, correction) : "";
+  return { references, prompt, fixNote };
+}
+
+// Generates a new illustration version for one page. Never touches the text.
+export async function generateIllustration(pageId: string, options: IllustrationOptions = {}) {
+  const page = await prisma.storyPage.findUniqueOrThrow({ where: { id: pageId } });
+  if (!hasPicture(page)) return;
+  const { chapter, snapshot, characterSheet } = await loadChapter(page.chapterId);
+  const rules = snapshot?.rules;
+  const { references, prompt, fixNote } = await composePagePicture(
+    page,
+    chapter,
+    { rules, cast: snapshot?.cast ?? [], family: snapshot?.family ?? [], people: characterSheet },
+    options
+  );
 
   const last = await prisma.pageAsset.findFirst({ where: { pageId }, orderBy: { version: "desc" } });
   const asset = await prisma.pageAsset.create({
@@ -1088,6 +1106,34 @@ export async function generateIllustration(pageId: string, options: Illustration
   // A family character who doesn't match their approved design gets one
   // automatic redraw; after that the page is flagged for the parent.
   if (mismatched.length && !fixNote) await generateIllustration(pageId, { fixCharacterIds: mismatched });
+}
+
+// VSB-97: draws a flagged page again from the same page plan with today's Page
+// Rules and Character Library art, to compare with the flagged picture. Saved
+// under uploads/feedback/ (admins only); the family's chapter never changes.
+export async function drawComparison(pageId: string, fileName: string) {
+  const page = await prisma.storyPage.findUniqueOrThrow({ where: { id: pageId } });
+  if (!hasPicture(page)) throw new Error("This page has no picture to redraw.");
+  const client = getOpenAI();
+  if (!client) throw new Error("Redrawing needs an OpenAI API key (OPENAI_API_KEY).");
+  const { chapter, snapshot, characterSheet } = await loadChapter(page.chapterId);
+  const { version, rules } = await getActiveRules();
+  const cast = await currentCast(snapshot?.cast ?? []);
+  const { references, prompt } = await composePagePicture(page, chapter, { rules, cast, family: snapshot?.family ?? [], people: characterSheet });
+  const common = { model: rules.imageModel, prompt, size: pictureFormat(page).size, quality: rules.imageQuality, output_format: "jpeg" as const };
+  const response = await withImageRateLimit(references.length, async () =>
+    references.length
+      ? client.images.edit({ ...common, image: await Promise.all(references.map((r) => toUpload(r.path))) })
+      : client.images.generate(common)
+  );
+  // An admin cost, not the family's.
+  await recordImage("feedback_redraw", common.model, response, common, {});
+  const b64 = response.data?.[0]?.b64_json;
+  if (!b64) throw new Error("The image service returned no image.");
+  fs.mkdirSync(FEEDBACK_DIR, { recursive: true });
+  const imagePath = path.join("uploads", "feedback", fileName);
+  fs.writeFileSync(path.join(process.cwd(), imagePath), Buffer.from(b64, "base64"));
+  return { imagePath, prompt, model: rules.imageModel, ruleSetVersion: version };
 }
 
 // Returns the IDs of family characters who don't match their approved design.
