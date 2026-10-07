@@ -59,11 +59,17 @@ router.put("/admin/ai-instructions/:key", async (req, res) => {
   const error = await validate(step.key, body, model);
   if (error) return res.status(400).json({ error });
 
-  await prisma.aiInstruction.upsert({
-    where: { key: step.key },
-    create: { key: step.key, body, model },
-    update: { body, model },
-  });
+  if (body === step.defaultBody && !model) {
+    // Saving the default text means "follow the default": drop the saved copy
+    // so a later change to the default in code isn't shadowed by it.
+    await prisma.aiInstruction.deleteMany({ where: { key: step.key } });
+  } else {
+    await prisma.aiInstruction.upsert({
+      where: { key: step.key },
+      create: { key: step.key, body, model },
+      update: { body, model },
+    });
+  }
   res.json(await withModels(step.key));
 });
 

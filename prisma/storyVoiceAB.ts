@@ -24,6 +24,10 @@ const memoryIds = arg("memories").split(",").filter(Boolean);
 const stages = arg("stages", "read_to_me,chapter_book").split(",");
 const arms = arg("arms", "current,proposed").split(",");
 const concurrency = Number(arg("concurrency", "4"));
+// Test-only overrides for the proposed arm: an embellishment rule, and alias rewrites
+// in the family cast ("Anna=Mama") so a naming gap in sample data doesn't muddy a voice test.
+const embellishmentPath = arg("embellishment-file");
+const aliasPairs = arg("alias").split(",").filter(Boolean).map((x) => x.split("=") as [string, string]);
 
 async function main() {
   fs.mkdirSync(outDir, { recursive: true });
@@ -65,6 +69,10 @@ async function main() {
         family_cast: describeFamilyCast(family),
       };
       for (const armName of arms) {
+        if (armName === "proposed") {
+          if (embellishmentPath) values.embellishment_rules = fs.readFileSync(embellishmentPath, "utf8").trim();
+          for (const [from, to] of aliasPairs) values.family_cast = values.family_cast.replace(`Also called: ${from}`, `Also called: ${to}`);
+        }
         const label = `${(m.title ?? m.id).replace(/[^a-z0-9]+/gi, "_").slice(0, 30)}__${stage}__${armName}`;
         jobs.push(async () => {
           const override = armName === "proposed" ? { body: proposedBody } : undefined;

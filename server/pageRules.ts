@@ -37,7 +37,7 @@ export const EMBELLISHMENT_LEVELS: Record<EmbellishmentLevel, { label: string; r
   },
   moderate: {
     label: "Moderate",
-    rule: "Baby Vambie is the fictional stand-in for the child and may add small actions, sounds and short lines of dialogue that fit the memory's feelings. Never add events, people, places or outcomes that aren't in the memory.",
+    rule: "Baby Vambie is the fictional stand-in for the child and may add small actions, sounds and short lines of dialogue that fit the memory's feelings. When the memory says something vague (\"wanted to change things\"), the story may show it as two or three small, ordinary, concrete actions in the same place with the same people. Never add events, people, places or outcomes that aren't in the memory.",
   },
   imaginative: {
     label: "Imaginative",
