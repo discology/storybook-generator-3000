@@ -90,9 +90,22 @@ type Draft = NonNullable<Awaited<ReturnType<typeof loadDraft>>>;
 const setCookie = (res: Response, token: string, expires: Date) =>
   res.cookie(GUEST_COOKIE, token, { httpOnly: true, expires, sameSite: "lax", secure: production });
 
-// Preview work in progress and the last failure, per draft.
+// Preview work in progress (writing the chapter, then drawing its pictures) and
+// the last failure, per draft.
 const writing = new Set<string>();
+const drawing = new Set<string>();
 const failures = new Map<string, string>();
+
+// Texts can only go out once the app has a registered sending number (VSB-9 /
+// VSB-8). Until then the wait screen doesn't offer "text me when it's ready".
+export const textingLive = () => Boolean(process.env.TWILIO_MESSAGING_SERVICE_SID);
+
+// VSB-83: texts someone who saved from the wait screen that their storybook is
+// ready. The sending itself arrives with VSB-9.
+async function notifyStoryReady(householdId: string) {
+  if (!textingLive()) return;
+  console.log(`Storybook ready for household ${householdId}; the text goes out once VSB-9 is in place.`);
+}
 
 async function allowance(req: Request) {
   const device = hash(`dev:${req.cookies?.[GUEST_COOKIE] ?? ""}`);
@@ -117,23 +130,26 @@ function memoryState(d: Draft) {
   return { status, kind: m.audioUrl || m.durationSec ? "audio" : "typed", title: m.title, error: m.processingError };
 }
 
+// The preview opens as soon as the words are written and checked; each page's
+// picture is "drawing" until it arrives, or "failed" if it couldn't be drawn (VSB-82).
 function previewState(d: Draft) {
   const id = d.household.id;
-  if (writing.has(id) && !d.chapter) return { status: "writing" };
+  if (writing.has(id)) return { status: "writing" };
   if (!d.chapter) return failures.has(id) ? { status: "failed", error: failures.get(id) } : { status: "none" };
-  const shown = d.chapter.pages.filter((p) => p.pageNumber <= PREVIEW_PAGES);
-  const waiting = shown.some((p) => p.pictureSize !== "none" && p.assets[0]?.status === "generating") || d.chapter.pagesStatus === "illustrating";
+  const stillDrawing = drawing.has(id);
+  const pages = d.chapter.pages
+    .filter((p) => p.pageNumber <= PREVIEW_PAGES)
+    .map((p) => {
+      const asset = p.assets[0];
+      const picture = p.pictureSize === "none" ? "none" : asset?.status === "ready" ? "ready" : stillDrawing ? "drawing" : "failed";
+      return { pageNumber: p.pageNumber, text: p.text, pictureSize: p.pictureSize, visibleAction: p.visibleAction, picture, image: picture === "ready" ? asset!.imagePath : null };
+    });
   return {
-    status: waiting ? "drawing" : "ready",
+    status: "ready",
+    drawing: pages.some((p) => p.picture === "drawing"),
     title: d.chapter.title,
     totalPages: d.chapter.pages.length,
-    pages: shown.map((p) => ({
-      pageNumber: p.pageNumber,
-      text: p.text,
-      pictureSize: p.pictureSize,
-      visibleAction: p.visibleAction,
-      image: p.assets[0]?.status === "ready" ? p.assets[0].imagePath : null,
-    })),
+    pages,
   };
 }
 
@@ -153,6 +169,8 @@ async function state(req: Request, d: Draft) {
     memory: memoryState(d),
     preview: previewState(d),
     limits: { canPreview: limit.ok, reason: limit.reason, left: limit.left },
+    saved: d.household.ownerUserId ? d.storybook.id : null, // saved from the wait screen (VSB-83)
+    textWhenReady: textingLive(),
   };
 }
 
@@ -332,20 +350,23 @@ router.post("/guest/memory/audio", upload.single("audio"), async (req, res) => {
 
 // --- The preview ---
 
+// Writes the whole chapter, then draws the preview's pictures. If they saved in
+// the meantime, the rest of the chapter is drawn straight after (never twice).
 async function writePreview(d: Draft, memory: NonNullable<Draft["memory"]>) {
   const id = d.household.id;
   writing.add(id);
   failures.delete(id);
+  let chapterId: string;
   try {
     if (d.chapter) {
       removeFiles(d.storybook.chapters.flatMap((c) => [c.characterSheetImage, ...c.pages.flatMap((p) => p.assets.map((a) => a.imagePath))]));
       await prisma.chapter.deleteMany({ where: { storybookId: d.storybook.id } });
     }
-    await withUsage({ trigger: "visitor", householdId: id }, () =>
+    const chapter = await withUsage({ trigger: "visitor", householdId: id }, () =>
       createPagedChapter({
         storybookId: d.storybook.id,
         castKeys: [],
-        firstPages: PREVIEW_PAGES,
+        illustrate: false,
         noQuestions: true,
         memories: [
           {
@@ -359,11 +380,27 @@ async function writePreview(d: Draft, memory: NonNullable<Draft["memory"]>) {
         ],
       })
     );
+    chapterId = chapter.id;
   } catch (error: any) {
     console.error(`Guest preview for ${id} failed:`, error?.message);
     failures.set(id, "We couldn't make the story this time.");
+    return;
   } finally {
     writing.delete(id);
+  }
+
+  drawing.add(id);
+  try {
+    await withUsage({ trigger: "visitor", householdId: id }, () => illustrateChapter(chapterId, { firstPages: PREVIEW_PAGES }));
+    const saved = await prisma.household.findUnique({ where: { id }, select: { ownerUserId: true } });
+    if (saved?.ownerUserId) {
+      await notifyStoryReady(id);
+      await withUsage({ trigger: "family", householdId: id }, () => illustrateChapter(chapterId, { missingOnly: true }));
+    }
+  } catch (error: any) {
+    console.error(`Drawing the preview for ${id} failed:`, error?.message);
+  } finally {
+    drawing.delete(id);
   }
 }
 
@@ -418,17 +455,28 @@ router.post("/guest/claim", async (req, res) => {
     return res.json({ storybookId: storybook.id, chapterId: null, joined: true });
   }
 
+  if (d.household.ownerUserId) {
+    return d.household.ownerUserId === user.id
+      ? res.json({ storybookId: d.storybook.id, chapterId: d.chapter?.id ?? null, joined: false })
+      : res.status(409).json({ error: "This story was saved to another account." });
+  }
   if (!canStartStorybook(user)) return res.status(403).json({ error: "Vambie is invite-only for now. If someone invited you, open the link they sent." });
   if (!user.name) await prisma.user.update({ where: { id: user.id }, data: { name } });
+  // Saved from the wait screen (VSB-83): the device keeps watching the preview
+  // until it's done; otherwise the draft stops being a draft now.
+  const keep = req.body?.keep === true;
   await prisma.$transaction([
     prisma.contributor.update({ where: { id: d.me.id }, data: { userId: user.id, inviteStatus: "joined", name, phone: user.phone } }),
-    prisma.household.update({ where: { id: d.household.id }, data: { ownerUserId: user.id, guestToken: null, guestExpiresAt: null } }),
+    prisma.household.update({ where: { id: d.household.id }, data: { ownerUserId: user.id, ...(keep ? {} : { guestToken: null, guestExpiresAt: null }) } }),
     prisma.storybook.update({ where: { id: d.storybook.id }, data: { status: "active" } }),
   ]);
-  res.clearCookie(GUEST_COOKIE);
+  if (!keep) res.clearCookie(GUEST_COOKIE);
 
   // Draw the rest of the chapter, or make it now if the preview was skipped.
-  if (d.chapter) void illustrateChapter(d.chapter.id, { missingOnly: true });
+  // A preview still being written or drawn carries on with the rest itself.
+  if (writing.has(d.household.id) || drawing.has(d.household.id)) {
+    // writePreview draws the rest once the preview's pictures are done
+  } else if (d.chapter) void illustrateChapter(d.chapter.id, { missingOnly: true });
   else if (d.memory && memoryState(d)?.status === "ready") {
     const memory = d.memory;
     void createPagedChapter({
@@ -458,11 +506,24 @@ async function deleteDraft(householdId: string) {
   await prisma.aiUsage.updateMany({ where: { householdId }, data: { householdId: null, chapterId: null, memoryId: null } });
 }
 
-// "Start over": deletes this device's draft.
+// "Start over": deletes this device's draft. A story already saved from the
+// wait screen is the family's now, so it's only detached from the device.
 async function discard(d: Draft) {
+  if (d.household.ownerUserId) {
+    await prisma.household.update({ where: { id: d.household.id }, data: { guestToken: null, guestExpiresAt: null } });
+    return;
+  }
   removeFiles(draftFiles(d));
   await deleteDraft(d.household.id);
 }
+
+// Leaving the preview of a story already saved from the wait screen.
+router.post("/guest/done", async (req, res) => {
+  const d = await loadDraft(req);
+  if (d?.household.ownerUserId) await prisma.household.update({ where: { id: d.household.id }, data: { guestToken: null, guestExpiresAt: null } });
+  res.clearCookie(GUEST_COOKIE);
+  res.json({ ok: true, storybookId: d?.storybook.id ?? null });
+});
 
 router.delete("/guest", async (req, res) => {
   try {
@@ -506,6 +567,11 @@ export async function deleteExpiredDrafts() {
     include: draftInclude,
   });
   for (const h of expired) {
+    if (h.ownerUserId) {
+      // Saved from the wait screen: the family keeps it; only the device link expires.
+      await prisma.household.update({ where: { id: h.id }, data: { guestToken: null, guestExpiresAt: null } });
+      continue;
+    }
     const storybook = h.children[0]?.storybooks[0];
     if (storybook) removeFiles(draftFiles({ storybook }));
     await deleteDraft(h.id);

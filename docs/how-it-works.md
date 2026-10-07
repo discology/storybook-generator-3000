@@ -12,7 +12,8 @@ The child never appears as themselves. **Baby Vambie stands in for the child on 
 
 New visitors see the value before they sign up. "Start their story" on the splash screen asks only for the child's name or nickname, their age (a birthday, or "on the way") and the visitor's relationship. Then the visitor records or types one memory.
 
-- From that memory, the app writes one complete chapter and draws its first three pages, shown as a swipeable preview. It takes 2 to 3 minutes. The rest of the pages are drawn only after the visitor saves.
+- From that memory, the app writes one complete chapter and shows its first three pages as a swipeable preview. The preview opens as soon as the words are ready (about 40 seconds), and each picture fades in as it's drawn (the last one about 2 to 3 minutes in). The rest of the pages are drawn only after the visitor saves.
+- Once texting is live, the wait screen also offers "Want a text when it's ready?". Verifying their number there saves the story straight away, and we text them when it's ready. Until the app can send texts, the offer is hidden.
 - **Save my story and text me a link** verifies their phone number. That creates the account (or signs in to an existing one) and keeps everything they made. Weekly reminders are a separate choice afterwards, off until they turn them on.
 - Until then, the draft lives only on that device, for 7 days, and then it's deleted.
 - Each device and network gets one preview and one retry a day. There's also a daily cap across all visitors, set under Admin → Settings → Visitors (default 100). Past it, visitors can still record and save, and their story is made once they verify.

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
 import { IconMic, IconRefresh, IconSpinner } from "../components/icons";
-import { Chev, Field, Loading, Masthead, Note, Segmented, Select, Sheet, Switch } from "../components/ui";
+import { Chev, Field, Loading, Mascot, Masthead, Note, Segmented, Select, Sheet, Switch, type MascotName } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
 import { apiGet, apiSend, ApiError } from "../lib/api";
 import { fillPrompt, promptValues } from "../lib/promptVariables";
@@ -19,6 +19,7 @@ interface PreviewPage {
   text: string;
   pictureSize: string;
   visibleAction: string;
+  picture: "none" | "ready" | "drawing" | "failed";
   image: string | null;
 }
 
@@ -29,11 +30,26 @@ interface Draft {
   invite: { invitedBy: string | null; childName: string } | null;
   expiresAt: string;
   memory: { status: "processing" | "ready" | "failed"; kind: "audio" | "typed"; title: string | null; error: string | null } | null;
-  preview: { status: "none" | "writing" | "drawing" | "ready" | "failed"; title?: string; totalPages?: number; pages?: PreviewPage[]; error?: string };
+  preview: { status: "none" | "writing" | "ready" | "failed"; drawing?: boolean; title?: string; totalPages?: number; pages?: PreviewPage[]; error?: string };
   limits: { canPreview: boolean; reason: "used" | "busy" | null; left: number };
+  saved: string | null; // saved from the wait screen: the storybook's id
+  textWhenReady: boolean; // the app can text, so the wait screen offers it
 }
 
 const MAX_SECONDS = 5 * 60;
+// The same Baby Vambie poses the recorder's deck uses for cards without artwork.
+const CARD_POSES: MascotName[] = ["star", "book", "open-book", "hug-book", "envelope-happy", "closedbook"];
+// A visitor hasn't given their name, and there's no parent on file yet, so
+// cards that need them would read oddly ("you, what do you want…"): left out.
+const NEEDS_FAMILY = /<(your_name|parent_name)>/;
+
+interface TryCard {
+  question: string;
+  category: string;
+  color: string;
+  art: string | null;
+  pose: MascotName;
+}
 const KEEP_NOTE = "Saved on this device for 7 days. Verify your number to keep it.";
 
 const pickMimeType = () => {
@@ -68,7 +84,7 @@ export default function TryStory() {
   }, [invite, load]);
 
   // While the memory or the story is being made, check again every few seconds.
-  const busy = draft && (draft.memory?.status === "processing" || draft.preview.status === "writing" || draft.preview.status === "drawing");
+  const busy = draft && (draft.memory?.status === "processing" || draft.preview.status === "writing" || (draft.preview.status === "ready" && draft.preview.drawing));
   useEffect(() => {
     if (!busy) return;
     const t = setInterval(() => void load(), 3000);
@@ -123,13 +139,18 @@ export default function TryStory() {
   }
 
   const p = draft.preview;
-  if (p.status === "ready" && p.pages?.length) return <Preview draft={draft} onSave={save} onRetry={() => void apiSend("/api/guest/preview", "POST").then(load).catch((e: ApiError) => setError(e.message))} />;
-  if (p.status === "writing" || p.status === "drawing" || (p.status === "none" && draft.limits.canPreview)) {
+  const read = async () => {
+    const r = await apiSend("/api/guest/done", "POST").catch(() => null);
+    navigate(`/storybooks/${r?.storybookId ?? draft.saved}`);
+  };
+  if (p.status === "ready" && p.pages?.length) {
+    return <Preview draft={draft} onSave={draft.saved ? () => void read() : save} onRetry={() => void apiSend("/api/guest/preview", "POST").then(load).catch((e: ApiError) => setError(e.message))} />;
+  }
+  if (p.status === "writing" || (p.status === "none" && draft.limits.canPreview)) {
     return (
-      <Working
-        title={p.status === "drawing" ? <>Drawing the<br />first pages…</> : <>Writing<br />{possessive(draft.child.name)}<br />story…</>}
-        sub="This takes 2 to 3 minutes. You can leave this page open, or come back to it on this device."
-      />
+      <Working title={<>Writing<br />{possessive(draft.child.name)}<br />story…</>} sub="The words take about 40 seconds; the pictures follow, one by one.">
+        {draft.textWhenReady && <TextWhenReady draft={draft} onSaved={load} />}
+      </Working>
     );
   }
   // No preview: today's limit, the daily cap, or a failure. They can still save.
@@ -172,7 +193,7 @@ const KeepNote = () => (
   </p>
 );
 
-function Working({ title, sub }: { title: React.ReactNode; sub: string }) {
+function Working({ title, sub, children }: { title: React.ReactNode; sub: string; children?: React.ReactNode }) {
   return (
     <div className="page">
       <TopBar back="/" wordmark />
@@ -182,8 +203,108 @@ function Working({ title, sub }: { title: React.ReactNode; sub: string }) {
           <IconSpinner size={34} />
           <p className="t-body t-muted">{sub}</p>
         </div>
+        {children}
         <KeepNote />
       </Sheet>
+    </div>
+  );
+}
+
+// VSB-83 (shown only once the app can send texts): while the story is being
+// made, they can verify their number; that saves the story, and we text them
+// when it's ready. Ignoring it changes nothing.
+function TextWhenReady({ draft, onSaved }: { draft: Draft; onSaved: () => void }) {
+  const { user, refresh } = useAuth();
+  const [step, setStep] = useState<"phone" | "code" | "name">("phone");
+  const [phone, setPhone] = useState("");
+  const [code, setCode] = useState("");
+  const [devCode, setDevCode] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const full = phone.trim().startsWith("+") ? phone.trim() : `+1${phone.replace(/\D/g, "")}`;
+
+  if (draft.saved) {
+    return (
+      <Note kind="ok" style={{ marginTop: 16 }}>
+        Saved. We'll text you as soon as {possessive(draft.child.name)} storybook is ready.
+      </Note>
+    );
+  }
+
+  const run = async (fn: () => Promise<void>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await fn();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "Something went wrong. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const claim = (withName?: string) =>
+    run(async () => {
+      await apiSend("/api/guest/claim", "POST", { name: withName ?? "", keep: true });
+      refresh();
+      onSaved();
+    });
+
+  return (
+    <div className="try-remind">
+      <span className="field__label">Want a text when it's ready?</span>
+      <p className="t-small t-muted" style={{ margin: "0 0 10px" }}>
+        Optional. Verifying your number also saves the story.
+      </p>
+      {step === "phone" && (
+        <div className="hstack" style={{ gap: 8 }}>
+          <input className="input" type="tel" inputMode="tel" autoComplete="tel" placeholder="Mobile number" value={phone} onChange={(e) => setPhone(e.target.value)} />
+          <button
+            type="button"
+            className="btn btn--purple btn--sm btn--auto"
+            disabled={busy || !phone.trim()}
+            onClick={() =>
+              void run(async () => {
+                if (user) return void (await claim());
+                const r = await apiSend("/api/auth/send-code", "POST", { phone: full });
+                setDevCode(r.devCode ?? null);
+                setStep("code");
+              })
+            }
+          >
+            Text me
+          </button>
+        </div>
+      )}
+      {step === "code" && (
+        <div className="hstack" style={{ gap: 8 }}>
+          <input className="input" inputMode="numeric" autoComplete="one-time-code" maxLength={6} placeholder="6-digit code" value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))} />
+          <button
+            type="button"
+            className="btn btn--purple btn--sm btn--auto"
+            disabled={busy || code.length !== 6}
+            onClick={() =>
+              void run(async () => {
+                const r = await apiSend("/api/auth/verify", "POST", { phone: full, code });
+                if (r.user?.name) await claim();
+                else setStep("name");
+              })
+            }
+          >
+            Verify
+          </button>
+        </div>
+      )}
+      {step === "name" && (
+        <div className="hstack" style={{ gap: 8 }}>
+          <input className="input" placeholder="Your first name" autoComplete="given-name" value={name} onChange={(e) => setName(e.target.value)} />
+          <button type="button" className="btn btn--purple btn--sm btn--auto" disabled={busy || !name.trim()} onClick={() => void claim(name.trim())}>
+            Save
+          </button>
+        </div>
+      )}
+      {devCode && step === "code" && <p className="t-small t-muted">Dev mode code: {devCode}</p>}
+      {error && <p className="error-text">{error}</p>}
     </div>
   );
 }
@@ -245,7 +366,7 @@ function Details({ onDone }: { onDone: () => void }) {
 // --- Step 2: record or type one memory ---
 
 function Memory({ draft, onDone, failed }: { draft: Draft; onDone: () => void; failed: boolean }) {
-  const [prompts, setPrompts] = useState<string[]>([]);
+  const [prompts, setPrompts] = useState<TryCard[]>([]);
   const [which, setWhich] = useState(0);
   const [mode, setMode] = useState<"record" | "type">("record");
   const [text, setText] = useState("");
@@ -264,14 +385,23 @@ function Memory({ draft, onDone, failed }: { draft: Draft; onDone: () => void; f
       .then((list: Prompt[]) =>
         setPrompts(
           list
-            .filter((p) => p.audience === "Everyone" || (p.audience === "Parents" && draft.relationship === "Parent") || (p.audience === "Grandparents" && draft.relationship === "Grandparent"))
-            .map((p) => fillPrompt(p.question, values))
+            .map((p, i) => ({ p, pose: CARD_POSES[i % CARD_POSES.length] }))
+            .filter(({ p }) => p.audience === "Everyone" || (p.audience === "Parents" && draft.relationship === "Parent") || (p.audience === "Grandparents" && draft.relationship === "Grandparent"))
+            .filter(({ p }) => !NEEDS_FAMILY.test(`${p.question} ${p.supportingText ?? ""}`))
+            .map(({ p, pose }) => ({ question: fillPrompt(p.question, values), category: p.category, color: p.cardColor, art: p.artworkPath, pose }))
         )
       )
       .catch(() => setPrompts([]));
   }, [name, draft.child.stage, draft.child.birthDate, draft.relationship]);
 
-  const question = prompts[which % Math.max(1, prompts.length)] ?? `What's a moment with ${name} you want to remember?`;
+  const card: TryCard = prompts[which % Math.max(1, prompts.length)] ?? {
+    question: `What's a moment with ${name} you want to remember?`,
+    category: "Just talk",
+    color: "purple",
+    art: null,
+    pose: "star",
+  };
+  const question = card.question;
 
   const send = async () => {
     setBusy(true);
@@ -303,13 +433,17 @@ function Memory({ draft, onDone, failed }: { draft: Draft; onDone: () => void; f
           {draft.invite.invitedBy} invited you to help write {possessive(name)} storybook. Record first; you'll verify your number after.
         </p>
       )}
-      <div className="try-prompt prompt-card prompt-card--purple">
-        <span className="prompt-card__q">{question}</span>
-        {prompts.length > 1 && (
-          <button type="button" className="tlink tlink--light" onClick={() => setWhich((w) => w + 1)}>
-            Another question
-          </button>
-        )}
+      <div className={`try-prompt prompt-card prompt-card--${card.color}`}>
+        <div className="try-prompt__words">
+          <span className={`badge badge--caps badge--sm ${card.color === "purple" ? "badge--pink" : "badge--purple"}`}>{card.category}</span>
+          <span className="prompt-card__q">{question}</span>
+          {prompts.length > 1 && (
+            <button type="button" className="tlink try-prompt__next" onClick={() => setWhich((w) => w + 1)}>
+              Another question
+            </button>
+          )}
+        </div>
+        {card.art ? <img className="try-prompt__art" src={`/${card.art}`} alt="" /> : <Mascot name={card.pose} className="try-prompt__art" />}
       </div>
 
       <Segmented
@@ -458,9 +592,20 @@ function Preview({ draft, onSave, onRetry }: { draft: Draft; onSave: () => void;
         {pages.map((p) => (
           <section key={p.pageNumber} className="how-slide" aria-roledescription="slide" aria-label={`Page ${p.pageNumber}`}>
             <div className="how-paper try-page">
-              {p.image && (
+              {p.picture !== "none" && (
                 <div className="how-art">
-                  <img src={`/${p.image}`} alt={p.visibleAction} />
+                  {p.picture === "ready" && p.image ? (
+                    <img className="try-fade" src={`/${p.image}`} alt={p.visibleAction} />
+                  ) : p.picture === "drawing" ? (
+                    <div className="try-drawing" role="status">
+                      <IconSpinner size={26} />
+                      <span>Drawing the picture…</span>
+                    </div>
+                  ) : (
+                    <div className="try-drawing try-drawing--still">
+                      <Mascot name="peek" className="try-drawing__vambie" />
+                    </div>
+                  )}
                 </div>
               )}
               <p className="try-page__text">{p.text}</p>
@@ -472,12 +617,14 @@ function Preview({ draft, onSave, onRetry }: { draft: Draft; onSave: () => void;
           <div className="how-paper try-page try-page--end">
             <h2 className="how-title">{more ? `${more} more pages are waiting` : "Keep this story"}</h2>
             <p className="try-page__text">
-              Save {possessive(draft.child.name)} story to read it all, and keep adding memories every week with the family.
+              {draft.saved
+                ? `It's saved. The rest of ${possessive(draft.child.name)} story is being drawn now.`
+                : `Save ${possessive(draft.child.name)} story to read it all, and keep adding memories every week with the family.`}
             </p>
             <button className="btn btn--lime btn--caps" onClick={onSave}>
-              Save my story and text me a link <Chev />
+              {draft.saved ? `Read ${possessive(draft.child.name)} storybook` : "Save my story and text me a link"} <Chev />
             </button>
-            {draft.limits.left > 0 && (
+            {draft.limits.left > 0 && !draft.saved && !draft.preview.drawing && (
               <button className="tlink" style={{ marginTop: 14 }} onClick={onRetry}>
                 Make a different version (once)
               </button>
@@ -502,7 +649,7 @@ function Preview({ draft, onSave, onRetry }: { draft: Draft; onSave: () => void;
       </div>
       {index < slides - 1 && (
         <button className="btn btn--lime btn--caps try-save" onClick={onSave}>
-          Save my story and text me a link <Chev />
+          {draft.saved ? `Read ${possessive(draft.child.name)} storybook` : "Save my story and text me a link"} <Chev />
         </button>
       )}
       <p className="how-count">{KEEP_NOTE}</p>

@@ -377,7 +377,7 @@ export interface CreateChapterInput {
   existingChapterId?: string; // replace this chapter's pages (full rewrite)
   revisionRequest?: string;
   castKeys?: string[]; // characters the parent picked for this chapter
-  firstPages?: number; // draw only this many pictures for now (a visitor's preview)
+  illustrate?: boolean; // false: the caller draws the pictures itself (a visitor's preview, guests.ts)
   noQuestions?: boolean; // a visitor's preview: no Who's who, unplaced people are drawn from the memory
 }
 
@@ -518,7 +518,7 @@ export async function createPagedChapter(input: CreateChapterInput) {
 
   await checkPages(chapterId);
   await runGuardian(chapterId);
-  if (!unresolved.length) void illustrateChapter(chapterId, { firstPages: input.firstPages });
+  if (!unresolved.length && input.illustrate !== false) void illustrateChapter(chapterId);
   return prisma.chapter.findUniqueOrThrow({ where: { id: chapterId }, include: { sources: true, findings: true } });
 }
 
