@@ -8,13 +8,13 @@ import { normalizePhone } from "./sms";
 
 const production = () => process.env.NODE_ENV === "production";
 
-const phoneList = (value: string | undefined) =>
+export const phoneList = (value: string | undefined) =>
   (value ?? "")
     .split(",")
     .map((p) => normalizePhone(p))
     .filter((p): p is string => Boolean(p));
 
-const adminPhones = () => phoneList(process.env.ADMIN_PHONES);
+export const adminPhones = () => phoneList(process.env.ADMIN_PHONES);
 
 export const adminIsOpen = () => adminPhones().length === 0 && !production();
 

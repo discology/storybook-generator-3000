@@ -23,6 +23,9 @@ import { guardUploads } from "./server/uploadAccess";
 import { usageFromRequest } from "./server/aiUsage";
 import costRoutes from "./server/costRoutes";
 import guestRoutes, { startGuestCleanup } from "./server/guests";
+import textRoutes from "./server/textRoutes";
+import { startTextCleanup } from "./server/texts";
+import { startReminders } from "./server/reminders";
 
 const production = process.env.NODE_ENV === "production";
 
@@ -40,6 +43,8 @@ if (production) {
   });
 }
 app.use(express.json());
+// Twilio's webhooks post form fields (server/textRoutes.ts).
+app.use("/api/twilio", express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
 app.get("/api/health", (_req, res) => res.json({ ok: true }));
@@ -92,6 +97,7 @@ app.use("/api", accountRoutes);
 app.use("/api", costRoutes);
 app.use("/api", guestRoutes);
 app.use("/api", jobRoutes);
+app.use("/api", textRoutes);
 
 // In production this server also serves the built web app (npm run build);
 // in development Vite serves it.
@@ -112,6 +118,10 @@ app.listen(PORT, () => {
   void resumeUnfinishedMemories();
   void failInterruptedExports();
   startGuestCleanup();
+  startTextCleanup();
+  // Memory reminder texts, like weekly chapters, only go out from the hosted app
+  // unless asked (TEXT_REMINDERS=on), so two copies never both text a family.
+  if (production || process.env.TEXT_REMINDERS === "on") startReminders();
   // Weekly chapters are made by the hosted app. A development copy only makes
   // them when asked (WEEKLY_CHAPTERS=on), so two copies don't both spend on one.
   if (production || process.env.WEEKLY_CHAPTERS === "on") startWeeklyChapters();

@@ -3069,6 +3069,12 @@ button.btn-small,
   background: var(--green);
 }
 
+/* A text that failed or wasn't delivered (Admin → Text Messages). */
+.pill.bad {
+  background: #fde4e4;
+  color: #a12a2a;
+}
+
 .status-line {
   font-size: 0.92rem;
   color: var(--text-secondary);

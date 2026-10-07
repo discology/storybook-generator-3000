@@ -62,6 +62,13 @@ export const MESSAGE_TYPES: MessageType[] = [
     variables: [v.childName, v.storybookTitle, v.chapterTitle, v.chapterUrl],
     defaultBody: "A new chapter of <storybook_title> is ready: \"<chapter_title>\". Read it here: <chapter_url>",
   },
+  {
+    key: "story_ready",
+    name: "Storybook ready",
+    trigger: "Sent to someone who tried Vambie and saved their story while it was being made, once all its pictures are drawn",
+    variables: [v.childName, v.storybookTitle, v.storybookUrl],
+    defaultBody: "<child_name>'s storybook is ready! Read it here: <storybook_url>",
+  },
 ];
 
 export const getMessageType = (key: string) => MESSAGE_TYPES.find((t) => t.key === key);

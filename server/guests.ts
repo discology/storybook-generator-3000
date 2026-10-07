@@ -11,6 +11,8 @@ import { interpret, processMemory } from "./memoryPipeline";
 import { createPagedChapter, illustrateChapter, recordedBy } from "./storyPages";
 import { withUsage } from "./aiUsage";
 import { acceptInvitation, invitationProblem } from "./familyRoutes";
+import { appUrl, renderMessage } from "./messageTemplates";
+import { sendText, textsMode } from "./texts";
 
 // Try before you sign up (VSB-75). A visitor's first memory and story live in a
 // temporary family tied to this device's cookie: a household with a guest token,
@@ -96,15 +98,25 @@ const writing = new Set<string>();
 const drawing = new Set<string>();
 const failures = new Map<string, string>();
 
-// Texts can only go out once the app has a registered sending number (VSB-9 /
-// VSB-8). Until then the wait screen doesn't offer "text me when it's ready".
-export const textingLive = () => Boolean(process.env.TWILIO_MESSAGING_SERVICE_SID);
+// The wait screen offers "text me when it's ready" only once texts go to
+// everyone (VSB-8 approved, TEXTS_MODE=live): in test mode, a visitor would be
+// promised a text that only admins get.
+export const textingLive = () => textsMode() === "live";
 
-// VSB-83: texts someone who saved from the wait screen that their storybook is
-// ready. The sending itself arrives with VSB-9.
+// VSB-83: texts someone who saved from the wait screen that their storybook is ready.
 async function notifyStoryReady(householdId: string) {
-  if (!textingLive()) return;
-  console.log(`Storybook ready for household ${householdId}; the text goes out once VSB-9 is in place.`);
+  const storybook = await prisma.storybook.findFirst({
+    where: { child: { householdId } },
+    include: { child: { include: { household: { include: { owner: true } } } } },
+  });
+  const owner = storybook?.child.household.owner;
+  if (!storybook || !owner?.phone) return;
+  const body = await renderMessage("story_ready", {
+    child_name: storybook.child.displayName,
+    storybook_title: storybook.title,
+    storybook_url: appUrl(`/storybooks/${storybook.id}`),
+  });
+  if (body) await sendText({ event: "story_ready", to: { userId: owner.id, phone: owner.phone }, body, householdId });
 }
 
 async function allowance(req: Request) {

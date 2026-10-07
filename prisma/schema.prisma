@@ -22,6 +22,10 @@ model User {
   termsAcceptedAt  DateTime?
   smsConsentAt     DateTime?
   smsConsentSource String? // sign-in | text-when-ready
+  // Replied STOP (or Twilio reported them unsubscribed): no texts until START.
+  textsOptedOut    Boolean   @default(false)
+  textsOptedOutAt  DateTime?
+  texts            TextMessage[]
   contributors Contributor[]
   sessions    Session[]
   ownedHouseholds Household[]
@@ -193,6 +197,7 @@ model Storybook {
   vambieNameAge     Int     @default(4) // "Baby Vambie" is called just "Vambie" from this age
   // The week's memories become one chapter the morning after the weekly reminder.
   lastBatchAt       DateTime?
+  lastReminderAt    DateTime? // when the memory reminder text last went out (VSB-9)
   pendingCastKeys   String  @default("[]") // JSON: Vambies picked for the next weekly chapter
   memories      Memory[]
   chapters      Chapter[]
@@ -542,4 +547,25 @@ model AppSetting {
   key       String   @id
   value     String
   updatedAt DateTime @updatedAt
+}
+
+// Every text the app sends or skips (VSB-9), with Twilio's delivery status. The
+// wording is cleared after 30 days; the event and status stay.
+model TextMessage {
+  id           String   @id @default(cuid())
+  event        String // welcome | reminder | chapter_ready | story_ready | test:<event>
+  userId       String?
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  householdId  String?
+  toMasked     String // last four digits only
+  body         String?
+  status       String // queued | sent | delivered | undelivered | failed | skipped
+  skipReason   String? // test_mode | opted_out
+  twilioSid    String?  @unique
+  errorCode    String?
+  errorMessage String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([createdAt])
 }

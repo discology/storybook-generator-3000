@@ -7,6 +7,7 @@ import { createPagedChapter, recordedBy } from "./storyPages";
 import { getCurrentUser } from "./session";
 import { normalizePhone } from "./sms";
 import { appUrl, renderMessage } from "./messageTemplates";
+import { sendText } from "./texts";
 import { audioSrc, canSeeChapter, canSeeMemory, isOwner, memberForChapter, memberForMemory, parseIds, requireMember } from "./access";
 import { interpret, processMemory } from "./memoryPipeline";
 import { canStartStorybook } from "./admin";
@@ -102,6 +103,7 @@ router.post("/storybooks", async (req, res) => {
     storybook_url: appUrl(`/storybooks/${storybook.id}`),
     record_url: appUrl(`/storybooks/${storybook.id}/record`),
   });
+  if (welcome) void sendText({ event: "welcome", to: { userId: user.id, phone: user.phone }, body: welcome, householdId: household.id });
   res.status(201).json({ storybook, child, contributor, household, welcomeMessage: welcome });
 });
 
@@ -499,8 +501,29 @@ router.put("/chapters/:id/publish", async (req, res) => {
   const unapproved = await prisma.storyPage.count({ where: { chapterId: chapter.id, approvedAt: null } });
   if (unapproved > 0) return res.status(400).json({ error: `Approve every page first (${unapproved} still need approval).` });
   const updated = await prisma.chapter.update({ where: { id: chapter.id }, data: { status: "published", publishedAt: new Date() } });
+  void textNewChapter(updated.id, member.me.id).catch((e) => console.error("New chapter texts:", e?.message));
   res.json(updated);
 });
+
+// "A new chapter is ready" to everyone else in the family who can read it.
+export async function textNewChapter(chapterId: string, publisherId: string) {
+  const chapter = await prisma.chapter.findUniqueOrThrow({
+    where: { id: chapterId },
+    include: { access: true, storybook: { include: { child: { include: { household: { include: { contributors: { include: { user: true } } } } } } } } },
+  });
+  const sb = chapter.storybook;
+  const body = await renderMessage("chapter_ready", {
+    child_name: sb.child.displayName,
+    storybook_title: sb.title,
+    chapter_title: chapter.title,
+    chapter_url: appUrl(`/storybooks/${sb.id}/read/${chapter.id}`),
+  });
+  if (!body) return;
+  for (const c of sb.child.household.contributors) {
+    if (c.id === publisherId || c.inviteStatus !== "joined" || !c.user?.phone || !canSeeChapter(chapter, c)) continue;
+    await sendText({ event: "chapter_ready", to: { userId: c.user.id, phone: c.user.phone }, body, householdId: sb.child.householdId });
+  }
+}
 
 // --- Chapter sharing ---
 router.get("/chapters/:id/access", async (req, res) => {

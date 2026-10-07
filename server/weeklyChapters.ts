@@ -15,14 +15,14 @@ export const TIMEZONES: Record<string, string> = {
   "Hawaii Time": "Pacific/Honolulu",
 };
 
-const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+export const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const BATCH_HOUR = 6;
 const TICK_MS = 5 * 60 * 1000;
 
 const generating = new Set<string>();
 const lastErrors = new Map<string, string>();
 
-function zonedParts(date: Date, timeZone: string) {
+export function zonedParts(date: Date, timeZone: string) {
   const parts = new Intl.DateTimeFormat("en-US", {
     timeZone,
     hourCycle: "h23",
@@ -38,8 +38,8 @@ function zonedParts(date: Date, timeZone: string) {
 }
 
 // The UTC instant of a wall-clock time in a time zone.
-function zonedToUtc(year: number, month: number, day: number, hour: number, timeZone: string) {
-  const guess = Date.UTC(year, month - 1, day, hour);
+export function zonedToUtc(year: number, month: number, day: number, hour: number, timeZone: string, minute = 0) {
+  const guess = Date.UTC(year, month - 1, day, hour, minute);
   const seen = zonedParts(new Date(guess), timeZone);
   const offset = Date.UTC(seen.year, seen.month - 1, seen.day, seen.hour, seen.minute) - guess;
   return new Date(guess - offset);
