@@ -77,7 +77,7 @@ It follows these rules:
   4. family members' reference sheets;
   5. when a Vambie's reference art is one of its official 3D renders, the render that matches the page's mood and camera angle.
 - **Pacing.** OpenAI limits how many reference images an account may send per minute. Requests wait their turn instead of failing, are retried after a rate limit, and are retried once after a timeout.
-- **Learning from what went wrong.** The team flags pictures and words in Story Review, parents' feedback joins the queue, and Admin → Feedback analyzes the flags against the Guide Book, suggests exact wording fixes, and can try a picture-rule change on the flagged pictures before anyone edits the live rules. See the admin guide.
+- **Learning from what went wrong.** The team flags pictures and words in Story Review; parents' feedback joins the queue ("Something's off" on a page in page review, chapter feedback from the reader, and automatic signals when they redraw a picture or ask for a change); and Admin → Feedback analyzes the flags against the Guide Book, suggests exact wording fixes, and can try a picture-rule change on the flagged pictures before anyone edits the live rules. See the admin guide.
 - **Checking each picture.** The `illustration_check` AI step compares the picture with the page plan. It flags missing characters or actions, written words in the picture, anyone not drawn the way the page rules draw people (for example a person drawn as a human), and family members who don't match their approved design. A family member who doesn't match is redrawn automatically once; after that, the page is flagged for the parent.
 
 ### Review and publishing

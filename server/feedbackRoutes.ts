@@ -82,6 +82,33 @@ export async function flagFromFeedback(feedbackId: string) {
   });
 }
 
+// A parent's flag on a page (VSB-107): "Something's off", or the signal recorded
+// when they redraw a page or ask for a change. Labeled by their relationship.
+export async function familyPageFlag(
+  pageId: string,
+  userId: string,
+  input: { target: "picture" | "words" | "both"; categories: string[]; note: string; parentReason?: string }
+) {
+  const { page, asset, snapshot } = await pageSnapshot(pageId);
+  if (input.target !== "words" && !asset) return null;
+  const member = await prisma.contributor.findFirst({
+    where: { userId, household: { children: { some: { storybooks: { some: { chapters: { some: { id: page.chapterId } } } } } } } },
+  });
+  return prisma.flag.create({
+    data: {
+      chapterId: page.chapterId,
+      pageId: page.id,
+      assetId: input.target === "words" ? null : asset?.id ?? null,
+      target: input.target,
+      categories: JSON.stringify(input.categories),
+      note: input.note.slice(0, 2000),
+      source: "family",
+      createdById: userId,
+      snapshot: JSON.stringify({ ...snapshot, from: member?.relationship || "Family member", parentReason: input.parentReason ?? null }),
+    },
+  });
+}
+
 router.post("/admin/pages/:pageId/flags", async (req, res) => {
   const user = await getCurrentUser(req);
   const target = String(req.body?.target ?? "");

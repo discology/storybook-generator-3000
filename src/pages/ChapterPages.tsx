@@ -3,8 +3,9 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
 import PagePicture from "../components/PagePicture";
 import AccessDenied from "../components/AccessDenied";
-import { IconCheck, IconChevronDown, IconEdit, IconRefresh, IconSpinner, IconWand } from "../components/icons";
-import { Chev, Loading, Note, Select } from "../components/ui";
+import { IconBookmark as IconFlag, IconCheck, IconChevronDown, IconEdit, IconRefresh, IconSpinner, IconWand } from "../components/icons";
+import { Chev, Loading, Note, RadioRow, Select } from "../components/ui";
+import { PARENT_REASONS } from "../lib/flags";
 import { apiGet, apiSend, ApiError } from "../lib/api";
 import { chapterLabel } from "../lib/format";
 import type { Chapter, StoryPage, UnresolvedPerson } from "../types";
@@ -275,9 +276,30 @@ function PageCard({
   waitingOnPeople: boolean;
   castNames: Record<string, string>; // character key or ref → name
 }) {
-  const [mode, setMode] = useState<"view" | "edit" | "revise">("view");
+  const [mode, setMode] = useState<"view" | "edit" | "revise" | "off">("view");
   const [text, setText] = useState(page.text);
   const [instructions, setInstructions] = useState("");
+  // "Something's off" (VSB-107): a reason in the parent's words, for the Vambie team.
+  const [offReason, setOffReason] = useState("");
+  const [offNote, setOffNote] = useState("");
+  const [offSent, setOffSent] = useState<{ picture: boolean } | null>(null);
+  const [offBusy, setOffBusy] = useState(false);
+  const [offError, setOffError] = useState<string | null>(null);
+  const sendOff = async () => {
+    setOffBusy(true);
+    setOffError(null);
+    try {
+      const r = await apiSend(`/api/pages/${page.id}/feedback`, "POST", { reason: offReason, note: offNote });
+      setOffSent({ picture: Boolean(r.picture) });
+      setOffReason("");
+      setOffNote("");
+      setMode("view");
+    } catch (e) {
+      setOffError(e instanceof ApiError ? e.message : "Couldn't send it. Try again.");
+    } finally {
+      setOffBusy(false);
+    }
+  };
 
   useEffect(() => setText(page.text), [page.text]);
 
@@ -480,6 +502,48 @@ function PageCard({
         </div>
       )}
 
+      {mode === "off" && (
+        <div style={{ marginTop: 14 }}>
+          <p className="field__label field__label--strong" style={{ margin: 0 }}>
+            What's off on this page?
+          </p>
+          <div role="radiogroup" style={{ marginTop: 8 }}>
+            {Object.entries(PARENT_REASONS)
+              .filter(([, r]) => pictured || r.target === "words" || r.target === "both")
+              .map(([key, r]) => (
+                <RadioRow key={key} on={offReason === key} onClick={() => setOffReason(key)}>
+                  {r.label}
+                </RadioRow>
+              ))}
+          </div>
+          <textarea className="textarea" rows={2} value={offNote} onChange={(e) => setOffNote(e.target.value)} maxLength={1000} placeholder="Anything else? (optional)" aria-label="Anything else" style={{ marginTop: 10 }} />
+          <p className="field__hint">Goes to the Vambie team so the next pages come out better. It doesn't change this page.</p>
+          {offError && <p className="error-text">{offError}</p>}
+          <div className="hstack" style={{ marginTop: 10 }}>
+            <button className="btn btn--purple btn--xs btn--auto" disabled={offBusy || !offReason} onClick={() => void sendOff()}>
+              {offBusy ? "Sending…" : "Send to the Vambie team"}
+            </button>
+            <button className="btn btn--outline btn--xs btn--auto" onClick={() => setMode("view")}>
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {offSent && mode === "view" && (
+        <Note kind="ok" style={{ marginTop: 14 }}>
+          Thank you. The Vambie team will take a look.
+          {offSent.picture && pictured && ready && (
+            <>
+              {" "}
+              <button className="tlink" style={{ fontSize: 15 }} disabled={disabled} onClick={() => void act(`draw-${page.id}`, () => apiSend(`/api/pages/${page.id}/illustration`, "POST")).then(() => setOffSent(null))}>
+                Redraw this picture now
+              </button>
+            </>
+          )}
+        </Note>
+      )}
+
       {mode === "view" && (
         <div className="hstack" style={{ flexWrap: "wrap", gap: 8, marginTop: 14 }}>
           {!page.approvedAt && (
@@ -501,6 +565,9 @@ function PageCard({
           )}
           <button className="btn btn--outline btn--xs btn--auto" disabled={disabled} onClick={() => setMode("revise")}>
             <IconWand size={16} /> Revise page
+          </button>
+          <button className="btn btn--outline btn--xs btn--auto" disabled={busy !== null} onClick={() => setMode("off")}>
+            <IconFlag size={16} /> Something's off
           </button>
         </div>
       )}

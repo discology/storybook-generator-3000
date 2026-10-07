@@ -14,6 +14,8 @@ import {
   updatePagesStatus,
 } from "./storyPages";
 import { approvedVariants } from "./familyCharacters";
+import { familyPageFlag } from "./feedbackRoutes";
+import { PARENT_REASONS } from "./flagCategories";
 import { DEFAULT_RULES, EMBELLISHMENT_LEVELS, IMAGE_MODELS, getActiveRules, saveRules, validateRules } from "./pageRules";
 
 const router: Router = express.Router();
@@ -125,6 +127,12 @@ router.post("/pages/:pageId/illustration", async (req, res) => {
   const generating = await prisma.pageAsset.count({ where: { pageId: page.id, status: "generating" } });
   if (generating) return res.status(409).json({ error: "This page's illustration is already being drawn." });
   const fixCharacterIds = Array.isArray(req.body?.fixCharacterIds) ? req.body.fixCharacterIds.map(String) : undefined;
+  // A parent redrawing a finished picture is a judgment on it: recorded for the
+  // team with the picture as it was (VSB-107). Automatic redraws don't count.
+  if (!fixCharacterIds) {
+    const user = await getCurrentUser(req);
+    if (user) await familyPageFlag(page.id, user.id, { target: "picture", categories: ["redraw_requested"], note: "Asked for a redraw." }).catch((e) => console.error("Redraw flag:", e?.message));
+  }
   await prisma.chapter.update({ where: { id: page.chapterId }, data: { pagesStatus: "illustrating" } });
   void generateIllustration(page.id, { fixCharacterIds }).then(() => updatePagesStatus(page.chapterId));
   // Give the new "generating" version a moment to exist before responding.
@@ -138,11 +146,31 @@ router.post("/pages/:pageId/revise", async (req, res) => {
   const request = String(req.body?.instructions ?? "").trim();
   if (!request) return res.status(400).json({ error: "Say what should change on this page." });
   try {
+    const user = await getCurrentUser(req);
+    if (user) await familyPageFlag(page.id, user.id, { target: "both", categories: ["change_requested"], note: request }).catch((e) => console.error("Change flag:", e?.message));
     await revisePage(page.id, request);
     res.json(await chapterWithPages(page.chapterId));
   } catch (error) {
     fail(res, error);
   }
+});
+
+// "Something's off" on a page (VSB-107): a parent's reason, in their words, for
+// the team's Feedback queue. Separate from fixing the page.
+router.post("/pages/:pageId/feedback", async (req, res) => {
+  const page = await pageForRequest(req, res);
+  if (!page) return;
+  const user = await getCurrentUser(req);
+  const reason = PARENT_REASONS[String(req.body?.reason ?? "")];
+  if (!user || !reason) return res.status(400).json({ error: "Pick what's off." });
+  const flag = await familyPageFlag(page.id, user.id, {
+    target: reason.target,
+    categories: reason.categories,
+    note: String(req.body?.note ?? "").trim() || reason.label,
+    parentReason: reason.label,
+  });
+  if (!flag) return res.status(400).json({ error: "This page has no picture yet." });
+  res.status(201).json({ ok: true, picture: reason.target !== "words" });
 });
 
 // The parent's answers to "who is this?" for people the planner couldn't identify.

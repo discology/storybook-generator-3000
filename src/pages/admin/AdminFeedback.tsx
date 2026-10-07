@@ -30,6 +30,7 @@ interface Flag {
   chapter: { id: string; title: string };
   pageId: string | null;
   snapshot: {
+    parentReason?: string | null;
     stage?: string | null;
     ruleSetVersion?: number | null;
     pageNumber?: number;
@@ -300,6 +301,11 @@ function FlagCard({ flag: f, busy, act, selected, onSelect, onAction }: { flag: 
             </span>
           ))}
         </div>
+        {f.snapshot.parentReason && (
+          <p className="t-small" style={{ margin: "8px 0 0" }}>
+            <strong>In their words:</strong> {f.snapshot.parentReason}
+          </p>
+        )}
         <p style={{ margin: "10px 0 0" }}>{f.note || <em className="t-muted">No note.</em>}</p>
         {f.shouldBe && (
           <p className="t-small" style={{ margin: "6px 0 0" }}>
