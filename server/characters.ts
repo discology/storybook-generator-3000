@@ -48,8 +48,8 @@ export interface CastMember {
 
 export interface CharacterRender {
   view: string; // front | angle | side
-  expression: string; // happy | sad | excited | angry | surprised | in_love | amused
-  set: string; // "" for the usual look, or e.g. "with guitar"
+  expression: string; // happy | sad | excited | angry | surprised | in_love | amused (book style adds scared | sleepy)
+  set: string; // "" for the usual look, e.g. "with guitar", or BOOK_STYLE for the book-style expressions
   path: string;
 }
 
@@ -125,7 +125,9 @@ const toCastMember = (c: CharacterWithArt, required: boolean): CastMember => ({
 // that, its action) picks the expression render.
 const MOODS: [string, RegExp][] = [
   ["happy", /\b(happy|happi|joy|glad|cheer|content|proud|pride|warm|calm|peace|cozy|grateful|gentle|hopeful|relie|bright|smil)/],
-  ["sad", /\b(sad|lonely|disappoint|sorrow|tear|cry|cries|gloom|hurt|grief|upset|worr|anxious|nervous|scared|afraid|fear|guilt)/],
+  ["sad", /\b(sad|lonely|disappoint|sorrow|tear|cry|cries|gloom|hurt|grief|upset|guilt)/],
+  ["scared", /\b(scared|afraid|fear|frighten|worr|anxious|nervous|uneasy|unsure|shy)/],
+  ["sleepy", /\b(sleep|drows|tired|yawn|bedtime|dream)/],
   ["excited", /\b(excit|eager|thrill|buzz|energ|anticipat|bounc|wiggl)/],
   ["angry", /\b(angry|anger|frustrat|mad\b|cross\b|annoy|grump|furious)/],
   ["surprised", /\b(surpris|amaz|astonish|wonder|shock|gasp|startl|awe\b|curious|curiosity)/],
@@ -157,11 +159,46 @@ export function viewForShot(shot: { type?: string; angle?: string } | null): "fr
 
 const VIEW_LABELS: Record<string, string> = { front: "front", angle: "three-quarter angle", side: "side" };
 
+// The 3D renders have no scared or sleepy faces; the nearest ones stand in.
+const RENDER_MOOD: Record<string, string> = { scared: "sad", sleepy: "happy" };
+
+// --- Book-style expressions ---
+
+// A character whose reference art is in the book's style gets one picture per
+// mood in that style, drawn once (VSB-90). A page attaches the one matching its
+// mood in place of the neutral reference art, so faces change with the story.
+export const BOOK_STYLE = "book style";
+export const BOOK_EXPRESSIONS: Record<string, { label: string; look: string }> = {
+  happy: { label: "happy", look: "happy: eyes bright and lifted, a wide open smile showing the tiny fangs, arms loose and open" },
+  sad: { label: "sad", look: "sad: eyes drooping and glassy with one small tear, mouth turned down, head and shoulders low" },
+  scared: { label: "scared", look: "scared: eyes huge with tiny pupils, mouth a small wobbly line, shrinking back with hands up near the face" },
+  excited: { label: "excited", look: "excited: eyes wide and sparkling, mouth open in a big grin, up on tiptoes with arms flung up" },
+  angry: { label: "angry", look: "angry: brows pulled down hard, eyes narrowed, a tight frown with the fangs showing, fists clenched, one foot stamping" },
+  surprised: { label: "surprised", look: "surprised: eyes as round as they can go, brows high, mouth a round O, hands flung out" },
+  in_love: { label: "tender", look: "tender: eyes soft and half-closed, a small warm smile, hands clasped to the chest, head tilted" },
+  amused: { label: "laughing", look: "laughing: eyes squeezed shut into happy arcs, mouth wide open, leaning back and holding its tummy" },
+  sleepy: { label: "sleepy", look: "sleepy: eyelids heavy and half-closed, a big yawn, slumped, rubbing one eye" },
+};
+
+// This page's book-style expression for a cast member, used in place of their
+// reference art. Null when the reference is a 3D render, nothing matches the
+// page's mood, or the set hasn't been drawn.
+export function moodArt(member: CastMember, page: { emotionalTone: string; visibleAction: string }) {
+  if (member.referenceIsRender !== false) return null;
+  const mood = moodExpression(page.emotionalTone, page.visibleAction);
+  const art = mood && member.renders?.find((r) => r.set === BOOK_STYLE && r.expression === mood);
+  if (!art) return null;
+  return {
+    path: art.path,
+    label: `${member.name} feeling ${BOOK_EXPRESSIONS[mood!]?.label ?? mood}, in this book's art style: match ${member.name}'s shape, proportions, colors and features exactly, and use this face and expression on this page. The pose comes from the scene, not from this picture.`,
+  };
+}
+
 // The renders to attach for a cast member on a page: the expression for the
 // page's mood and their shape from the page's camera angle, from the look set
 // the scene calls for (e.g. "with guitar" when a guitar is in the scene).
 export function renderReferences(member: CastMember, page: { emotionalTone: string; visibleAction: string; setting: string }, shot: { type?: string; angle?: string } | null) {
-  const renders = member.renders ?? [];
+  const renders = (member.renders ?? []).filter((r) => r.set !== BOOK_STYLE);
   // 3D renders match only 3D reference art; next to book-style art they'd pull
   // the picture back toward a 3D look.
   if (!renders.length || member.referenceIsRender === false) return [];
@@ -170,7 +207,8 @@ export function renderReferences(member: CastMember, page: { emotionalTone: stri
   const set = sets.find((s) => s && scene.includes(s.replace(/^with\s+/, "").toLowerCase())) ?? "";
   const inSet = renders.filter((r) => r.set === set);
   const find = (expression: string, view: string) => inSet.find((r) => r.expression === expression && r.view === view);
-  const mood = moodExpression(page.emotionalTone, page.visibleAction);
+  const named = moodExpression(page.emotionalTone, page.visibleAction);
+  const mood = named ? RENDER_MOOD[named] ?? named : null;
   const view = viewForShot(shot);
   const picks: { path: string; label: string }[] = [];
   const style = `Draw ${member.name} in the book's illustration style, not as a 3D render.`;
@@ -289,6 +327,55 @@ export async function restyleCharacterArt(characterId: string) {
   if (!b64) throw new Error("The image service returned no image.");
   const imagePath = saveCharacterImage(Buffer.from(b64, "base64"), `${character.key}-book-style-${Date.now()}.png`);
   return prisma.characterArt.create({ data: { characterId, imagePath, source: "generated", artSet: "book style", prompt } });
+}
+
+// Draws the book-style expression set from the character's book-style reference
+// art, replacing any earlier set. Each mood is one image request with one
+// reference, so the set takes about two minutes under the rate limit.
+export async function drawBookExpressions(characterId: string) {
+  const character = await prisma.character.findUniqueOrThrow({ where: { id: characterId }, include: { art: true } });
+  const referenceArt = character.art.find((a) => a.id === character.referenceArtId);
+  if (!referenceArt) throw new Error("Pick reference art first: the expressions are drawn from it.");
+  if (referenceArt.view) throw new Error("The reference art is a 3D render. Redraw it in the book's style and pick that first.");
+  const client = getOpenAI();
+  if (!client) throw new Error("Drawing expressions needs an OpenAI API key (OPENAI_API_KEY).");
+  const { rules } = await getActiveRules();
+  const reference = referenceArt.imagePath;
+  const results = await Promise.allSettled(
+    Object.entries(BOOK_EXPRESSIONS).map(async ([expression, { look }]) => {
+      const prompt = [
+        rules.illustrationStyle,
+        `The attached image is ${character.name}'s reference art in this book's art style. Draw exactly the same character, with the same shape, proportions, colors and features, in the same style, now feeling ${look}. The whole face and body show the feeling.`,
+        "Full body, centered on plain warm-cream paper. No scenery, no props, no other characters, no labels.",
+        character.neverRules ? `Never: ${character.neverRules}` : "",
+        "Do not include any text, letters or words in the image.",
+      ]
+        .filter(Boolean)
+        .join("\n\n");
+      const response = await withImageRateLimit(1, async () =>
+        client.images.edit({
+          model: rules.imageModel,
+          prompt,
+          image: [await toFile(fs.createReadStream(path.join(process.cwd(), reference)), path.basename(reference), { type: reference.endsWith(".png") ? "image/png" : "image/jpeg" })],
+          size: "1024x1024",
+          quality: "high",
+          output_format: "png",
+        })
+      );
+      await recordImage("library_art", rules.imageModel, response, { size: "1024x1024", quality: "high" });
+      const b64 = response.data?.[0]?.b64_json;
+      if (!b64) throw new Error("The image service returned no image.");
+      const imagePath = saveCharacterImage(Buffer.from(b64, "base64"), `${character.key}-book-${expression}-${Date.now()}.png`);
+      // One picture per mood: the new one replaces the earlier one.
+      await prisma.characterArt.deleteMany({ where: { characterId, artSet: BOOK_STYLE, expression } });
+      await prisma.characterArt.create({ data: { characterId, imagePath, source: "generated", artSet: BOOK_STYLE, view: "front", expression, prompt } });
+    })
+  );
+  const failed = results.filter((r) => r.status === "rejected").length;
+  if (failed === results.length) throw new Error((results[0] as PromiseRejectedResult).reason?.message ?? "Couldn't draw the expressions.");
+  // Like new reference art, a new set changes how pictures look.
+  await prisma.character.update({ where: { id: characterId }, data: { version: { increment: 1 } } });
+  return { drawn: results.length - failed, failed };
 }
 
 // How many chapters were made with this character in their cast.

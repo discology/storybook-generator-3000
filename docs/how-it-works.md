@@ -68,11 +68,12 @@ It follows these rules:
 ### Drawing the pictures
 
 - **One art direction.** Every picture uses the same style: expressive pen-and-ink line with watercolor washes, on warm cream paper, where the Vambies' own colors are the only bright ones. It's set in Page Rules.
+- **Camera and acting.** Page pictures follow the planned camera (close-ups crop boldly, wide shots make the characters small, angles tilt), compose off-center, catch the moment mid-movement and show the feeling on faces and bodies. It's the "Camera and acting" text in Page Rules; the planner writes each page as its peak moment and varies what each picture is about.
 - **A character sheet first.** A reference sheet of the chapter's characters is drawn first. The pages are then drawn three at a time.
 - **References attached to every picture,** up to five (the per-minute limit), most important first:
-  1. the reference art of each Vambie on the page;
+  1. the reference art of each Vambie on the page, or, when the Vambie has book-style expressions, the one matching the page's mood (happy, sad, scared, excited, angry, surprised, tender, laughing or sleepy);
   2. the approved portrait of each family member on the page;
-  3. the chapter's character sheet;
+  3. the chapter's character sheet (left out for close-ups, where its full-body lineup would pull the picture back to whole figures);
   4. family members' reference sheets;
   5. when a Vambie's reference art is one of its official 3D renders, the render that matches the page's mood and camera angle.
 - **Pacing.** OpenAI limits how many reference images an account may send per minute. Requests wait their turn instead of failing, are retried after a rate limit, and are retried once after a timeout.

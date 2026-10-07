@@ -33,6 +33,19 @@ const cardFor = (f: Form) => {
 
 const EXPRESSIONS = ["happy", "sad", "excited", "angry", "surprised", "in_love", "amused"];
 const VIEWS = ["front", "angle", "side"];
+// Mirrors BOOK_EXPRESSIONS in server/characters.ts.
+const BOOK_STYLE = "book style";
+const BOOK_MOODS: [string, string][] = [
+  ["happy", "happy"],
+  ["sad", "sad"],
+  ["scared", "scared"],
+  ["excited", "excited"],
+  ["angry", "angry"],
+  ["surprised", "surprised"],
+  ["in_love", "tender"],
+  ["amused", "laughing"],
+  ["sleepy", "sleepy"],
+];
 
 export default function AdminCharacterEdit() {
   const { id } = useParams();
@@ -41,7 +54,7 @@ export default function AdminCharacterEdit() {
   const [form, setForm] = useState<Form | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
-  const [busy, setBusy] = useState<"upload" | "generate" | "restyle" | null>(null);
+  const [busy, setBusy] = useState<"upload" | "generate" | "restyle" | "expressions" | null>(null);
 
   const apply = (c: LibraryCharacter & { castingModes?: CastingModes }) => {
     setCharacter(c);
@@ -57,7 +70,11 @@ export default function AdminCharacterEdit() {
 
   const dirty = JSON.stringify(form) !== JSON.stringify(toForm(character));
   // Labeled 3D renders show as a view × expression grid per look set (usual look first).
-  const renderSets = [...new Set((character.art ?? []).filter((a) => a.view && a.expression).map((a) => a.artSet))].sort();
+  const renderSets = [...new Set((character.art ?? []).filter((a) => a.view && a.expression && a.artSet !== BOOK_STYLE).map((a) => a.artSet))].sort();
+  // Book-style expressions are drawn from book-style reference art (not a 3D render).
+  const referenceArt = (character.art ?? []).find((a) => a.id === character.referenceArtId);
+  const bookReference = Boolean(referenceArt && !referenceArt.view);
+  const bookExpressions = (character.art ?? []).filter((a) => a.artSet === BOOK_STYLE && a.expression);
   const otherArt = (character.art ?? []).filter((a) => !a.view || !a.expression);
   const set = <K extends keyof Form>(key: K, value: Form[K]) => {
     setForm({ ...form, [key]: value });
@@ -69,7 +86,7 @@ export default function AdminCharacterEdit() {
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => set(key, e.target.value),
   });
 
-  const run = async (action: () => Promise<LibraryCharacter>, kind?: "upload" | "generate" | "restyle") => {
+  const run = async (action: () => Promise<LibraryCharacter>, kind?: "upload" | "generate" | "restyle" | "expressions") => {
     setError(null);
     if (kind) setBusy(kind);
     try {
@@ -194,7 +211,9 @@ export default function AdminCharacterEdit() {
               No reference art yet. Pictures will rely on the written look, which can drift from page to page. Upload official art or generate some.
             </p>
           )}
-          <p className="status-line">Attached to every picture {character.name} appears in.</p>
+          <p className="status-line">
+            Attached to every picture {character.name} appears in{bookExpressions.length ? ", unless one of the expressions below fits the page's mood" : ""}.
+          </p>
 
           <div className="row inline" style={{ flexWrap: "wrap" }}>
             <label className="btn-small btn-secondary" style={{ cursor: busy ? "default" : "pointer", margin: 0 }}>
@@ -228,6 +247,39 @@ export default function AdminCharacterEdit() {
             </button>
           </div>
           {dirty && <p className="status-line">Save your changes before generating, so the art uses the new look.</p>}
+
+          {bookReference && (
+            <>
+              <label>Expressions in the book's style</label>
+              {bookExpressions.length > 0 ? (
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(5, 1fr)", gap: "0.35rem" }}>
+                  {BOOK_MOODS.map(([mood, label]) => {
+                    const a = bookExpressions.find((x) => x.expression === mood);
+                    return (
+                      <figure key={mood} style={{ margin: 0 }}>
+                        {a ? (
+                          <img src={`/${a.imagePath}`} alt={`${character.name} ${label}`} style={{ width: "100%", aspectRatio: "1", objectFit: "cover", borderRadius: 6, display: "block", background: "#fff" }} />
+                        ) : (
+                          <div style={{ width: "100%", aspectRatio: "1", borderRadius: 6, background: "#ece4d3" }} />
+                        )}
+                        <figcaption className="status-line" style={{ fontSize: "0.65rem", textAlign: "center" }}>{label}</figcaption>
+                      </figure>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="status-line">None yet. Each picture uses the one neutral reference art, so {character.name}'s face looks the same on every page.</p>
+              )}
+              <p className="status-line">Each picture attaches the expression matching the page's mood in place of the reference art.</p>
+              <button
+                className="btn-small btn-secondary"
+                disabled={busy !== null}
+                onClick={() => run(() => apiSend(`/api/admin/characters/${id}/art/expressions`, "POST"), "expressions")}
+              >
+                {busy === "expressions" ? "Drawing 9 expressions… (about 2 minutes)" : bookExpressions.length ? "Redraw the expressions" : "Draw expressions in the book's style"}
+              </button>
+            </>
+          )}
 
           {renderSets.map((set) => (
             <div key={set || "main"}>

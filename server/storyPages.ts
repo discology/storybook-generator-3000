@@ -4,7 +4,7 @@ import { toFile } from "openai";
 import { prisma } from "./db";
 import { runAiStep, isAiConfigured, guardianReview } from "./aiService";
 import { getAiInstruction } from "./aiInstructions";
-import { CastMember, buildCast, characterCardValues, describeCast, renderReferences } from "./characters";
+import { CastMember, buildCast, characterCardValues, describeCast, moodArt, renderReferences } from "./characters";
 import {
   AppearanceWithDesign,
   FamilyCastEntry,
@@ -146,6 +146,22 @@ const parseShot = (json: string | null): Shot | null => {
 
 const describeShot = (shot: Shot | null) =>
   shot ? `${shot.type}${shot.angle ? `, ${shot.angle}` : ""}${shot.focus ? `. Focus: ${shot.focus}` : ""}` : "";
+
+// What each planned shot type means for the frame, spelled out so pictures don't
+// drift back to a medium shot of everyone (VSB-90). Matched on the type only.
+const SHOT_FRAMING: [RegExp, string][] = [
+  [/extreme close/, "Extreme close-up: only the focus (an eye, a mouth, hands, a small object) fills the frame, cropped tight. Nothing else of the scene or the characters' bodies shows."],
+  [/close/, "Close-up: the focus fills most of the frame. A face is cropped at the shoulders or tighter, and little of the room shows."],
+  [/establishing|wide/, "Wide shot: the place fills the frame and the characters are small in it."],
+  [/over.the.shoulder/, "Over-the-shoulder: one character's back, shoulder and head are large in the near foreground at one side, cut off by the frame, and we look past them at the other."],
+  [/bird/, "Bird's-eye view: looking straight down from high above, so we see the tops of heads and the floor around them."],
+  [/low/, "Low angle: the camera is near the ground looking up, so the subject looms above."],
+  [/medium/, "Medium shot: characters from about the knees or waist up, filling the frame; most of the room is cropped out."],
+];
+const shotFraming = (shot: Shot | null) => (shot ? SHOT_FRAMING.find(([pattern]) => pattern.test(shot.type.toLowerCase()))?.[1] ?? "" : "");
+// Close-ups leave out the full-body character sheet, which pulls pictures back
+// to whole figures, and repeat their framing at the end of the prompt.
+const isCloseUp = (shot: Shot | null) => /close/.test(shot?.type.toLowerCase() ?? "");
 
 const findCastMember = (cast: CastMember[], nameOrKey: string) => {
   const n = nameOrKey.trim().toLowerCase();
@@ -827,7 +843,7 @@ const SHEET_LABEL =
 const EARLIER_PAGE_LABEL =
   "An earlier page of this same book: draw the characters, outfits and art style as they appear there, in a new scene.";
 const castArtLabel = (m: CastMember) =>
-  `Official artwork of ${m.name}: match ${m.name}'s shape, proportions, colors and features exactly, drawn in this book's art style.`;
+  `Official artwork of ${m.name}: match ${m.name}'s shape, proportions, colors and features exactly, drawn in this book's art style. Its pose and expression come from the scene, not from this picture.`;
 // References define who characters are; the art style comes from the rules.
 const BELONG_NOTE =
   "Reference images show who each character is (shape, proportions, colors, features), not how to render them: draw every character in this book's art style, with the same line, texture, lighting and palette as the scene, so they belong in it.";
@@ -841,11 +857,15 @@ const PICTURE_SIZES: Record<string, { size: string; framing: string }> = {
     framing:
       "Picture size: a small vignette: the characters and a few props on plain warm-cream paper, the color fading out in soft, irregular edges with empty paper all around; no background scenery and no border.",
   },
-  framed: { size: "1024x1024", framing: "Picture size: a square picture of the whole scene." },
-  full: { size: "1024x1536", framing: "Picture size: a tall full-page picture of the whole scene." },
+  framed: { size: "1024x1024", framing: "Picture size: a square picture, framed exactly as the camera says." },
+  full: {
+    size: "1024x1536",
+    framing: "Picture size: a tall full-page picture, framed exactly as the camera says. A phone may trim its outer edges, so keep faces away from the very edges.",
+  },
   wordless: {
     size: "1024x1536",
-    framing: "Picture size: a tall full-page picture with no words on the page: the meaningful moment of the chapter, filling the frame edge to edge.",
+    framing:
+      "Picture size: a tall full-page picture with no words on the page: the meaningful moment of the chapter, framed exactly as the camera says and filling the frame edge to edge. A phone may trim its outer edges, so keep faces away from the very edges.",
   },
 };
 const pictureFormat = (page: { pictureSize: string }) => PICTURE_SIZES[page.pictureSize] ?? { size: "1536x1024", framing: "" };
@@ -892,7 +912,9 @@ function buildImagePrompt(page: PageRow, ctx: PromptContext, references: ImageRe
   const shot = parseShot(page.shot);
   return [
     shot ? `Camera: ${describeShot(shot)}.` : "",
+    shotFraming(shot),
     pictureFormat(page).framing,
+    ctx.rules.pictureDirection ?? "",
     ctx.rules.illustrationStyle,
     // Chapters from before the Character Library described Baby Vambie in the rules.
     ctx.cast.length ? "" : ctx.rules.babyVambieAppearance ?? "",
@@ -905,6 +927,7 @@ function buildImagePrompt(page: PageRow, ctx: PromptContext, references: ImageRe
     `Show: ${page.visibleAction}`,
     `Mood: ${page.emotionalTone}`,
     page.continuity ? `Keep consistent: ${page.continuity}` : "",
+    isCloseUp(shot) ? `Framing, above all: ${shotFraming(shot)} Characters who aren't the focus may be cut off by the frame or left out.` : "",
     "Do not include any text, letters or words in the image.",
   ]
     .filter(Boolean)
@@ -1005,7 +1028,9 @@ export async function generateIllustration(pageId: string, options: Illustration
   // pages still match), then family reference sheets and mood/angle renders.
   const onPage = (JSON.parse(page.characters) as string[]).map((t) => findCastMember(cast, t)).filter((m): m is CastMember => Boolean(m));
   const scene: ImageReference[] = [];
-  if (chapter.characterSheetImage && !options.referencePageId) {
+  if (isCloseUp(parseShot(page.shot)) && !options.referencePageId) {
+    // No full-body references for a close-up: the characters' own art is enough.
+  } else if (chapter.characterSheetImage && !options.referencePageId) {
     scene.push({ path: chapter.characterSheetImage, label: SHEET_LABEL });
   } else {
     const firstPicture = chapter.pages.find(hasPicture);
@@ -1013,7 +1038,8 @@ export async function generateIllustration(pageId: string, options: Illustration
     if (pageRef?.imagePath) scene.push({ path: pageRef.imagePath, label: EARLIER_PAGE_LABEL });
   }
   const references: ImageReference[] = [
-    ...onPage.filter((m) => m.referenceImage).map((m) => ({ path: m.referenceImage!, label: castArtLabel(m) })),
+    // A book-style expression for the page's mood stands in for the neutral reference art.
+    ...onPage.filter((m) => m.referenceImage).map((m) => moodArt(m, page) ?? { path: m.referenceImage!, label: castArtLabel(m) }),
     ...appearances.flatMap((a) => appearanceReferences(a).slice(0, 1)),
     ...scene,
     ...appearances.flatMap((a) => appearanceReferences(a).slice(1)),

@@ -10,6 +10,7 @@ import {
   generateCharacterArt,
   referenceImageOf,
   restyleCharacterArt,
+  drawBookExpressions,
   saveCharacterImage,
   validateKey,
 } from "./characters";
@@ -142,6 +143,17 @@ router.post("/admin/characters/:id/art/restyle", async (req, res) => {
     res.status(201).json(await present(req.params.id));
   } catch (error: any) {
     res.status(502).json({ error: error?.message ?? "Couldn't redraw the artwork. Try again." });
+  }
+});
+
+// Draw (or redraw) the book-style expression set from the reference art.
+router.post("/admin/characters/:id/art/expressions", async (req, res) => {
+  if (!(await loadCharacter(req.params.id))) return res.status(404).json({ error: "Not found" });
+  try {
+    const { failed } = await drawBookExpressions(req.params.id);
+    res.status(201).json({ ...(await present(req.params.id)), failed });
+  } catch (error: any) {
+    res.status(502).json({ error: error?.message ?? "Couldn't draw the expressions. Try again." });
   }
 });
 

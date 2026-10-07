@@ -26,6 +26,9 @@ export interface PageRules {
   // now live on the Characters page.
   babyVambieAppearance?: string;
   peopleStyle: string;
+  // Camera and acting for page pictures (VSB-90). Absent on older versions, whose
+  // chapters keep the pictures they were made with.
+  pictureDirection?: string;
   imageModel: string;
   imageQuality: "low" | "medium" | "high";
 }
@@ -50,7 +53,12 @@ export const IMAGE_MODELS = ["gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt
 // The chosen art direction: classic ink line and watercolor wash, with the
 // Vambies' signature colors as the only bright notes.
 export const INK_AND_WASH_STYLE =
-  "Art direction: a classic picture book drawn in expressive pen-and-ink line with fine cross-hatching, finished with transparent watercolor washes. Ink first, wash second: no 3D shading, glossy surfaces or smooth gradients. A muted, earthy palette (sage, olive, ochre, warm browns; dusky blue and violet for night and big feelings), in which the Vambies' signature colors, like Baby Vambie's aqua, are the only clear, bright colors. Warm cream paper texture. Simple faces; feelings show through posture and small gestures. Keep faces and the key action inside the central 80% of the frame. No text, letters, numbers or words anywhere in the image.";
+  "Art direction: a classic picture book drawn in expressive pen-and-ink line with fine cross-hatching, finished with transparent watercolor washes. Ink first, wash second: no 3D shading, glossy surfaces or smooth gradients. A muted, earthy palette (sage, olive, ochre, warm browns; dusky blue and violet for night and big feelings), in which the Vambies' signature colors, like Baby Vambie's aqua, are the only clear, bright colors. Warm cream paper texture. Expressive faces drawn simply: feelings show in the eyes, brows and mouth as well as in posture and gesture. No text, letters, numbers or words anywhere in the image.";
+
+// How page pictures are shot and acted (VSB-90): follow the planned camera,
+// compose off-center, catch movement, show the feeling on faces and bodies.
+export const PICTURE_DIRECTION =
+  "Direct every picture like a still from a warm, beautifully shot picture-book film. Frame it exactly as the camera says: a close-up fills the frame with a face, hands or a small object and crops boldly; a wide shot makes the characters small in their world; a low angle looks up at its subject and a bird's-eye view looks straight down. Place the subject off-center, with something in the foreground, depth behind, and open space where the feeling needs room; never line the characters up in the middle facing the viewer. Not every picture centers on the characters: the focus can be a hand, an object or the place. Catch the moment mid-movement (leaning, reaching, turning, mid-step) and show the feeling on every face and in every body: eyes, brows and mouth change with the mood, and shoulders and posture follow. Keep it gentle and warm: quiet moments can be still, but never stiff or posed.";
 
 // Everyone in the book is a Vambie in their own skin tone (VSB-86). Baby Vambie
 // alone is teal-blue. Family-member designs follow this too.
@@ -108,6 +116,7 @@ export const DEFAULT_RULES: PageRules = {
   embellishment: "moderate",
   illustrationStyle: INK_AND_WASH_STYLE,
   peopleStyle: PEOPLE_AS_VAMBIES,
+  pictureDirection: PICTURE_DIRECTION,
   imageModel: "gpt-image-2",
   imageQuality: "medium",
 };
@@ -144,6 +153,7 @@ export function validateRules(rules: any): string | null {
   for (const field of ["illustrationStyle", "peopleStyle"] as const) {
     if (typeof rules[field] !== "string" || !rules[field].trim()) return `${field} can't be empty.`;
   }
+  if (rules.pictureDirection !== undefined && typeof rules.pictureDirection !== "string") return "Camera and acting must be text.";
   if (!IMAGE_MODELS.includes(rules.imageModel)) return "Pick one of the listed image models.";
   if (!["low", "medium", "high"].includes(rules.imageQuality)) return "Pick an image quality.";
   return null;

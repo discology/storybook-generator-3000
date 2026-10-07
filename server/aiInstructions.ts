@@ -142,12 +142,14 @@ Page boundaries
 
 Scene and continuity
 - For each page, describe the characters present, the setting, the visible action, the emotional tone and important objects.
+- Write the visible action as the page's peak moment, caught mid-movement: what bodies are doing (leaning in, reaching, turning away, mid-step, toes lifting off the rug) and what faces do (eyes squeezed shut, brows up, a wobbly mouth). Even a quiet page has a body doing something; never just "sits" or "stands".
 - Keep clothing, objects and setting details the same across connected scenes, and say what must carry over in "continuity".
 
 Shot list
 - Plan every page's camera like a picture-book illustrator: the shot type (wide establishing, medium, close-up, extreme close-up, over-the-shoulder, bird's-eye or low angle), the camera angle, and the one thing the picture focuses on.
 - Open with a wide establishing shot that shows where we are. Use close-ups for the most emotional moments and for important small objects.
 - Never use the same shot type on two pages in a row. When the setting stays the same, show it from a new viewpoint or distance instead of repeating the view.
+- Vary what each picture is about: a face, two people's hands, an important object, the place, someone else's reaction. Not every picture centers on Baby Vambie.
 
 Picture size
 - Follow the reading level's picture pattern. Within it, let the size of each picture follow the feeling: "vignette" (small, on open paper) for quiet openings and endings, "framed" as the feeling builds, "full" for the biggest moments.
@@ -294,7 +296,7 @@ Approved family character designs attached after the illustration, for compariso
 Flag it if:
 - a character, action or important object from the scene plan or the text is missing or contradicted in the picture;
 - a character looks clearly different from their description;
-- someone isn't drawn the way this book draws people (for example a person drawn as a human when everyone is a Vambie);
+- someone isn't drawn the way this book draws people (for example a person drawn as a human when everyone is a Vambie), unless their line above says their approved design shows them as a person;
 - a family character doesn't match their approved design: different skin tone, hair color or usual hairstyle, build, or missing signature glasses or accessories. (Expression, pose, lighting, windblown hair and scene clothing may differ.) List their refs in "mismatched";
 - the picture itself contains any written words, letters or captions (it shouldn't).
 Small artistic differences are fine.`,

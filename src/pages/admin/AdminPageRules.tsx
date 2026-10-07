@@ -16,6 +16,7 @@ interface PageRules {
   embellishment: string;
   illustrationStyle: string;
   peopleStyle: string;
+  pictureDirection?: string;
   imageModel: string;
   imageQuality: string;
 }
@@ -168,6 +169,8 @@ export default function AdminPageRules() {
         <textarea id="style" rows={3} value={rules.illustrationStyle} onChange={(e) => update({ ...rules, illustrationStyle: e.target.value })} />
         <label htmlFor="people">How people are drawn</label>
         <textarea id="people" rows={4} value={rules.peopleStyle} onChange={(e) => update({ ...rules, peopleStyle: e.target.value })} />
+        <label htmlFor="direction">Camera and acting (page pictures only)</label>
+        <textarea id="direction" rows={5} value={rules.pictureDirection ?? ""} onChange={(e) => update({ ...rules, pictureDirection: e.target.value })} />
         <div className="row">
           <div style={{ flex: 1 }}>
             <label htmlFor="model">Image model</label>

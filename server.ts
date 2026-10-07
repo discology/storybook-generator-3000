@@ -65,6 +65,7 @@ app.post(
     "/api/admin/ai-instructions/:key/test",
     "/api/admin/characters/:id/art/generate",
     "/api/admin/characters/:id/art/restyle",
+    "/api/admin/characters/:id/art/expressions",
     "/api/designs/:designId/proposals",
     "/api/prompts/:id/artwork/generate",
     "/api/pages/:pageId/revise",

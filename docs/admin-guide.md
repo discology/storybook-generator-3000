@@ -73,6 +73,7 @@ The Vambie Character Library. Every chapter can include these characters, and AI
 - **When they appear:** in every chapter (like Baby Vambie), when the memory fits their casting notes, or only when a parent picks them on This week's chapter.
 - **Reference art** is attached to every picture the character appears in. You can upload artwork, generate it, or **redraw it in the book's style** so the character matches the ink-and-wash pages.
 - **3D renders:** the official renders, organized by camera view and expression. Select one to make it the reference art. When the reference art is a render, each page also gets the render matching its mood and camera angle.
+- **Expressions in the book's style:** when the reference art is in the book's style, **Draw expressions in the book's style** draws nine moods from it (about three minutes, about $2). Each page then attaches the expression matching its mood in place of the reference art, so the character's face changes with the story. **Redraw the expressions** replaces the set.
 - Editing a card or changing the reference art creates a new version. Chapters keep the version they were made with.
 
 ## Visitors
@@ -125,6 +126,6 @@ The rules every new chapter is made with.
 
 - **Reading stages:** page counts, words per page and per sentence, vocabulary, and each stage's picture pattern.
 - **Fictional embellishment:** minimal, moderate or imaginative.
-- **Illustrations:** the art style, how people are drawn (by default everyone is a Vambie in their own skin tone, and Baby Vambie alone is teal-blue), and the image model and quality.
+- **Illustrations:** the art style, how people are drawn (by default everyone is a Vambie in their own skin tone, and Baby Vambie alone is teal-blue), camera and acting for page pictures (follow the planned camera, off-center framing, movement, feelings on faces), and the image model and quality.
 
 Saving creates a new version, and only new chapters use it. The version history shows how many chapters were made with each version.
