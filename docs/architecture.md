@@ -96,6 +96,8 @@ Background jobs run inside the API process. There's no separate worker yet.
 
 Each step's instructions can be edited under Admin → Settings → AI instructions, and each can use its own model. The reply format is fixed in code, because the app reads it. Every step uses `OPENAI_MODEL` (`gpt-5.5`) unless a step has its own model set.
 
+The story steps (`page_plan`, `page_check`, `page_revise`, `guardian`) also read **The Vambie world** (key `world`), an editable block rather than a step: `runAiStep` fills it in wherever an instruction says `<world>`, chapters snapshot it with their other instructions, and older chapters without a snapshot read the current text.
+
 | Step | Runs when | Produces |
 | --- | --- | --- |
 | `interpret` | A memory has been transcribed | A title, what happened, feelings and possible themes |

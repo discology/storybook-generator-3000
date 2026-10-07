@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import { GoogleGenAI } from "@google/genai";
 import OpenAI, { toFile } from "openai";
-import { getAiInstruction } from "./aiInstructions";
+import { WORLD_KEY, getAiInstruction } from "./aiInstructions";
 import { fillTemplate } from "./messageTemplates";
 import { characterCardValues } from "./characters";
 import { stageInfo } from "./readingStages";
@@ -90,7 +90,10 @@ export async function runAiStep(key: string, values: Record<string, string>, ove
   const instruction = await getAiInstruction(key);
   const body = override?.body ?? instruction.body;
   const model = (override && "model" in override ? override.model : instruction.model) || OPENAI_MODEL;
-  const allValues = { ...(await characterCardValues()), ...values };
+  // <world> is the shared "The Vambie world" block. Chapters pass the copy from
+  // their snapshot; everything else (and older chapters) reads the current text.
+  const world = values.world || (key === WORLD_KEY ? "" : (await getAiInstruction(WORLD_KEY)).body);
+  const allValues = { ...(await characterCardValues()), ...values, world };
   const prompt = `${fillTemplate(body, allValues).replace(/\n{3,}/g, "\n\n").trim()}\n\n${instruction.outputFormat}`;
   const usedModel = provider.kind === "openai" ? model : GEMINI_MODEL;
   const { raw, usage } = await generateJson(provider, prompt, TEMPERATURE[key] ?? 0.7, model, images);

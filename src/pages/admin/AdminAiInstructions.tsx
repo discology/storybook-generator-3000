@@ -17,7 +17,7 @@ export default function AdminAiInstructions() {
       <h1 className="display" style={{ color: "var(--ink)", fontSize: "2rem" }}>
         AI Instructions
       </h1>
-      <p style={{ color: "var(--ink-soft)", marginTop: 0 }}>What we ask the AI to do at each step.</p>
+      <p style={{ color: "var(--ink-soft)", marginTop: 0 }}>What we ask the AI to do at each step, and the shared text the story steps read.</p>
 
       <table className="admin-table">
         <thead>
@@ -36,7 +36,7 @@ export default function AdminAiInstructions() {
                 {!s.isDefault && <div className="status-line">Customized</div>}
               </td>
               <td>{s.trigger}</td>
-              <td>{s.model ?? `${s.defaultModel} (default)`}</td>
+              <td>{s.kind === "block" ? "—" : s.model ?? `${s.defaultModel} (default)`}</td>
               <td>
                 <Link className="btn-small btn-secondary" style={{ textDecoration: "none" }} to={`/admin/ai/${s.key}`}>
                   Edit

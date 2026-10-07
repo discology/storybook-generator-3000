@@ -4,16 +4,17 @@ import TopBar from "../components/TopBar";
 import BottomNav from "../components/BottomNav";
 import AudioPlayer from "../components/AudioPlayer";
 import AccessDenied from "../components/AccessDenied";
-import { IconCheck, IconChevronLeft, IconDownload, IconLock, IconMic, IconRefresh, IconSparkle, IconUpload, IconWarning } from "../components/icons";
+import { IconCheck, IconChevronLeft, IconDownload, IconEdit, IconLock, IconMic, IconRefresh, IconSparkle, IconUpload, IconWarning } from "../components/icons";
 import { Chev, Field, Loading, Mascot, Masthead, Note, Select, Sheet, Switch, type MascotName } from "../components/ui";
 import { useStorybookData } from "../hooks/useStorybookData";
-import { apiGet } from "../lib/api";
+import { apiGet, apiSend } from "../lib/api";
 import { formatDuration, possessive } from "../lib/format";
 import { ageInYears } from "../lib/stages";
 import { fillPrompt, promptValues } from "../lib/promptVariables";
 import type { Prompt, StorybookView } from "../types";
 
-type Stage = "deck" | "requesting" | "mic-blocked" | "recording" | "paused" | "review" | "uploading" | "upload-error" | "saved";
+type Stage = "deck" | "typing" | "requesting" | "mic-blocked" | "recording" | "paused" | "review" | "uploading" | "upload-error" | "saved";
+const MAX_TYPED = 4000;
 
 interface DeckCard {
   id: string | null;
@@ -74,6 +75,9 @@ export default function Recorder() {
   const [visibility, setVisibility] = useState("contributor_only");
   const [storyUse, setStoryUse] = useState(true);
   const [memoryId, setMemoryId] = useState<string | null>(null);
+  // A memory is recorded or typed (VSB-85).
+  const [typed, setTyped] = useState(false);
+  const [text, setText] = useState("");
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -238,11 +242,19 @@ export default function Recorder() {
     setPreviewUrl(null);
     setMemoryId(null);
     setSeconds(0);
+    setTyped(false);
+    setText("");
     setStage("deck");
   };
 
   const leaveRecording = () => {
-    if (window.confirm("Stop and discard this recording?")) discard();
+    if (typed ? !text.trim() || window.confirm("Discard what you've written?") : window.confirm("Stop and discard this recording?")) discard();
+  };
+
+  const startTyping = (card: DeckCard) => {
+    setChosen(card);
+    setTyped(true);
+    setStage("typing");
   };
 
   const eventDate = () => {
@@ -254,6 +266,7 @@ export default function Recorder() {
   };
 
   const save = async () => {
+    if (typed) return saveTyped();
     if (!blob || !storybook) return;
     setStage("uploading");
     try {
@@ -280,6 +293,26 @@ export default function Recorder() {
       form.append("audio", blob, `memory.${ext}`);
       const upload = await fetch(`/api/memories/${savedId}/audio`, { method: "POST", body: form });
       if (!upload.ok) throw new Error("upload");
+      setStage("saved");
+    } catch {
+      setStage("upload-error");
+    }
+  };
+
+  // Typed words are saved with the memory itself; there's nothing to upload.
+  const saveTyped = async () => {
+    if (!storybook) return;
+    setStage("uploading");
+    try {
+      const memory = await apiSend(`/api/storybooks/${storybook.id}/memories`, "POST", {
+        text: text.trim(),
+        eventDate: eventDate(),
+        visibility,
+        storyUseConsent: storyUse,
+        promptId: chosen?.id ?? null,
+        promptText: chosen?.question ?? null,
+      });
+      setMemoryId(memory.id);
       setStage("saved");
     } catch {
       setStage("upload-error");
@@ -356,19 +389,25 @@ export default function Recorder() {
           style={{ paddingBottom: 40, paddingRight: 150 }}
         />
         <Sheet peek="peek" grow>
-          <AudioPlayer src={previewUrl} durationSec={seconds} />
-          <h2 className="h-title" style={{ marginTop: 18 }}>The upload stopped before it finished.</h2>
+          {typed ? <blockquote className="typed-words">{text}</blockquote> : <AudioPlayer src={previewUrl} durationSec={seconds} />}
+          <h2 className="h-title" style={{ marginTop: 18 }}>{typed ? "Your words didn't save yet." : "The upload stopped before it finished."}</h2>
           <p className="t-body t-muted" style={{ marginTop: 6 }}>Keep this page open while you retry.</p>
           <div className="stack" style={{ marginTop: 18 }}>
             <button className="btn btn--lime btn--caps" onClick={() => void save()}>
-              <IconUpload size={22} /> Retry upload <Chev />
+              <IconUpload size={22} /> {typed ? "Try saving again" : "Retry upload"} <Chev />
             </button>
-            <button className="btn btn--outline btn--caps" onClick={download}>
-              <IconDownload size={22} /> Download recording <Chev />
-            </button>
+            {typed ? (
+              <button className="btn btn--outline btn--caps" onClick={() => void navigator.clipboard?.writeText(text)}>
+                Copy my words <Chev />
+              </button>
+            ) : (
+              <button className="btn btn--outline btn--caps" onClick={download}>
+                <IconDownload size={22} /> Download recording <Chev />
+              </button>
+            )}
           </div>
           <Note kind="danger" style={{ marginTop: 16 }}>
-            If you leave now, this recording may be lost.{" "}
+            If you leave now, {typed ? "what you wrote" : "this recording"} may be lost.{" "}
             <Link to="/help" className="tlink">Get help</Link>
           </Note>
         </Sheet>
@@ -389,7 +428,7 @@ export default function Recorder() {
             Safely kept.
           </h1>
           <Mascot name="hug-book" className="saved-screen__art" />
-          <p className="t-body">Your recording is saved in {possessive(child)} memories.</p>
+          <p className="t-body">Your {typed ? "words are" : "recording is"} saved in {possessive(child)} memories.</p>
           <div className="preparing-card">
             <IconSparkle size={30} />
             <div>
@@ -406,7 +445,7 @@ export default function Recorder() {
               Back to {possessive(child)} story <Chev />
             </Link>
             <button className="btn btn--ghost btn--caps" onClick={discard}>
-              Record another memory
+              Add another memory
             </button>
           </div>
           {memoryId && (
@@ -427,12 +466,25 @@ export default function Recorder() {
         <TopBar back={leaveRecording} />
         <Masthead title="Keep this moment." style={{ paddingTop: 0 }} />
         <Sheet grow>
-          <AudioPlayer src={previewUrl} durationSec={seconds} />
-          <p className="t-center" style={{ margin: "12px 0 0" }}>
-            <button className="tlink" onClick={() => window.confirm("Record it again? This recording will be discarded.") && discard()}>
-              <IconRefresh size={18} /> Re-record
-            </button>
-          </p>
+          {typed ? (
+            <>
+              <blockquote className="typed-words">{text}</blockquote>
+              <p className="t-center" style={{ margin: "12px 0 0" }}>
+                <button className="tlink" onClick={() => setStage("typing")}>
+                  <IconEdit size={18} /> Edit
+                </button>
+              </p>
+            </>
+          ) : (
+            <>
+              <AudioPlayer src={previewUrl} durationSec={seconds} />
+              <p className="t-center" style={{ margin: "12px 0 0" }}>
+                <button className="tlink" onClick={() => window.confirm("Record it again? This recording will be discarded.") && discard()}>
+                  <IconRefresh size={18} /> Re-record
+                </button>
+              </p>
+            </>
+          )}
           <Field label="When did it happen?" htmlFor="when">
             <Select
               id="when"
@@ -449,7 +501,7 @@ export default function Recorder() {
               <input type="date" className="input" style={{ marginTop: 8 }} value={pickedDate} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setPickedDate(e.target.value)} />
             )}
           </Field>
-          <Field label="Original recording" htmlFor="visibility">
+          <Field label={typed ? "Who can read your words" : "Original recording"} htmlFor="visibility">
             <Select
               id="visibility"
               value={visibility}
@@ -466,10 +518,47 @@ export default function Recorder() {
             <span className="t-body" style={{ fontWeight: 500 }}>Use this memory in {possessive(child)} story</span>
             <Switch checked={storyUse} onChange={setStoryUse} label={`Use this memory in ${possessive(child)} story`} />
           </div>
-          <p className="field__hint">Your recording stays private. A story inspired by it can be shared with your family.</p>
+          <p className="field__hint">Your {typed ? "words stay" : "recording stays"} private. A story inspired by it can be shared with your family.</p>
           <button className="btn btn--lime btn--caps" style={{ marginTop: 22 }} onClick={() => void save()} disabled={stage === "uploading"}>
             {stage === "uploading" ? "Saving…" : "Save memory"} <Chev />
           </button>
+        </Sheet>
+      </div>
+    );
+  }
+
+  if (stage === "typing") {
+    const card = chosen ?? FREEFORM;
+    const tooShort = text.trim().length < 10;
+    return (
+      <div className="page">
+        <TopBar back={leaveRecording} />
+        <div className="rec-screen rec-screen--typing">
+          <span className="badge badge--purple badge--caps">{card.category}</span>
+          <h1 className="h-display h-display--md">{card.question}</h1>
+          <p className="t-body" style={{ marginTop: 8 }}>{card.supportingText}</p>
+        </div>
+        <Sheet grow>
+          <label className="field__label" htmlFor="typed">
+            Write it the way you'd tell it
+          </label>
+          <textarea
+            id="typed"
+            className="textarea"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            maxLength={MAX_TYPED}
+            rows={9}
+            autoFocus
+            placeholder={`Today ${child}…`}
+          />
+          <p className="field__hint" style={{ textAlign: "right" }}>
+            {text.length.toLocaleString()} / {MAX_TYPED.toLocaleString()}
+          </p>
+          <button className="btn btn--lime btn--caps" style={{ marginTop: 12 }} onClick={() => setStage("review")} disabled={tooShort}>
+            Next <Chev />
+          </button>
+          {tooShort && text.trim() && <p className="t-small t-muted t-center">A sentence or two is plenty.</p>}
         </Sheet>
       </div>
     );
@@ -571,12 +660,21 @@ export default function Recorder() {
         </>
       )}
       <div className="pad" style={{ marginTop: 16 }}>
-        <button className="btn btn--lime btn--caps" onClick={() => void startRecording(current ?? FREEFORM)}>
-          <IconMic size={24} filled /> Record this memory <Chev />
-        </button>
+        <div className="rec-choice">
+          <button className="btn btn--lime btn--caps" onClick={() => void startRecording(current ?? FREEFORM)}>
+            <IconMic size={24} filled /> Record it <Chev />
+          </button>
+          <button className="btn btn--ghost btn--caps" onClick={() => startTyping(current ?? FREEFORM)}>
+            <IconEdit size={22} /> Type it
+          </button>
+        </div>
         <p className="t-center" style={{ margin: "14px 0 0" }}>
           <button className="tlink tlink--light" onClick={() => void startRecording(FREEFORM)}>
             Just let me talk
+          </button>
+          <span className="t-muted-dark" aria-hidden="true">{" · "}</span>
+          <button className="tlink tlink--light" onClick={() => startTyping({ ...FREEFORM, question: "What would you like to remember?", category: "Just write" })}>
+            Just let me write
           </button>
         </p>
       </div>

@@ -33,6 +33,7 @@ export default function AdminAiInstructionEdit() {
 
   if (!step) return <p>Loading…</p>;
 
+  const isBlock = step.kind === "block";
   const dirty = body !== step.body || model !== step.model;
   const allowed = new Set([...step.variables, ...step.characterVariables].map((v) => v.name));
   const unknown = templateVariables(body).filter((name) => !allowed.has(name));
@@ -94,9 +95,11 @@ export default function AdminAiInstructionEdit() {
         <div className="row inline">
           {dirty && <span className="pill warn">Unsaved changes</span>}
           {saved && !dirty && <span className="pill good">Saved</span>}
-          <button className="btn-secondary" style={{ width: "auto" }} onClick={runTest} disabled={testing || unknown.length > 0}>
-            {testing ? "Running…" : "Test run"}
-          </button>
+          {!isBlock && (
+            <button className="btn-secondary" style={{ width: "auto" }} onClick={runTest} disabled={testing || unknown.length > 0}>
+              {testing ? "Running…" : "Test run"}
+            </button>
+          )}
           <button className="btn-primary" style={{ width: "auto" }} onClick={save} disabled={!dirty || unknown.length > 0}>
             Save changes
           </button>
@@ -106,24 +109,28 @@ export default function AdminAiInstructionEdit() {
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 380px", gap: "1.5rem", marginTop: "1rem", alignItems: "start" }}>
         <div className="card">
-          <label htmlFor="model">Model</label>
-          <select
-            id="model"
-            value={model ?? ""}
-            onChange={(e) => {
-              setModel(e.target.value || null);
-              setSaved(false);
-            }}
-          >
-            <option value="">Default ({step.defaultModel})</option>
-            {step.models.map((m) => (
-              <option key={m} value={m}>
-                {m}
-              </option>
-            ))}
-          </select>
+          {!isBlock && (
+            <>
+              <label htmlFor="model">Model</label>
+              <select
+                id="model"
+                value={model ?? ""}
+                onChange={(e) => {
+                  setModel(e.target.value || null);
+                  setSaved(false);
+                }}
+              >
+                <option value="">Default ({step.defaultModel})</option>
+                {step.models.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </select>
+            </>
+          )}
 
-          <label htmlFor="body">Instructions</label>
+          <label htmlFor="body">{isBlock ? "Text" : "Instructions"}</label>
           <textarea id="body" ref={textareaRef} rows={18} value={body} onChange={(e) => edit(e.target.value)} style={{ fontFamily: "ui-monospace, monospace", fontSize: "0.85rem" }} />
 
           {unknown.length > 0 && (
@@ -137,14 +144,24 @@ export default function AdminAiInstructionEdit() {
             </p>
           )}
 
-          <label>Reply format (added automatically, not editable)</label>
-          <p className="status-line" style={{ fontFamily: "ui-monospace, monospace", fontSize: "0.8rem" }}>
-            {step.outputFormat}
-          </p>
-          <p className="status-line">The app reads these fields from the AI's reply, so they stay fixed. Change what goes in them with the instructions above.</p>
+          {!isBlock && (
+            <>
+              <label>Reply format (added automatically, not editable)</label>
+              <p className="status-line" style={{ fontFamily: "ui-monospace, monospace", fontSize: "0.8rem" }}>
+                {step.outputFormat}
+              </p>
+              <p className="status-line">The app reads these fields from the AI's reply, so they stay fixed. Change what goes in them with the instructions above.</p>
+            </>
+          )}
+          {isBlock && (
+            <p className="status-line">
+              Saving changes this text for new chapters only: every chapter keeps the version it was made with. Plan pages, Check pages, Revise page and the Guardian
+              read it wherever their instructions say &lt;world&gt;.
+            </p>
+          )}
 
-          <label>Variables — click to insert</label>
-          <table className="admin-table">
+          {step.variables.length > 0 && <label>Variables — click to insert</label>}
+          <table className="admin-table" style={step.variables.length ? undefined : { display: "none" }}>
             <tbody>
               {step.variables.map((v) => (
                 <tr key={v.name}>
@@ -190,7 +207,7 @@ export default function AdminAiInstructionEdit() {
           )}
         </div>
 
-        <div className="card">
+        <div className="card" style={isBlock ? { display: "none" } : undefined}>
           <h3 style={{ marginTop: 0, color: "var(--ink)" }}>Test run</h3>
           <p className="status-line">
             Sends these instructions, saved or not, to the AI using sample values, so you can see the reply before saving. Each run is a real, billed AI call.

@@ -21,7 +21,7 @@ New visitors see the value before they sign up. "Start their story" on the splas
 
 ## 1. Recording a memory
 
-- Anyone in the family can record, for up to 15 minutes, usually in answer to a prompt card such as "What made you smile today?".
+- Anyone in the family can record, for up to 15 minutes, usually in answer to a prompt card such as "What made you smile today?". Or they can **type it** instead (up to about 4,000 characters): a typed memory skips transcription, but otherwise goes through the same steps, and shows with a pen in the memory lists. Its words can be edited later.
 - When saving, they choose **who can hear the original recording**: only them, or everyone in the family. They also choose **whether the memory may be used in stories**. The storybook's privacy settings set the defaults.
 - The question they answered is saved with the memory, so later edits to the prompt card don't change it.
 
@@ -43,7 +43,7 @@ The person who recorded a memory can correct its words at any time, and the memo
 
 ### Planning the pages
 
-The `page_plan` AI step plans the chapter page by page. For each page it writes:
+The `page_plan` AI step plans the chapter page by page. Its voice comes from **The Vambie world**, a block of text under Admin → Settings → AI instructions: who Baby Vambie is, Parts as tiny people with intentions (from the Early reader stage up), the band as background music, and the voice for each reading stage. Facts come only from the memories; texture (light, sound, a refrain, a drum far off) is free. For each page it writes:
 
 - the story moment, characters, setting, visible action, mood and what must carry over from neighboring pages;
 - a camera shot (wide, medium, close-up and so on) with an angle and a focus;

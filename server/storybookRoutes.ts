@@ -163,6 +163,7 @@ router.get("/storybooks/:id", async (req, res) => {
     .filter((m) => canSeeMemory(m, me))
     .map(({ transcripts, chapterSources, contributor, audioUrl, favoritedBy, ...m }) => ({
       ...m,
+      typed: transcripts[0]?.source === "typed", // written, not recorded (VSB-85)
       audioSrc: audioSrc({ id: m.id, audioUrl }),
       contributor: { id: contributor.id, name: contributor.name, relationship: contributor.relationship },
       mine: m.contributorId === me.id,
@@ -304,10 +305,14 @@ router.post("/storybooks/:id/memories", async (req, res) => {
   if (!member) return;
   const { storybook, me } = member;
   const b = req.body ?? {};
+  // A typed memory (VSB-85) arrives with its words, and skips transcription.
+  const text = typeof b.text === "string" ? b.text.trim().slice(0, 4000) : null;
+  if (text !== null && text.length < 10) return res.status(400).json({ error: "Write a little more: a sentence or two is plenty." });
   const memory = await prisma.memory.create({
     data: {
       storybookId: storybook.id,
       contributorId: me.id,
+      ...(text ? { status: "transcribed", durationSec: null, transcripts: { create: { source: "typed", text } } } : {}),
       title: b.title ? String(b.title).slice(0, 80) : null,
       eventDate: b.eventDate ? new Date(b.eventDate) : null,
       visibility: b.visibility === "household" ? "household" : b.visibility === "contributor_only" ? "contributor_only" : storybook.defaultVisibility,
@@ -317,6 +322,7 @@ router.post("/storybooks/:id/memories", async (req, res) => {
       promptText: b.promptText ? String(b.promptText) : null,
     },
   });
+  if (text) void interpret(memory.id, text, true).catch((e) => console.error(`Interpreting typed memory ${memory.id} failed:`, e?.message));
   res.status(201).json(memory);
 });
 
@@ -356,6 +362,7 @@ router.get("/memories/:id", async (req, res) => {
   const { audioUrl, favoritedBy, chapterSources, contributor, transcripts, ...rest } = memory;
   res.json({
     ...rest,
+    typed: transcripts[0]?.source === "typed",
     audioSrc: audioSrc(memory),
     recordingKept: member.storybook.keepRecordings,
     favorite: parseIds(favoritedBy).includes(member.me.id),
@@ -415,7 +422,9 @@ router.put("/memories/:id/transcript", async (req, res) => {
   const text = String(req.body?.text ?? "").trim();
   if (!text) return res.status(400).json({ error: "The transcript can't be empty." });
 
-  await prisma.transcriptVersion.create({ data: { memoryId: member.memory.id, source: "corrected", text } });
+  // Edits to a typed memory stay "typed", so it's still shown as written (VSB-85).
+  const latest = await prisma.transcriptVersion.findFirst({ where: { memoryId: member.memory.id }, orderBy: { createdAt: "desc" } });
+  await prisma.transcriptVersion.create({ data: { memoryId: member.memory.id, source: latest?.source === "typed" ? "typed" : "corrected", text } });
   await prisma.memory.update({ where: { id: member.memory.id }, data: { status: "transcribed", processingError: null } });
   void interpret(member.memory.id, text, !member.memory.title).catch(() => undefined);
   res.json({ ok: true });

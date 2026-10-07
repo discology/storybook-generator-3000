@@ -3845,6 +3845,33 @@ button.btn-small,
   font-size: 17px;
 }
 
+/* ---------- Typed memories (VSB-85) ---------- */
+
+.rec-choice {
+  display: grid;
+  grid-template-columns: 3fr 2fr;
+  gap: 10px;
+}
+
+.rec-screen--typing {
+  flex: none;
+  padding-bottom: 22px;
+}
+
+.typed-words {
+  margin: 0;
+  padding: 14px 16px;
+  border-left: 4px solid var(--purple);
+  background: var(--white);
+  border-radius: 0 14px 14px 0;
+  font-family: var(--font-book);
+  font-size: 18px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
 /* ---------- Try before sign-up (VSB-75) ---------- */
 
 .try-working {

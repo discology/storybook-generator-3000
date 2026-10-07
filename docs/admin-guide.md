@@ -111,6 +111,8 @@ Today, only sign-in codes are actually texted. Invites and chapter links use thi
 
 The instructions given to the AI at each step: interpret memory, plan pages, check pages, revise a page, check a picture, describe a person, and the Guardian. See [AI steps](architecture.md#ai-steps) for when each one runs.
 
+**The Vambie world** is the first entry and isn't a step: it's the shared text that describes Baby Vambie, Parts, the band as background and the storybook's voice at each reading stage. Plan pages, Check pages, Revise page and the Guardian read it wherever their instructions say `<world>`. It has no model and no test run; to see its effect, test run Plan pages. Chapters keep the version of it they were made with.
+
 - Write variables in angle brackets. Each step lists its variables, and any Vambie can be included as `<key>`.
 - **Model:** each step can use its own model. Checking steps often work well on a smaller, cheaper model; see [Running costs](how-it-works.md#running-costs).
 - **The reply format** is shown, but it can't be edited, because the app reads the AI's reply.

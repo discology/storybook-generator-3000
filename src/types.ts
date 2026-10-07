@@ -196,6 +196,7 @@ export interface MessageTemplate {
 export interface AiInstruction {
   key: string;
   name: string;
+  kind?: "step" | "block";
   trigger: string;
   variables: MessageVariable[];
   defaultBody: string;
@@ -340,6 +341,7 @@ export interface StorybookMemory {
   words: string; // the full transcript, for search
   chapterIds: string[];
   audioSrc: string | null;
+  typed: boolean; // written, not recorded
   promptText: string | null;
 }
 
@@ -440,6 +442,7 @@ export interface MemoryDetail {
   promptText: string | null;
   audioSrc: string | null;
   recordingKept: boolean; // false when the family keeps only the words
+  typed: boolean; // written, not recorded (VSB-85)
   favorite: boolean;
   mine: boolean;
   contributor: { id: string; name: string; relationship: string | null };

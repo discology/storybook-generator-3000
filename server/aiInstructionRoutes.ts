@@ -43,6 +43,10 @@ async function validate(key: string, body: unknown, model: unknown): Promise<str
   if (unknown.length) {
     return `This step doesn't support ${unknown.map((n) => `<${n}>`).join(", ")}. Use one of the variables listed, or add the character on the Characters page first.`;
   }
+  if (step.kind === "block") {
+    if (model) return "This text doesn't run on its own, so it has no model.";
+    return null;
+  }
   if (model !== null && model !== undefined && !AI_MODELS.includes(String(model))) return "Pick one of the listed models.";
   return null;
 }
@@ -72,7 +76,9 @@ router.post("/admin/ai-instructions/:key/test", async (req, res) => {
   const error = await validate(step.key, body, model);
   if (error) return res.status(400).json({ error });
 
-  const values = Object.fromEntries(step.variables.map((v) => [v.name, v.sample]));
+  if (step.kind === "block") return res.status(400).json({ error: "This text doesn't run on its own. Test run a step that uses it, such as Plan pages." });
+  // Sample values, except <world>, which the step runner fills from the saved block.
+  const values = Object.fromEntries(step.variables.filter((v) => v.name !== "world").map((v) => [v.name, v.sample]));
   const started = Date.now();
   try {
     const result = await withUsage({ step: "admin_test" }, () => runAiStep(step.key, values, { body, model }));

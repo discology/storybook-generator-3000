@@ -1,5 +1,5 @@
 import { Link } from "react-router-dom";
-import { IconDotsVertical, IconMic, IconPause, IconPlay, IconSpinner } from "./icons";
+import { IconDotsVertical, IconEdit, IconMic, IconPause, IconPlay, IconSpinner } from "./icons";
 import { formatDate, formatDuration } from "../lib/format";
 import type { StorybookMemory } from "../types";
 
@@ -30,7 +30,7 @@ export default function MemoryListRow({
         </button>
       ) : (
         <span className="mem-row__play mem-row__play--off" aria-hidden="true">
-          {busy ? <IconSpinner size={20} /> : <IconMic size={20} />}
+          {busy ? <IconSpinner size={20} /> : memory.typed ? <IconEdit size={20} /> : <IconMic size={20} />}
         </span>
       )}
       <Link to={to} className="mem-row__text" style={{ color: "inherit", textDecoration: "none" }}>

@@ -111,18 +111,20 @@ export default function MemoryDetail() {
       <header className="masthead" style={{ paddingTop: 0, paddingBottom: 18 }}>
         <h1 className="h-display h-display--md masthead__title">{memoryTitle(memory)}.</h1>
         <p className="masthead__sub" style={{ fontSize: 18, marginTop: 8 }}>
-          Recorded by {recordedBy} · {formatDate(memory.eventDate ?? memory.recordedAt)}
+          {memory.typed ? "Written" : "Recorded"} by {recordedBy} · {formatDate(memory.eventDate ?? memory.recordedAt)}
         </p>
       </header>
-      <div className="pad">
-        {memory.audioSrc ? (
-          <AudioPlayer src={memory.audioSrc} durationSec={memory.durationSec} variant="purple" />
-        ) : (
-          <Note kind="dark">
-            {memory.recordingKept ? "The recording isn't available." : "Only the words were kept. The recording was deleted once it was transcribed."}
-          </Note>
-        )}
-      </div>
+      {!memory.typed && (
+        <div className="pad">
+          {memory.audioSrc ? (
+            <AudioPlayer src={memory.audioSrc} durationSec={memory.durationSec} variant="purple" />
+          ) : (
+            <Note kind="dark">
+              {memory.recordingKept ? "The recording isn't available." : "Only the words were kept. The recording was deleted once it was transcribed."}
+            </Note>
+          )}
+        </div>
+      )}
 
       <Sheet grow style={{ marginTop: 16 }}>
         <div className="kv-row">
@@ -135,14 +137,14 @@ export default function MemoryDetail() {
                 setEditing(true);
               }}
             >
-              <IconEdit size={18} /> Edit transcript
+              <IconEdit size={18} /> {memory.typed ? "Edit your words" : "Edit transcript"}
             </button>
           )}
         </div>
         {editing ? (
           <div style={{ marginTop: 10 }}>
-            <textarea className="textarea" value={draft} onChange={(e) => setDraft(e.target.value)} rows={7} aria-label="Transcript" />
-            <p className="field__hint">Fix anything we heard wrong. The story uses your corrected words.</p>
+            <textarea className="textarea" value={draft} onChange={(e) => setDraft(e.target.value)} rows={7} maxLength={4000} aria-label={memory.typed ? "Your words" : "Transcript"} />
+            <p className="field__hint">{memory.typed ? "Change anything you like. The story uses your latest words." : "Fix anything we heard wrong. The story uses your corrected words."}</p>
             <div className="hstack" style={{ marginTop: 12 }}>
               <button className="btn btn--purple btn--sm btn--auto" onClick={() => void saveWords()} disabled={saving || !draft.trim()}>
                 {saving ? "Saving…" : "Save words"}

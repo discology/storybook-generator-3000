@@ -168,6 +168,9 @@ const toPageTokens = (names: string[], cast: CastMember[], family: FamilyCastEnt
 // <cast>, <family_cast> and every <key> card for a chapter's AI steps, from its snapshot.
 const snapshotCharacterValues = (snapshot: GenerationSnapshot) => ({
   ...(snapshot.characterCards ?? {}),
+  // The Vambie world as it was when the chapter was made; empty on older
+  // chapters, which then read the current block (runAiStep).
+  world: snapshot.instructions.world ?? "",
   cast: describeCast(snapshot.cast ?? []),
   family_cast: describeFamilyCast(snapshot.family ?? []),
 });
@@ -400,7 +403,7 @@ export async function createPagedChapter(input: CreateChapterInput) {
   } else {
     const active = await getActiveRules();
     const instructions: Record<string, string> = {};
-    for (const key of ["page_plan", "page_check", "page_revise", "illustration_check"]) {
+    for (const key of ["page_plan", "page_check", "page_revise", "illustration_check", "world"]) {
       instructions[key] = (await getAiInstruction(key)).body;
     }
     const stage = effectiveStage(storybook);
