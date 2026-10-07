@@ -8,9 +8,8 @@ export const TERMS_EFFECTIVE = "October 6, 2026";
 export const LEGAL = {
   company: "Discology Inc",
   product: "Vambie Storybook",
-  // Filled in before the pages go live.
-  contactEmail: "[support email]",
-  governingState: "[state]",
+  contactEmail: "dan@vambie.com",
+  governingState: "the State of Delaware",
 };
 
 // What a person agrees to by entering their number: the same words carriers
