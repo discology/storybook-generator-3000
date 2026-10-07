@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
 import AccessDenied from "../components/AccessDenied";
-import { IconDatabase, IconDownload, IconTrash } from "../components/icons";
+import { IconDatabase, IconDownload, IconFileText, IconShield, IconTrash } from "../components/icons";
 import { Chev, Field, Loading, Masthead, MenuRow, Note, Select, Sheet, Switch } from "../components/ui";
 import { useStorybookData } from "../hooks/useStorybookData";
 import { apiSend, ApiError } from "../lib/api";
@@ -81,6 +81,11 @@ export default function SettingsPrivacy() {
           <MenuRow icon={<IconDownload size={24} />} title="Export my memories" to={`${base}/settings/export`} />
           <MenuRow icon={<IconDatabase size={24} />} title="Manage saved memories" to={`${base}/memories?tab=memories`} />
           <MenuRow icon={<IconTrash size={24} />} title="Delete account" sub="Review what will be removed before confirming." to={`${base}/settings/delete-account`} danger />
+        </div>
+        <h2 className="h-title" style={{ marginTop: 22 }}>The fine print</h2>
+        <div className="menu" style={{ marginTop: 4 }}>
+          <MenuRow icon={<IconShield size={24} />} title="Privacy Policy" to="/privacy" />
+          <MenuRow icon={<IconFileText size={24} />} title="Terms of Service" to="/terms" />
         </div>
       </Sheet>
     </div>

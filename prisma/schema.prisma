@@ -16,6 +16,12 @@ model User {
   phone       String?   @unique
   email       String?   @unique
   name        String?
+  // The Terms version accepted and the texting consent (VSB-44, VSB-91), set
+  // when the number is verified with the consent note shown.
+  termsVersion     String?
+  termsAcceptedAt  DateTime?
+  smsConsentAt     DateTime?
+  smsConsentSource String? // sign-in | text-when-ready
   contributors Contributor[]
   sessions    Session[]
   ownedHouseholds Household[]

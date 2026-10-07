@@ -5302,3 +5302,28 @@ input[type="radio"] {
 .admin-main textarea:not(.textarea) {
   line-height: 1.45;
 }
+
+/* Terms and Privacy Policy (VSB-44) and the texting consent note (VSB-91). */
+.legal section {
+  margin-top: 22px;
+}
+.legal p,
+.legal li {
+  font-size: 17px;
+  line-height: 1.5;
+}
+.legal ul {
+  padding-left: 20px;
+  margin: 8px 0 0;
+}
+.legal li + li {
+  margin-top: 6px;
+}
+.legal a,
+.text-consent a {
+  color: inherit;
+  text-decoration: underline;
+}
+.text-consent {
+  line-height: 1.45;
+}

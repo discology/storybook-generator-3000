@@ -7,6 +7,7 @@ import { isSmsConfigured, normalizePhone, sendVerificationCode, checkVerificatio
 const router: Router = express.Router();
 
 const INVALID_PHONE = "Enter a full mobile number, like +1 555 123 4567.";
+const ACCEPT_SOURCES = ["sign-in", "text-when-ready"];
 
 // With Twilio configured, Twilio Verify texts and checks the code. Otherwise
 // dev mode: the code is stored locally and returned in the response instead.
@@ -50,6 +51,16 @@ router.post("/auth/verify", async (req, res) => {
 
   let user = await prisma.user.findUnique({ where: { phone } });
   if (!user) user = await prisma.user.create({ data: { phone } });
+
+  // The consent note and Terms were shown where the number was entered.
+  const accepted = req.body?.accepted;
+  if (typeof accepted?.terms === "string" && ACCEPT_SOURCES.includes(accepted?.source)) {
+    const now = new Date();
+    user = await prisma.user.update({
+      where: { id: user.id },
+      data: { termsVersion: accepted.terms.slice(0, 20), termsAcceptedAt: now, smsConsentAt: now, smsConsentSource: accepted.source },
+    });
+  }
 
   const token = generateToken();
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);

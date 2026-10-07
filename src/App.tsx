@@ -24,6 +24,7 @@ import SettingsPrivacy from "./pages/SettingsPrivacy";
 import ExportMemories, { ExportStatus } from "./pages/Export";
 import Account, { DeleteAccount, Help } from "./pages/Account";
 import HowItWorks from "./pages/HowItWorks";
+import { Privacy, Terms } from "./pages/Legal";
 import YourStorybooks from "./pages/YourStorybooks";
 import TryStory, { TrySave } from "./pages/TryStory";
 import AdminLayout from "./pages/admin/AdminLayout";
@@ -98,6 +99,8 @@ export default function App() {
                 <Route path="/storybooks/:id/settings/delete-account" element={<DeleteAccount />} />
                 <Route path="/help" element={<Help />} />
                 <Route path="/how-it-works" element={<HowItWorks />} />
+                <Route path="/terms" element={<Terms />} />
+                <Route path="/privacy" element={<Privacy />} />
                 <Route path="/storybooks" element={<YourStorybooks />} />
                 <Route path="/try" element={<TryStory />} />
                 <Route path="/try/save" element={<TrySave />} />

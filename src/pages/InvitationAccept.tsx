@@ -210,6 +210,9 @@ export default function InvitationAccept() {
         <p className="t-center t-small t-muted" style={{ marginTop: 14 }}>
           {user ? "Joining doesn't unlock anyone's private recordings." : "Next: verify your phone number and set up your profile."}
         </p>
+        <p className="t-center t-xs t-muted" style={{ marginTop: 8 }}>
+          <Link to="/terms">Terms</Link> · <Link to="/privacy">Privacy Policy</Link>
+        </p>
       </Sheet>
     </div>
   );

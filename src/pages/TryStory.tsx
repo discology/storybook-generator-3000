@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
+import TextConsent from "../components/TextConsent";
 import { IconMic, IconRefresh, IconSpinner } from "../components/icons";
 import { Chev, Field, Loading, Mascot, Masthead, Note, Segmented, Select, Sheet, Switch, type MascotName } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
@@ -8,6 +9,7 @@ import { apiGet, apiSend, ApiError } from "../lib/api";
 import { fillPrompt, promptValues } from "../lib/promptVariables";
 import { formatClock, possessive } from "../lib/format";
 import { RELATIONSHIPS } from "../lib/relationships";
+import { TERMS_VERSION } from "../lib/legal";
 import type { Prompt } from "../types";
 
 // Try before you sign up (server/guests.ts): a few details, one memory, a
@@ -285,7 +287,7 @@ function TextWhenReady({ draft, onSaved }: { draft: Draft; onSaved: () => void }
             disabled={busy || code.length !== 6}
             onClick={() =>
               void run(async () => {
-                const r = await apiSend("/api/auth/verify", "POST", { phone: full, code });
+                const r = await apiSend("/api/auth/verify", "POST", { phone: full, code, accepted: { terms: TERMS_VERSION, source: "text-when-ready" } });
                 if (r.user?.name) await claim();
                 else setStep("name");
               })
@@ -305,6 +307,7 @@ function TextWhenReady({ draft, onSaved }: { draft: Draft; onSaved: () => void }
       )}
       {devCode && step === "code" && <p className="t-small t-muted">Dev mode code: {devCode}</p>}
       {error && <p className="error-text">{error}</p>}
+      {step === "phone" && <TextConsent style={{ marginTop: 10 }} />}
     </div>
   );
 }

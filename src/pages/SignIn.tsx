@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
+import TextConsent from "../components/TextConsent";
+import { TERMS_VERSION } from "../lib/legal";
 import { Chev, Field, Masthead, Note, Select, Sheet } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
 
@@ -78,7 +80,7 @@ export default function SignIn() {
       const res = await fetch("/api/auth/verify", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone, code }),
+        body: JSON.stringify({ phone, code, accepted: { terms: TERMS_VERSION, source: "sign-in" } }),
       });
       if (!res.ok) {
         const data = await res.json();
@@ -247,9 +249,7 @@ export default function SignIn() {
           <button className="btn btn--lime btn--caps" type="submit" disabled={busy || !number.trim()} style={{ marginTop: 20 }}>
             {busy ? "Sending…" : "Send code"} <Chev />
           </button>
-          <p className="t-center t-xs t-muted" style={{ marginTop: 18 }}>
-            By continuing, you agree to our Terms and Privacy Policy.
-          </p>
+          <TextConsent style={{ marginTop: 18, textAlign: "center" }} />
         </form>
       </Sheet>
     </div>
