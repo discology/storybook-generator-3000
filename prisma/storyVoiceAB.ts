@@ -28,12 +28,19 @@ const concurrency = Number(arg("concurrency", "4"));
 // in the family cast ("Anna=Mama") so a naming gap in sample data doesn't muddy a voice test.
 const embellishmentPath = arg("embellishment-file");
 const aliasPairs = arg("alias").split(",").filter(Boolean).map((x) => x.split("=") as [string, string]);
+// --memory-json: run a memory that isn't in this database ({title, transcript, events, emotions, themes, recordedBy, childName, householdId}).
+const memoryJsonPath = arg("memory-json");
 
 async function main() {
   fs.mkdirSync(outDir, { recursive: true });
   const proposedBody = proposedPath ? fs.readFileSync(proposedPath, "utf8") : "";
   const active = await getActiveRules();
-  const memories = await prisma.memory.findMany({
+  const memories: any[] = memoryJsonPath
+    ? [JSON.parse(fs.readFileSync(memoryJsonPath, "utf8"))].map((m: any) => ({
+        id: m.id ?? "file", title: m.title, contributor: null, interpretation: { events: m.events, emotions: m.emotions, themes: m.themes },
+        transcripts: [{ text: m.transcript }], storybook: { child: { displayName: m.childName, householdId: m.householdId } }, recordedByText: m.recordedBy,
+      }))
+    : await prisma.memory.findMany({
     where: { id: { in: memoryIds } },
     include: {
       contributor: true,
@@ -42,7 +49,7 @@ async function main() {
       storybook: { include: { child: true } },
     },
   });
-  if (memories.length !== memoryIds.length) throw new Error(`Found ${memories.length} of ${memoryIds.length} memories`);
+  if (!memoryJsonPath && memories.length !== memoryIds.length) throw new Error(`Found ${memories.length} of ${memoryIds.length} memories`);
 
   const jobs: Array<() => Promise<void>> = [];
   for (const m of memories) {
@@ -52,7 +59,7 @@ async function main() {
       events: m.interpretation?.events ?? "",
       emotions: m.interpretation?.emotions ?? "",
       themes: m.interpretation?.themes ?? "",
-      recordedBy: recordedBy(m.contributor),
+      recordedBy: m.recordedByText ?? recordedBy(m.contributor),
     };
     const cast = await buildCast([]);
     const family = await buildFamilyCast(m.storybook.child.householdId);
@@ -69,10 +76,8 @@ async function main() {
         family_cast: describeFamilyCast(family),
       };
       for (const armName of arms) {
-        if (armName === "proposed") {
-          if (embellishmentPath) values.embellishment_rules = fs.readFileSync(embellishmentPath, "utf8").trim();
-          for (const [from, to] of aliasPairs) values.family_cast = values.family_cast.replace(`Also called: ${from}`, `Also called: ${to}`);
-        }
+        for (const [from, to] of aliasPairs) values.family_cast = values.family_cast.replace(`Also called: ${from}`, `Also called: ${to}`);
+        if (armName === "proposed" && embellishmentPath) values.embellishment_rules = fs.readFileSync(embellishmentPath, "utf8").trim();
         const label = `${(m.title ?? m.id).replace(/[^a-z0-9]+/gi, "_").slice(0, 30)}__${stage}__${armName}`;
         jobs.push(async () => {
           const override = armName === "proposed" ? { body: proposedBody } : undefined;
@@ -97,7 +102,7 @@ async function main() {
             const result = {
               memory: m.title, memoryId: m.id, stage, arm: armName, model, seconds: Math.round((Date.now() - started) / 1000),
               promptChars: prompt.length, title: output?.title ?? "",
-              pages: pages.map((p: any) => ({ text: p?.text ?? "", pictureSize: p?.pictureSize ?? "", storyMoment: p?.storyMoment ?? "", interpretationNote: p?.interpretationNote ?? "" })),
+              pages: pages.map((p: any) => ({ text: p?.text ?? "", pictureSize: p?.pictureSize ?? "", storyMoment: p?.storyMoment ?? "", interpretationNote: p?.interpretationNote ?? "", shot: p?.shot ?? null, visibleAction: p?.visibleAction ?? "", continuity: p?.continuity ?? "", setting: p?.setting ?? "", characters: p?.characters ?? [] })),
               unresolved: output?.unresolved ?? [],
             };
             fs.writeFileSync(path.join(outDir, `${label}.json`), JSON.stringify(result, null, 2));
