@@ -28,6 +28,7 @@ model User {
   texts            TextMessage[]
   flags            Flag[]
   actionItems      ActionItem[]
+  guideVersions    GuideBook[]
   contributors Contributor[]
   sessions    Session[]
   ownedHouseholds Household[]
@@ -624,6 +625,10 @@ model FlagRedraw {
   id             String   @id @default(cuid())
   flagId         String
   flag           Flag     @relation(fields: [flagId], references: [id], onDelete: Cascade)
+  // "today": the live rules; "trial": a suggested wording on a test copy of them (VSB-104).
+  kind           String   @default("today")
+  suggestionId   String?
+  suggestion     AnalysisSuggestion? @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
   status         String   @default("drawing") // drawing | ready | failed
   imagePath      String?
   prompt         String   @default("")
@@ -631,4 +636,54 @@ model FlagRedraw {
   ruleSetVersion Int?
   error          String?
   createdAt      DateTime @default(now())
+}
+
+// The Guide Book (VSB-102): each save is a new version of the whole rule list.
+model GuideBook {
+  id          String   @id @default(cuid())
+  version     Int      @unique
+  rules       String // JSON GuideRule[] (server/guideBook.ts)
+  note        String   @default("")
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+}
+
+// An AI analysis of flags against the Guide Book (VSB-103): patterns found and
+// suggested fixes. Weekly digests and on-demand runs.
+model FeedbackAnalysis {
+  id             String               @id @default(cuid())
+  trigger        String // manual | weekly
+  status         String               @default("running") // running | ready | failed
+  error          String?
+  filters        String               @default("{}") // JSON: the Feedback filter it ran on
+  flagIds        String               @default("[]") // JSON: the flags it covered
+  guideVersion   Int?
+  ruleSetVersion Int?
+  summary        String               @default("")
+  patterns       String               @default("[]") // JSON: name, summary, flagIds, ruleIds, rootCause, trend
+  costUsd        Float?
+  suggestions    AnalysisSuggestion[]
+  createdAt      DateTime             @default(now())
+}
+
+// One suggested fix from an analysis; accepting it makes an action item.
+model AnalysisSuggestion {
+  id           String           @id @default(cuid())
+  analysisId   String
+  analysis     FeedbackAnalysis @relation(fields: [analysisId], references: [id], onDelete: Cascade)
+  pattern      String // the pattern's name
+  title        String
+  target       String // an ENFORCEMENT_TARGETS key, or guide:<rule id>
+  before       String           @default("")
+  after        String           @default("")
+  why          String           @default("")
+  verify       String           @default("")
+  confidence   String           @default("medium") // high | medium | low
+  flagIds      String           @default("[]")
+  ruleIds      String           @default("[]")
+  status       String           @default("open") // open | accepted | dismissed
+  actionItemId String?
+  trials       FlagRedraw[]
+  createdAt    DateTime         @default(now())
 }

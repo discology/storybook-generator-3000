@@ -71,6 +71,13 @@ Where the team learns from what went wrong in pictures and words.
 - **Re-test all with today's rules** (after filtering by a picture category) redraws every open flag in that category, after showing how many and the estimated cost. Use it after changing Page Rules or AI instructions to see whether the change helped.
 - **Action items**: select flags and make an action item (what to change: picture prompt / camera and acting, Page Rules, planner wording, character art, other). The Action items tab tracks them as open or done. **Send to Jira** creates a VSB ticket (Story for development work, Task otherwise), once Jira is connected (see [deployment settings](deployment.md#settings)).
 - **Export** downloads the flags in the current filter as JSON: categories, notes, prompts, page plans, words, rules versions, picture links and redraws. Families are named by relationship only.
+- **Analysis** (the Analysis tab): "Analyze flags in this view" has the AI group the flags into patterns, name the Guide Book rules each one breaks, find the root cause (prompt wording, Page Rules, planner wording, character art, a Guide Book gap, or a limit of the image model), and suggest fixes with the exact wording to replace and what to replace it with, plus how to verify. It looks at small copies of the flagged pictures, not only the notes. A cost estimate comes first (usually $0.20–0.50). A weekly digest runs every Monday morning when there are new flags. Each suggestion can be **accepted** (it becomes an action item linked to the pattern's flags), **dismissed**, or **tried**: Try it redraws the pattern's flagged pictures with the suggested wording applied to a test copy of the rules, side by side with the originals; the live rules don't change. Decided suggestions aren't suggested again. The analysis instruction is editable under AI instructions → Analyze feedback.
+
+## Guide Book
+
+The rules a good Vambie storybook follows, in numbered sections: Voice (V-), World (W-), Pictures (P-), Characters (C-), Safety and privacy (S-). Each rule has a title, the rule, why it matters, a good and a bad example, and where it's enforced (a Page Rules field, an AI instruction, the Character Library, family designs, or app code). The prompts stay where they are; the Guide Book is what flags are analyzed against, so a suggested fix can name the exact place to change.
+
+Version 1 was drafted from the Vambie world bible, the voice rules, the art direction, camera and acting, the people rule and the Character Library. Edit, add or remove rules, then save: every save is a new version with a note, and earlier versions can be viewed from the version menu.
 
 ## Families
 

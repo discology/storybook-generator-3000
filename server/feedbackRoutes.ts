@@ -6,6 +6,8 @@ import { appUrl } from "./messageTemplates";
 import { drawComparison } from "./storyPages";
 import { createJiraIssue, jiraConfigured } from "./jira";
 import { normalizeStage } from "./readingStages";
+import { ENFORCEMENT_TARGETS, GUIDE_SECTIONS, getGuide, saveGuide, validateGuide } from "./guideBook";
+import { PICTURE_RULE_FIELDS, estimateAnalysis, flagsToAnalyze, startAnalysis, startTrial, trialFlags } from "./feedbackAnalysis";
 import { ACTION_AREAS, FAMILY_CATEGORIES, FLAG_CATEGORIES, FLAG_STATUSES, PICTURE_CATEGORIES, WORDS_CATEGORIES } from "./flagCategories";
 
 // The feedback loop (VSB-94): the team flags a page's picture or words, parents'
@@ -134,7 +136,9 @@ const presentFlag = (f: FlagWithAll) => {
     pageId: f.pageId,
     snapshot,
     actionItem: f.actionItem ? { id: f.actionItem.id, title: f.actionItem.title, status: f.actionItem.status, jiraKey: f.actionItem.jiraKey } : null,
+    // Trial redraws (a suggested wording) belong to their suggestion, not here.
     redraws: f.redraws
+      .filter((r) => r.kind === "today")
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
       .map((r) => ({ id: r.id, status: r.status, imagePath: r.imagePath, ruleSetVersion: r.ruleSetVersion, error: r.error, createdAt: r.createdAt, prompt: r.prompt })),
   };
@@ -304,6 +308,141 @@ router.post("/admin/action-items/:id/jira", async (req, res) => {
     res.json({ ...updated, jiraUrl: issue.url });
   } catch (error: any) {
     res.status(502).json({ error: error?.message ?? "Jira didn't create the ticket." });
+  }
+});
+
+// --- The Guide Book (VSB-102) ---
+
+router.get("/admin/guide", async (req, res) => {
+  const versions = await prisma.guideBook.findMany({ orderBy: { version: "desc" }, select: { version: true, note: true, createdAt: true, createdBy: { select: { name: true } } } });
+  const wanted = Number(req.query.version);
+  const row = Number.isInteger(wanted) && wanted > 0 ? await prisma.guideBook.findUnique({ where: { version: wanted } }) : null;
+  const guide = row ? { version: row.version, rules: parse(row.rules, []), note: row.note, createdAt: row.createdAt } : await getGuide();
+  res.json({ ...guide, sections: GUIDE_SECTIONS, targets: ENFORCEMENT_TARGETS, versions });
+});
+
+router.put("/admin/guide", async (req, res) => {
+  const user = await getCurrentUser(req);
+  const error = validateGuide(req.body?.rules);
+  if (error) return res.status(400).json({ error });
+  const saved = await saveGuide(req.body.rules, String(req.body?.note ?? ""), user?.id ?? null);
+  res.json({ version: saved.version });
+});
+
+// --- AI analysis of flags (VSB-103) and Try it (VSB-104) ---
+
+router.get("/admin/analyses", async (_req, res) => {
+  const runs = await prisma.feedbackAnalysis.findMany({ orderBy: { createdAt: "desc" }, take: 30, include: { _count: { select: { suggestions: true } } } });
+  res.json(
+    runs.map((r) => ({
+      id: r.id,
+      createdAt: r.createdAt,
+      trigger: r.trigger,
+      status: r.status,
+      error: r.error,
+      flags: parse<string[]>(r.flagIds, []).length,
+      suggestions: r._count.suggestions,
+      costUsd: r.costUsd,
+      summary: r.summary,
+    }))
+  );
+});
+
+router.get("/admin/analyses/:id", async (req, res) => {
+  const run = await prisma.feedbackAnalysis.findUnique({
+    where: { id: req.params.id },
+    include: { suggestions: { orderBy: { createdAt: "asc" }, include: { trials: { orderBy: { createdAt: "desc" } } } } },
+  });
+  if (!run) return res.status(404).json({ error: "Analysis not found" });
+  const patterns = parse<{ flagIds: string[] }[]>(run.patterns, []);
+  const ids = [...new Set(patterns.flatMap((p) => p.flagIds))];
+  const flags = await prisma.flag.findMany({ where: { id: { in: ids } }, include: { chapter: { select: { id: true, title: true } } } });
+  const mini = Object.fromEntries(
+    flags.map((f) => {
+      const s = parse<Record<string, any>>(f.snapshot, {});
+      return [f.id, { id: f.id, note: f.note, categories: parse<string[]>(f.categories, []), target: f.target, picture: s.picture?.imagePath ?? null, chapter: f.chapter, pageNumber: s.pageNumber ?? null }];
+    })
+  );
+  res.json({
+    ...run,
+    filters: parse(run.filters, {}),
+    flagIds: parse<string[]>(run.flagIds, []),
+    patterns,
+    flags: mini,
+    suggestions: run.suggestions.map((s) => ({
+      ...s,
+      flagIds: parse<string[]>(s.flagIds, []),
+      ruleIds: parse<string[]>(s.ruleIds, []),
+      targetLabel: s.target.startsWith("guide:") ? `Guide Book ${s.target.slice(6) === "new" ? "(new rule)" : s.target.slice(6)}` : ENFORCEMENT_TARGETS[s.target] ?? s.target,
+      canTry: s.target in PICTURE_RULE_FIELDS,
+    })),
+    targets: ENFORCEMENT_TARGETS,
+  });
+});
+
+router.post("/admin/analyses", async (req, res) => {
+  const filtered = req.body?.filters && typeof req.body.filters === "object" ? await filteredFlags(req.body.filters) : null;
+  const flags = filtered ? filtered.slice(0, 60).map((f) => ({ id: f.id, target: f.target })) : await flagsToAnalyze();
+  if (!flags.length) return res.status(400).json({ error: "There are no flags in this view to analyze." });
+  const pictures = flags.filter((f) => f.target !== "words" && f.target !== "chapter").length;
+  const estimate = await estimateAnalysis(flags.length, pictures);
+  if (req.body?.confirm !== true) return res.json({ flags: flags.length, pictures, estimate });
+  const run = await startAnalysis({ trigger: "manual", filters: req.body?.filters ?? {}, flagIds: flags.map((f) => f.id) });
+  res.status(202).json({ id: run.id, flags: flags.length, estimate });
+});
+
+const AREA_FOR_TARGET = (target: string) =>
+  target.startsWith("page_rules.") ? (target === "page_rules.pictureDirection" ? "picture_prompt" : "page_rules") : target === "instruction.page_plan" ? "planner" : target === "characters" || target === "family_designs" ? "characters" : "other";
+
+router.post("/admin/suggestions/:id/accept", async (req, res) => {
+  const user = await getCurrentUser(req);
+  const s = await prisma.analysisSuggestion.findUnique({ where: { id: req.params.id } });
+  if (!s) return res.status(404).json({ error: "Suggestion not found" });
+  if (s.status !== "open") return res.status(400).json({ error: "This suggestion was already decided." });
+  const where = s.target.startsWith("guide:") ? `Guide Book ${s.target.slice(6)}` : ENFORCEMENT_TARGETS[s.target] ?? s.target;
+  const item = await prisma.actionItem.create({
+    data: {
+      title: s.title,
+      area: AREA_FOR_TARGET(s.target),
+      details: [
+        s.why,
+        `Where: ${where}.`,
+        s.before ? `Replace: "${s.before}"` : "",
+        s.after ? `${s.before ? "With" : "Add"}: "${s.after}"` : "",
+        s.verify ? `Verify: ${s.verify}` : "",
+        `From the AI analysis (pattern "${s.pattern}", ${s.confidence} confidence).`,
+      ]
+        .filter(Boolean)
+        .join("\n\n"),
+      createdById: user?.id ?? null,
+    },
+  });
+  const flagIds = parse<string[]>(s.flagIds, []);
+  if (flagIds.length) await prisma.flag.updateMany({ where: { id: { in: flagIds }, actionItemId: null }, data: { actionItemId: item.id, status: "action" } });
+  await prisma.analysisSuggestion.update({ where: { id: s.id }, data: { status: "accepted", actionItemId: item.id } });
+  res.json({ ok: true, actionItemId: item.id });
+});
+
+router.post("/admin/suggestions/:id/dismiss", async (req, res) => {
+  const s = await prisma.analysisSuggestion.update({ where: { id: req.params.id }, data: { status: "dismissed" } }).catch(() => null);
+  if (!s) return res.status(404).json({ error: "Suggestion not found" });
+  res.json({ ok: true });
+});
+
+router.post("/admin/suggestions/:id/try", async (req, res) => {
+  const s = await prisma.analysisSuggestion.findUnique({ where: { id: req.params.id } });
+  if (!s) return res.status(404).json({ error: "Suggestion not found" });
+  if (!(s.target in PICTURE_RULE_FIELDS)) return res.status(400).json({ error: "Try it works for picture wording: art style, how people are drawn, or camera and acting." });
+  const done = new Set((await prisma.flagRedraw.findMany({ where: { suggestionId: s.id, status: "ready" }, select: { flagId: true } })).map((r) => r.flagId));
+  const flags = (await trialFlags(s.id)).filter((f) => !done.has(f.id));
+  if (!flags.length) return res.status(400).json({ error: done.size ? "Every flagged picture in this pattern already has a trial." : "This pattern has no flagged pictures to redraw." });
+  const estimate = Math.round(flags.length * (await pictureCost()) * 100) / 100;
+  if (req.body?.confirm !== true) return res.json({ count: flags.length, estimate });
+  try {
+    await startTrial(s.id);
+    res.status(202).json({ started: flags.length, estimate });
+  } catch (error: any) {
+    res.status(409).json({ error: error?.message ?? "Couldn't start." });
   }
 });
 

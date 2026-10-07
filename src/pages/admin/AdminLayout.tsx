@@ -1,7 +1,7 @@
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useEffect } from "react";
 import { useAuth } from "../../auth/AuthContext";
-import { IconBookmark, IconChat, IconCoins, IconHome, IconLock, IconPeople, IconPlayCircle, IconSettings, IconSmile, IconWarning } from "../../components/icons";
+import { IconBook, IconBookmark, IconChat, IconCoins, IconHome, IconLock, IconPeople, IconPlayCircle, IconSettings, IconSmile, IconWarning } from "../../components/icons";
 import { Mascot } from "../../components/ui";
 
 const SETTINGS_PATHS = ["/admin/settings", "/admin/messages", "/admin/ai", "/admin/page-rules", "/admin/visitors"];
@@ -54,6 +54,9 @@ export default function AdminLayout() {
         </NavLink>
         <NavLink to="/admin/feedback" className={linkClass}>
           <IconBookmark size={24} /> Feedback
+        </NavLink>
+        <NavLink to="/admin/guide" className={linkClass}>
+          <IconBook size={24} /> Guide Book
         </NavLink>
         <NavLink to="/admin/families" className={linkClass}>
           <IconPeople size={24} /> Families

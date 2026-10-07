@@ -26,6 +26,7 @@ import Account, { DeleteAccount, Help } from "./pages/Account";
 import HowItWorks from "./pages/HowItWorks";
 import { Privacy, Terms } from "./pages/Legal";
 import AdminFeedback from "./pages/admin/AdminFeedback";
+import AdminGuideBook from "./pages/admin/AdminGuideBook";
 import YourStorybooks from "./pages/YourStorybooks";
 import TryStory, { TrySave } from "./pages/TryStory";
 import AdminLayout from "./pages/admin/AdminLayout";
@@ -65,6 +66,7 @@ export default function App() {
           <Route path="costs" element={<AdminCosts />} />
           <Route path="visitors" element={<AdminVisitors />} />
           <Route path="feedback" element={<AdminFeedback />} />
+          <Route path="guide" element={<AdminGuideBook />} />
         </Route>
 
         <Route

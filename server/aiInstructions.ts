@@ -367,6 +367,48 @@ Check exactly these three things:
 For each, give a status of "ok" or "needs_revision" and a one-sentence note.`,
     outputFormat: `Respond with ONLY a JSON object, no markdown fences, in this shape: {"findings": [{"category": "continuity", "status": "ok" | "needs_revision", "note": "...", "quote": "for needs_revision: the exact words from the chapter the note is about, copied character for character (one sentence or phrase); otherwise empty"}, ...]} with exactly 3 findings for continuity, reader_fit, private_details in that order.`,
   },
+  {
+    key: "feedback_analysis",
+    name: "Analyze feedback",
+    trigger: "Runs from Admin > Feedback > Analysis (and the weekly digest) on flagged pictures and words, to find patterns and suggest long-term fixes",
+    variables: [
+      { name: "guide", description: "The Guide Book: every numbered rule and where it's enforced", sample: "P-2 Follow the planned camera: A close-up fills the frame... [Enforced in: Page Rules: Camera and acting]" },
+      { name: "current_wording", description: "Today's wording of the places a fix can change: the Page Rules picture fields and the planner instructions", sample: "Page Rules: Camera and acting (page_rules.pictureDirection):\nDirect every picture like a still..." },
+      { name: "targets", description: "The places a suggestion can change, with the key to use for each", sample: "page_rules.pictureDirection: Page Rules: Camera and acting" },
+      { name: "flags", description: "The flags being analyzed, each with a ref (F1, F2...), its notes and what the page was made from; flagged pictures are attached as small images", sample: "F1 (team, picture; Camera / framing): \"Planned as a close-up but it's a full-body shot.\" Should be: tight on her face. Camera: close-up, eye level. Action: ... Picture: image 1." },
+      { name: "previous_analysis", description: "The patterns the last analysis found, with how many flags each had, for trends", sample: "Close-ups come out as medium shots: 6 flags (P-2)" },
+      { name: "decided", description: "Suggestions the team already accepted or dismissed, which shouldn't be made again", sample: "Accepted: Spell out each shot type in the picture prompt (page_rules.pictureDirection)" },
+    ],
+    defaultBody: `You are the quality lead for Vambie Storybook, an app that turns family memories into illustrated storybooks for children. The team and parents flagged pictures and words that went wrong. Find the patterns, explain the causes, and suggest long-term fixes.
+
+The Guide Book (the rules every storybook should follow):
+<guide>
+
+Today's wording of the places a fix can change:
+<current_wording>
+
+Places a suggestion can change (use the key):
+<targets>
+guide: a Guide Book rule (target "guide:P-2" to change P-2, or "guide:new" for a missing rule)
+
+The flags (pictures are attached in order, as small images; look at them yourself, don't rely only on the notes):
+<flags>
+
+The last analysis found:
+<previous_analysis>
+
+Already decided by the team (don't suggest these again):
+<decided>
+
+How to work
+- Group flags that share a cause into patterns. A pattern needs at least two flags, unless one flag shows something serious (a safety or privacy problem, the child drawn as a human, a broken Guide Book rule in a way families would notice).
+- For each pattern, name the Guide Book rules it breaks by number. If no rule covers it, say so and suggest a new rule.
+- Find the root cause: is the wording in a prompt missing, vague or contradicted by other wording; is a reference picture pulling the image the wrong way; is a character's art wrong; is the Guide Book itself missing or unclear; or is it a limit of the image model that wording can't fix (say so plainly, and suggest a workaround if there is one).
+- Compare with the last analysis: a pattern is new, growing, steady or shrinking.
+- Suggest at most two fixes per pattern, the most likely to work first. A fix changes one place. Quote the exact current words to replace in "before" (copied character for character from the current wording, or empty to add new words) and give the exact new words in "after". Keep the house style: plain, specific, no jargon. Say how to verify it (for example: "re-test the Camera / framing flags").
+- Be honest about confidence. Prefer one well-aimed fix over many small ones. At most 6 patterns, most important first.`,
+    outputFormat: `Respond with ONLY a JSON object, no markdown fences, in this shape: {"summary": "two or three sentences: what's going wrong most and what to fix first", "patterns": [{"name": "short name", "summary": "what's going wrong, in one or two sentences", "flagRefs": ["F1", "F3"], "ruleIds": ["P-2"], "rootCause": "picture_prompt | page_rules | planner | characters | guide_gap | model_limit | other", "rootCauseNote": "one sentence", "trend": "new | growing | steady | shrinking", "suggestions": [{"title": "short imperative title", "target": "one key from the list above, or guide:RULE-ID / guide:new", "before": "exact current words to replace, or empty", "after": "the exact new words", "why": "one or two sentences", "verify": "how to check it worked", "confidence": "high | medium | low"}]}]}`,
+  },
 ];
 
 export const getAiStep = (key: string) => AI_STEPS.find((s) => s.key === key);

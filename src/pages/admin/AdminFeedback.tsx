@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiGet, apiSend, ApiError } from "../../lib/api";
 import { ACTION_AREAS, FLAG_CATEGORIES, PICTURE_CATEGORIES } from "../../lib/flags";
+import FeedbackAnalysis from "./FeedbackAnalysis";
 
 // Admin → Feedback (VSB-94): flags on pages from the team and parents, how often
 // each problem comes up, redraws to compare, action items (and Jira), and export.
@@ -63,7 +64,7 @@ const label = (key: string) => FLAG_CATEGORIES[key] ?? key;
 const FILTER = { width: "auto", minHeight: 40, fontSize: 15, padding: "0 10px" };
 
 export default function AdminFeedback() {
-  const [tab, setTab] = useState<"flags" | "actions">("flags");
+  const [tab, setTab] = useState<"flags" | "analysis" | "actions">("flags");
   const [filters, setFilters] = useState({ target: "", category: "", source: "", status: "open", stage: "", from: "", to: "" });
   const [data, setData] = useState<{ flags: Flag[]; counts: { key: string; label: string; count: number }[]; jira: boolean } | null>(null);
   const [actions, setActions] = useState<{ items: ActionItem[]; jira: boolean } | null>(null);
@@ -120,6 +121,9 @@ export default function AdminFeedback() {
       <div className="adm-tabs" role="tablist">
         <button role="tab" aria-selected={tab === "flags"} className={`adm-tab ${tab === "flags" ? "adm-tab--on" : ""}`} onClick={() => setTab("flags")}>
           Flags{data ? ` (${data.flags.length})` : ""}
+        </button>
+        <button role="tab" aria-selected={tab === "analysis"} className={`adm-tab ${tab === "analysis" ? "adm-tab--on" : ""}`} onClick={() => setTab("analysis")}>
+          Analysis
         </button>
         <button role="tab" aria-selected={tab === "actions"} className={`adm-tab ${tab === "actions" ? "adm-tab--on" : ""}`} onClick={() => setTab("actions")}>
           Action items{actions ? ` (${actions.items.filter((i) => i.status === "open").length} open)` : ""}
@@ -207,6 +211,8 @@ export default function AdminFeedback() {
           )}
         </>
       )}
+
+      {tab === "analysis" && <FeedbackAnalysis filters={Object.fromEntries(Object.entries(filters).filter(([, v]) => v))} />}
 
       {tab === "actions" && actions && <ActionItems data={actions} busy={busy} act={act} onNew={() => setCreating([])} />}
 

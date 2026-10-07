@@ -35,10 +35,12 @@ export async function withImageRateLimit<T>(inputImages: number, request: () => 
     try {
       return await request();
     } catch (error: any) {
-      // A slow response can trip the network timeout; one more try usually lands.
-      const timedOut = error?.name === "APIConnectionTimeoutError" || /timed out/i.test(String(error?.message));
-      if (timedOut && attempt === 1) {
-        console.log("Image request timed out; retrying once");
+      // A slow response can trip the network timeout, and a connection can drop
+      // mid-request; one more try usually lands.
+      const transient =
+        error?.name === "APIConnectionTimeoutError" || error?.name === "APIConnectionError" || /timed out|connection error/i.test(String(error?.message));
+      if (transient && attempt === 1) {
+        console.log(`Image request failed (${error?.message ?? error?.name}); retrying once`);
         continue;
       }
       if (error?.status !== 429 || attempt >= MAX_ATTEMPTS) throw error;

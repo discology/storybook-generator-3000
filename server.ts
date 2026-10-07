@@ -25,6 +25,7 @@ import costRoutes from "./server/costRoutes";
 import guestRoutes, { startGuestCleanup } from "./server/guests";
 import textRoutes from "./server/textRoutes";
 import feedbackRoutes from "./server/feedbackRoutes";
+import { startWeeklyDigest } from "./server/feedbackAnalysis";
 import { startTextCleanup } from "./server/texts";
 import { startReminders } from "./server/reminders";
 
@@ -125,6 +126,8 @@ app.listen(PORT, () => {
   // Memory reminder texts, like weekly chapters, only go out from the hosted app
   // unless asked (TEXT_REMINDERS=on), so two copies never both text a family.
   if (production || process.env.TEXT_REMINDERS === "on") startReminders();
+  // The weekly feedback digest (Monday morning), likewise only from the hosted app.
+  if (production || process.env.FEEDBACK_DIGEST === "on") startWeeklyDigest();
   // Weekly chapters are made by the hosted app. A development copy only makes
   // them when asked (WEEKLY_CHAPTERS=on), so two copies don't both spend on one.
   if (production || process.env.WEEKLY_CHAPTERS === "on") startWeeklyChapters();

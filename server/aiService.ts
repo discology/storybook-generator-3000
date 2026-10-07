@@ -25,7 +25,12 @@ const getProvider = (): Provider | null => {
 const supportsTemperature = (model: string) => /^gpt-4/.test(model);
 
 // Returns the reply unparsed, so a reply that isn't JSON is still recorded as spent.
-async function generateJson(provider: Provider, prompt: string, temperature: number, model = OPENAI_MODEL, images: string[] = []): Promise<{ raw: string; usage: TextUsage | null }> {
+// An image for a text step: a data URL, or one with a detail level ("low" sends a
+// small copy, for steps that look at many pictures).
+export type AiImage = string | { url: string; detail: "low" | "high" | "auto" };
+const imageUrl = (image: AiImage) => (typeof image === "string" ? image : image.url);
+
+async function generateJson(provider: Provider, prompt: string, temperature: number, model = OPENAI_MODEL, images: AiImage[] = []): Promise<{ raw: string; usage: TextUsage | null }> {
   let raw: string;
   let usage: TextUsage | null;
   if (provider.kind === "openai") {
@@ -35,7 +40,13 @@ async function generateJson(provider: Provider, prompt: string, temperature: num
         {
           role: "user",
           content: images.length
-            ? [{ type: "text", text: prompt }, ...images.map((url) => ({ type: "image_url" as const, image_url: { url } }))]
+            ? [
+                { type: "text", text: prompt },
+                ...images.map((image) => ({
+                  type: "image_url" as const,
+                  image_url: typeof image === "string" ? { url: image } : { url: image.url, detail: image.detail },
+                })),
+              ]
             : prompt,
         },
       ],
@@ -45,8 +56,8 @@ async function generateJson(provider: Provider, prompt: string, temperature: num
     raw = response.choices[0]?.message?.content ?? "";
     usage = openAiTextUsage(response.usage);
   } else {
-    const imageParts = images.flatMap((url) => {
-      const [, mimeType, data] = url.match(/^data:(.+?);base64,(.+)$/) ?? [];
+    const imageParts = images.flatMap((image) => {
+      const [, mimeType, data] = imageUrl(image).match(/^data:(.+?);base64,(.+)$/) ?? [];
       return data ? [{ inlineData: { mimeType, data } }] : [];
     });
     const response = await provider.client.models.generateContent({
@@ -70,6 +81,7 @@ const TEMPERATURE: Record<string, number> = {
   illustration_check: 0.2,
   describe_person: 0.2,
   guardian: 0.2,
+  feedback_analysis: 0.3,
 };
 
 // Unsaved instructions from the admin editor, used for test runs.
@@ -84,7 +96,7 @@ export interface InstructionOverride {
 // supplies them (chapters pass the character cards from their snapshot).
 // `images` are data URLs attached after the prompt, in order. `tags` say which
 // chapter, memory or family the call's cost belongs to (server/aiUsage.ts).
-export async function runAiStep(key: string, values: Record<string, string>, override?: InstructionOverride, images: string[] = [], tags?: UsageTags) {
+export async function runAiStep(key: string, values: Record<string, string>, override?: InstructionOverride, images: AiImage[] = [], tags?: UsageTags) {
   const provider = getProvider();
   if (!provider) throw new Error("No AI provider configured");
   const instruction = await getAiInstruction(key);

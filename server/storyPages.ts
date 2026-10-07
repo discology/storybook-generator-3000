@@ -1111,13 +1111,16 @@ export async function generateIllustration(pageId: string, options: Illustration
 // VSB-97: draws a flagged page again from the same page plan with today's Page
 // Rules and Character Library art, to compare with the flagged picture. Saved
 // under uploads/feedback/ (admins only); the family's chapter never changes.
-export async function drawComparison(pageId: string, fileName: string) {
+// VSB-104 passes a test copy of the rules with a suggested change in it.
+export async function drawComparison(pageId: string, fileName: string, testRules?: PageRules) {
   const page = await prisma.storyPage.findUniqueOrThrow({ where: { id: pageId } });
   if (!hasPicture(page)) throw new Error("This page has no picture to redraw.");
   const client = getOpenAI();
   if (!client) throw new Error("Redrawing needs an OpenAI API key (OPENAI_API_KEY).");
   const { chapter, snapshot, characterSheet } = await loadChapter(page.chapterId);
-  const { version, rules } = await getActiveRules();
+  const active = await getActiveRules();
+  const version = active.version;
+  const rules = testRules ?? active.rules;
   const cast = await currentCast(snapshot?.cast ?? []);
   const { references, prompt } = await composePagePicture(page, chapter, { rules, cast, family: snapshot?.family ?? [], people: characterSheet });
   const common = { model: rules.imageModel, prompt, size: pictureFormat(page).size, quality: rules.imageQuality, output_format: "jpeg" as const };
