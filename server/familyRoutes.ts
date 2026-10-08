@@ -4,6 +4,29 @@ import { prisma } from "./db";
 import type { Invitation } from "../src/generated/prisma/client";
 import { getCurrentUser } from "./session";
 import { renderMessage, appUrl } from "./messageTemplates";
+import { normalizePhone } from "./sms";
+import { householdStorybook, sendText } from "./texts";
+
+// An invitation is texted only to a number that already verified in the app:
+// that person gave their own consent to texts (VSB-109). Everyone else gets
+// the link from the parent.
+async function textInvite(contact: string, message: string | null, householdId: string) {
+  const phone = normalizePhone(contact);
+  if (!phone || !message) return false;
+  const user = await prisma.user.findUnique({ where: { phone } });
+  if (!user) return false;
+  const result = await sendText({ event: "invite", to: { userId: user.id, phone }, body: message, householdId });
+  return result.sent;
+}
+
+// Texts the storybook's owner about something in their family.
+async function textOwner(householdId: string, event: string, values: (storybook: NonNullable<Awaited<ReturnType<typeof householdStorybook>>>) => Record<string, string>) {
+  const storybook = await householdStorybook(householdId);
+  const owner = await prisma.contributor.findFirst({ where: { householdId, role: "owner", inviteStatus: "joined" }, include: { user: true } });
+  if (!storybook || !owner?.user) return;
+  const body = await renderMessage(event, values(storybook));
+  if (body) await sendText({ event, to: { userId: owner.user.id, phone: owner.user.phone }, body, householdId });
+}
 import { isOwner, requireMember } from "./access";
 
 const router: Router = express.Router();
@@ -70,7 +93,8 @@ router.post("/storybooks/:id/family/invite", async (req, res) => {
     data: { householdId: storybook.child.householdId, contributorId: contributor.id, invitedByName: me.name, contact, relationship, token },
   });
   const message = await inviteMessage(me.name, storybook.child.displayName, storybook.title, relationship, token);
-  res.status(201).json({ contributor, invitation, inviteLink: appUrl(`/invitations/${token}`), inviteMessage: message, devMode: true });
+  const texted = await textInvite(contact, message, storybook.child.householdId).catch(() => false);
+  res.status(201).json({ contributor, invitation, inviteLink: appUrl(`/invitations/${token}`), inviteMessage: message, devMode: !texted, texted });
 });
 
 // A fresh link for a pending invite (the old link stops working).
@@ -88,7 +112,8 @@ router.post("/family/:contributorId/resend", async (req, res) => {
     data: { token, status: "pending", createdAt: new Date(), renewRequestedAt: null },
   });
   const message = await inviteMessage(member.me.name, member.storybook.child.displayName, storybook.title, invitation.relationship, token);
-  res.json({ inviteLink: appUrl(`/invitations/${token}`), inviteMessage: message, devMode: true });
+  const texted = await textInvite(invitation.contact, message, contributor.householdId).catch(() => false);
+  res.json({ inviteLink: appUrl(`/invitations/${token}`), inviteMessage: message, devMode: !texted, texted });
 });
 
 // Cancels a pending invite or removes someone from the storybook.
@@ -150,6 +175,16 @@ export async function acceptInvitation(invitation: Invitation, user: { id: strin
     return tx.contributor.update({ where: { id: invitation.contributorId }, data: { userId: user.id, inviteStatus: "joined", name, phone: user.phone } });
   });
   const household = await prisma.household.findUnique({ where: { id: invitation.householdId }, include: { children: { include: { storybooks: true } } } });
+  // The parent hears that they joined (VSB-9), unless the parent is the one joining.
+  if (user.id !== household?.ownerUserId) {
+    void textOwner(invitation.householdId, "member_joined", (sb) => ({
+      member_name: name,
+      relationship: invitation.relationship ?? "",
+      child_name: sb.child.displayName,
+      storybook_title: sb.title,
+      family_url: appUrl(`/storybooks/${sb.id}/family`),
+    })).catch((e) => console.error("Joined text:", e?.message));
+  }
   return { place, storybook: household?.children[0]?.storybooks[0] ?? null };
 }
 
@@ -176,6 +211,12 @@ router.post("/invitations/:token/request-new", async (req, res) => {
   if (!invitation) return res.status(404).json({ error: "not_found" });
   if (invitation.status === "pending" && !invitation.renewRequestedAt) {
     await prisma.invitation.update({ where: { id: invitation.id }, data: { renewRequestedAt: new Date() } });
+    void textOwner(invitation.householdId, "new_link_requested", (sb) => ({
+      member_name: invitation.contact,
+      child_name: sb.child.displayName,
+      storybook_title: sb.title,
+      family_url: appUrl(`/storybooks/${sb.id}/family`),
+    })).catch((e) => console.error("New link text:", e?.message));
   }
   // Same answer either way, so the request reveals nothing about the invite.
   res.json({ ok: true });

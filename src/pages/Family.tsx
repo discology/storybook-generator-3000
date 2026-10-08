@@ -36,6 +36,7 @@ interface SentInvite {
   name: string;
   link: string;
   message: string | null;
+  texted: boolean; // the app texted it (the number had already verified here)
 }
 
 export default function Family() {
@@ -68,7 +69,7 @@ export default function Family() {
     setError(null);
     try {
       const res = await apiSend(`/api/storybooks/${id}/family/invite`, "POST", { contact: contact.trim(), relationship });
-      setSent({ name: contact.trim(), link: res.inviteLink, message: res.inviteMessage });
+      setSent({ name: contact.trim(), link: res.inviteLink, message: res.inviteMessage, texted: Boolean(res.texted) });
       setContact("");
       load();
     } catch (err) {
@@ -82,7 +83,7 @@ export default function Family() {
     setSelected(null);
     try {
       const res = await apiSend(`/api/family/${person.id}/resend`, "POST");
-      setSent({ name: person.name, link: res.inviteLink, message: res.inviteMessage });
+      setSent({ name: person.name, link: res.inviteLink, message: res.inviteMessage, texted: Boolean(res.texted) });
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't make a new link.");
@@ -176,18 +177,24 @@ export default function Family() {
         <Sheet style={{ marginTop: 18 }}>
           {sent ? (
             <div>
-              <h2 className="h-title">Send {sent.name} the invite</h2>
+              <h2 className="h-title">{sent.texted ? `We texted ${sent.name} the invite` : `Send ${sent.name} the invite`}</h2>
               <p className="t-small t-muted" style={{ marginTop: 6 }}>
-                Texting invites from Vambie isn't switched on yet, so send this yourself. The link works for 14 days.
+                {sent.texted
+                  ? "They already use Vambie with that number, so the invitation went straight to their phone. The link works for 14 days."
+                  : "That number hasn't signed up with Vambie yet, so send this yourself (we only text people who have agreed to texts). The link works for 14 days."}
               </p>
-              <div className="share-box" style={{ marginTop: 12 }}>
-                {sent.message ?? sent.link}
-              </div>
+              {!sent.texted && (
+                <div className="share-box" style={{ marginTop: 12 }}>
+                  {sent.message ?? sent.link}
+                </div>
+              )}
               <div className="stack" style={{ marginTop: 14 }}>
-                <button className="btn btn--lime btn--caps" onClick={() => void share(sent)}>
-                  {copied ? "Copied" : canShare ? "Share invite" : "Copy message"} <Chev />
-                </button>
-                <button className="btn btn--outline" onClick={() => setSent(null)}>
+                {!sent.texted && (
+                  <button className="btn btn--lime btn--caps" onClick={() => void share(sent)}>
+                    {copied ? "Copied" : canShare ? "Share invite" : "Copy message"} <Chev />
+                  </button>
+                )}
+                <button className={sent.texted ? "btn btn--lime btn--caps" : "btn btn--outline"} onClick={() => setSent(null)}>
                   Invite someone else
                 </button>
               </div>

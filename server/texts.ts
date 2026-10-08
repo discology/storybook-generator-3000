@@ -90,6 +90,28 @@ export async function sendText(request: TextRequest): Promise<TextResult> {
   }
 }
 
+// The storybook's owner (the parent) with their number, for texts about events in
+// their family, plus the child's and storybook's names for the wording.
+export async function storybookOwner(storybookId: string) {
+  const storybook = await prisma.storybook.findUnique({
+    where: { id: storybookId },
+    include: { child: { include: { household: { include: { contributors: { where: { role: "owner", inviteStatus: "joined" }, include: { user: true } } } } } } },
+  });
+  if (!storybook) return null;
+  const owner = storybook.child.household.contributors[0];
+  return {
+    storybook,
+    child: storybook.child,
+    householdId: storybook.child.householdId,
+    ownerName: owner?.name ?? "",
+    to: { userId: owner?.user?.id ?? null, phone: owner?.user?.phone ?? null },
+  };
+}
+
+// Someone's first storybook in a household (what family links point at).
+export const householdStorybook = async (householdId: string) =>
+  prisma.storybook.findFirst({ where: { child: { householdId } }, include: { child: true }, orderBy: { createdAt: "asc" } });
+
 export const optOut = (userId: string, out: boolean) =>
   prisma.user.update({ where: { id: userId }, data: { textsOptedOut: out, textsOptedOutAt: out ? new Date() : null } });
 

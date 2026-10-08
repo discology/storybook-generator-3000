@@ -156,6 +156,7 @@ export function ChapterAccess() {
 }
 
 // "Send a little story": a chapter link (and a note) for chosen family members.
+const listNames = (names: string[]) => (names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`);
 export default function ShareChapter() {
   const { id, chapterId } = useParams();
   const navigate = useNavigate();
@@ -163,7 +164,7 @@ export default function ShareChapter() {
   const [to, setTo] = useState<string[]>([]);
   const [message, setMessage] = useState("A little story to read together.");
   const [busy, setBusy] = useState(false);
-  const [result, setResult] = useState<{ text: string; link: string } | null>(null);
+  const [result, setResult] = useState<{ text: string; link: string; texted?: string[]; notTexted?: { name: string; reason: string }[] } | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -210,14 +211,32 @@ export default function ShareChapter() {
           <Note kind="warn" style={{ marginTop: 16 }}>Publish this chapter before sending it to anyone.</Note>
         ) : result ? (
           <div style={{ marginTop: 18 }}>
-            <h2 className="h-title" style={{ fontSize: 24 }}>Ready to send</h2>
-            <p className="t-small t-muted" style={{ marginTop: 6 }}>
-              It's in their storybook now. Texting links from Vambie isn't switched on yet, so send this yourself:
-            </p>
-            <div className="share-box" style={{ marginTop: 12 }}>{result.text}</div>
-            <button className="btn btn--lime btn--caps" style={{ marginTop: 14 }} onClick={() => void shareOut()}>
-              {copied ? "Copied" : canShare ? "Share message" : "Copy message"} <Chev />
-            </button>
+            <h2 className="h-title" style={{ fontSize: 24 }}>{result.texted?.length ? "Sent" : "Ready to send"}</h2>
+            {result.texted?.length ? (
+              <p className="t-small" style={{ marginTop: 6 }}>
+                It's in their storybook, and we texted {listNames(result.texted)}.
+              </p>
+            ) : (
+              <p className="t-small t-muted" style={{ marginTop: 6 }}>
+                It's in their storybook now.
+              </p>
+            )}
+            {result.notTexted?.length ? (
+              <>
+                <p className="t-small t-muted" style={{ marginTop: 8 }}>
+                  {listNames(result.notTexted.map((n) => (n.reason === "couldn't be texted" ? n.name : `${n.name} (${n.reason})`)))} couldn't be texted, so send this
+                  yourself:
+                </p>
+                <div className="share-box" style={{ marginTop: 12 }}>{result.text}</div>
+                <button className="btn btn--lime btn--caps" style={{ marginTop: 14 }} onClick={() => void shareOut()}>
+                  {copied ? "Copied" : canShare ? "Share message" : "Copy message"} <Chev />
+                </button>
+              </>
+            ) : (
+              <Link className="btn btn--lime btn--caps" to={`${base}/read/${chapterId}`} style={{ marginTop: 14 }}>
+                Back to the chapter <Chev />
+              </Link>
+            )}
           </div>
         ) : (
           <>

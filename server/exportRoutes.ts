@@ -4,6 +4,8 @@ import fs from "fs";
 import path from "path";
 import { prisma } from "./db";
 import { canSeeChapter, memberForMemory, requireMember } from "./access";
+import { appUrl, renderMessage } from "./messageTemplates";
+import { sendText } from "./texts";
 
 const EXPORT_DIR = path.join(process.cwd(), "uploads", "exports");
 fs.mkdirSync(EXPORT_DIR, { recursive: true });
@@ -107,6 +109,10 @@ export async function buildExport(exportId: string) {
       where: { id: request.id },
       data: { status: "ready", filePath: `/uploads/exports/${fileName}`, expiresAt: new Date(Date.now() + EXPORT_TTL_MS), error: null },
     });
+    // Whoever asked hears it's ready (VSB-9).
+    const asker = await prisma.contributor.findUnique({ where: { id: me.id }, include: { user: true } });
+    const body = await renderMessage("export_ready", { storybook_title: storybook.title, export_url: appUrl(`/storybooks/${request.storybookId}/settings/export/${request.id}`) });
+    if (asker?.user && body) await sendText({ event: "export_ready", to: { userId: asker.user.id, phone: asker.user.phone }, body, householdId: storybook.child.householdId });
   } catch (error: any) {
     console.error(`Export ${exportId} failed:`, error?.message ?? error);
     await prisma.exportRequest.update({ where: { id: exportId }, data: { status: "failed", error: String(error?.message ?? "unknown error").slice(0, 300) } });

@@ -1,6 +1,8 @@
 import { prisma } from "./db";
 import { createPagedChapter, recordedBy } from "./storyPages";
 import { withUsage } from "./aiUsage";
+import { appUrl, renderMessage } from "./messageTemplates";
+import { sendText, storybookOwner } from "./texts";
 
 // Each week's memories become one chapter, made at 6 AM (the family's time)
 // the morning after their weekly reminder, so memories recorded in answer to
@@ -104,6 +106,19 @@ export async function makeWeeklyChapter(storybookId: string) {
     });
     await prisma.memory.updateMany({ where: { id: { in: memories.map((m) => m.id) } }, data: { status: "ready" } });
     await prisma.storybook.update({ where: { id: storybookId }, data: { lastBatchAt: new Date(), pendingCastKeys: "[]" } });
+    // The parent hears the chapter is drafted and waiting for their review (VSB-9).
+    void (async () => {
+      const owner = await storybookOwner(storybookId);
+      if (!owner) return;
+      const body = await renderMessage("review_ready", {
+        parent_name: owner.ownerName,
+        child_name: owner.child.displayName,
+        storybook_title: owner.storybook.title,
+        chapter_title: chapter.title,
+        review_url: appUrl(`/storybooks/${storybookId}/chapters/${chapter.id}/pages`),
+      });
+      if (body) await sendText({ event: "review_ready", to: owner.to, body, householdId: owner.householdId });
+    })().catch((e) => console.error("Review text:", e?.message));
     return chapter;
   } catch (error: any) {
     // Recorded so the family sees it; not retried automatically, so a failing

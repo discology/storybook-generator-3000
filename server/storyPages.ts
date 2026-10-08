@@ -5,6 +5,8 @@ import { prisma } from "./db";
 import { runAiStep, isAiConfigured, guardianReview } from "./aiService";
 import { getAiInstruction } from "./aiInstructions";
 import { CastMember, buildCast, characterCardValues, currentCast, describeCast, moodArt, renderReferences } from "./characters";
+import { appUrl, renderMessage } from "./messageTemplates";
+import { sendText, storybookOwner } from "./texts";
 import {
   AppearanceWithDesign,
   FamilyCastEntry,
@@ -1200,6 +1202,21 @@ export async function updatePagesStatus(chapterId: string) {
       ? "needs_attention"
       : "ready";
   await prisma.chapter.update({ where: { id: chapterId }, data: { pagesStatus: status } });
+  // The parent hears once that some pictures need another try (VSB-9); not for
+  // a visitor's draft, which has no parent yet.
+  if (status === "needs_attention" && chapter.pagesStatus !== "needs_attention") {
+    void (async () => {
+      const owner = await storybookOwner(chapter.storybookId);
+      if (!owner || owner.storybook.status === "guest") return;
+      const body = await renderMessage("pictures_failed", {
+        child_name: owner.child.displayName,
+        storybook_title: owner.storybook.title,
+        chapter_title: chapter.title,
+        review_url: appUrl(`/storybooks/${chapter.storybookId}/chapters/${chapterId}/pages`),
+      });
+      if (body) await sendText({ event: "pictures_failed", to: owner.to, body, householdId: owner.householdId });
+    })().catch((e) => console.error("Pictures text:", e?.message));
+  }
 }
 
 // Character sheet first, then every page in parallel against it. If the sheet

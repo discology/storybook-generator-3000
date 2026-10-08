@@ -561,9 +561,9 @@ router.put("/chapters/:id/access", async (req, res) => {
   res.json({ ok: true, shareMode });
 });
 
-// Texting chapter links needs a Twilio sending number, which isn't set up yet:
-// the share is recorded (recipients see it in their book) and the message is
-// returned for the sender to pass on themselves.
+// "Send a little story": the share is recorded (recipients see it in their
+// book), each chosen family member with a verified number is texted, and the
+// message is returned for the sender to pass on to anyone who couldn't be.
 router.post("/chapters/:id/share", async (req, res) => {
   const member = await memberForChapter(req, res, req.params.id, { owner: true });
   if (!member) return;
@@ -589,7 +589,24 @@ router.post("/chapters/:id/share", async (req, res) => {
     chapter_title: chapter.title,
     chapter_url: link,
   });
-  res.json({ ok: true, link, text: message ? `${message}\n\n${text ?? link}` : text ?? link });
+  const body = await renderMessage("chapter_shared", {
+    sender_name: member.me.name,
+    child_name: member.storybook.child.displayName,
+    storybook_title: member.storybook.title,
+    chapter_title: chapter.title,
+    chapter_url: link,
+    note: message,
+  });
+  const texted: string[] = [];
+  const notTexted: { name: string; reason: string }[] = [];
+  const recipients = await prisma.contributor.findMany({ where: { id: { in: recipientIds } }, include: { user: true } });
+  for (const r of recipients) {
+    if (!body) break;
+    const result = await sendText({ event: "chapter_shared", to: { userId: r.user?.id, phone: r.user?.phone ?? null }, body: body.replace(/\s{2,}/g, " "), householdId: member.storybook.child.householdId });
+    if (result.sent) texted.push(r.name);
+    else notTexted.push({ name: r.name, reason: result.reason === "no_phone" ? "no number yet" : result.reason === "opted_out" ? "asked not to get texts" : result.reason === "off" ? "texting isn't on" : "couldn't be texted" });
+  }
+  res.json({ ok: true, link, text: message ? `${message}\n\n${text ?? link}` : text ?? link, texted, notTexted });
 });
 
 // --- Settings ---

@@ -125,7 +125,7 @@ A chapter's cost is everything ever spent on it, including later redraws and rew
 
 The wording of the welcome, family invite, memory reminder and new-chapter texts. Write variables like `<child_name>` or `<record_url>` in angle brackets; the editor lists the ones each message supports and previews the result. It also counts characters, so you can see how many texts a message takes. Each message can be turned off, or reset to the default wording.
 
-The page also shows the texting mode (off, test or live), a "Text me a test" button for each message, and the log of recent texts with their delivery status. Every text starts "Vambie Storybook:". Invitations are never texted by the app, since carriers need the person's own consent: the parent shares the link.
+The page also shows the texting mode (off, test or live), a "Text me a test" button for each message, and the log of recent texts with their delivery status. Every text starts "Vambie Storybook:". The events: welcome, memory reminder, new chapter published, chapter sent to you ("Send a little story"), someone joined, chapter ready for review, download ready, pictures need another try, a memory couldn't be transcribed, new invite link requested, and storybook ready (visitors). Invitations are texted only to numbers that have already verified in the app (they agreed to texts); for anyone else the parent shares the link, since carriers need the person's own consent.
 
 ### AI instructions
 

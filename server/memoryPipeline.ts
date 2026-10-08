@@ -2,6 +2,21 @@ import fs from "fs";
 import path from "path";
 import { prisma } from "./db";
 import { interpretMemory, transcribeAudio } from "./aiService";
+import { appUrl, renderMessage } from "./messageTemplates";
+import { sendText } from "./texts";
+
+// VSB-9: the person who recorded a memory hears when its words couldn't be made out.
+async function textTranscriptionFailed(storybookId: string, storybookTitle: string, contributorId: string, memoryId: string) {
+  const recorder = await prisma.contributor.findUnique({ where: { id: contributorId }, include: { user: true } });
+  const storybook = await prisma.storybook.findUnique({ where: { id: storybookId }, include: { child: true } });
+  if (!recorder?.user || !storybook || storybook.status === "guest") return;
+  const body = await renderMessage("transcription_failed", {
+    child_name: storybook.child.displayName,
+    storybook_title: storybookTitle,
+    memory_url: appUrl(`/storybooks/${storybookId}/memories/${memoryId}`),
+  });
+  if (body) await sendText({ event: "transcription_failed", to: { userId: recorder.user.id, phone: recorder.user.phone }, body, householdId: storybook.child.householdId });
+}
 
 // After a recording is uploaded, the memory is transcribed and interpreted in
 // the background, so the parent never has to press "Transcribe". When the
@@ -31,6 +46,7 @@ export async function processMemory(memoryId: string) {
       const result = await transcribeAudio(filePath, mimeFor(filePath), memory.durationSec, tags);
       if (!result.text) {
         await prisma.memory.update({ where: { id: memoryId }, data: { status: "failed", processingError: result.reason ?? "We couldn't make out the words." } });
+        void textTranscriptionFailed(memory.storybookId, memory.storybook.title, memory.contributorId, memoryId).catch((e) => console.error("Transcription text:", e?.message));
         return;
       }
       await prisma.transcriptVersion.create({ data: { memoryId, source: "machine", text: result.text } });
