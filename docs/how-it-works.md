@@ -24,6 +24,7 @@ New visitors see the value before they sign up. "Start their story" on the splas
 - Anyone in the family can record, for up to 15 minutes, usually in answer to a prompt card such as "What made you smile today?". Or they can **type it** instead (up to about 4,000 characters): a typed memory skips transcription, but otherwise goes through the same steps, and shows with a pen in the memory lists. Its words can be edited later.
 - When saving, they choose **who can hear the original recording**: only them, or everyone in the family. They also choose **whether the memory may be used in stories**. The storybook's privacy settings set the defaults.
 - The question they answered is saved with the memory, so later edits to the prompt card don't change it.
+- **Question of the week.** The first card in the deck is the family's question for the week, the same for everyone in the family. On cards meant to be answered once, the deck shows who in the family has answered ("You, Emma and Sue answered"), never what they said, and only for answers shared with the family. Once you've answered such a card, it moves to the back of your deck.
 
 ## 2. Preparing the memory
 

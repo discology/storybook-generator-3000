@@ -30,6 +30,7 @@ Who can start a storybook on the hosted app is a setting. It's invite-only by de
 
 - When saving a memory, the person who recorded it chooses who can hear the original: **only them** (the default) or **everyone in the family**. That choice covers the recording and its transcript. The story made from it can still be shared.
 - They also choose whether the memory may be used in stories. A memory that isn't allowed in stories never goes into a chapter.
+- On cards meant to be answered once, the deck shows who has answered. A private answer shows as "You" on its author's own phone and nowhere else; only answers shared with the family show the person's name to others. What anyone said is never shown on the card.
 - Recordings are never served as public files. They're streamed through an API route that checks who's asking.
 - A family can choose **not to keep voice recordings** at setup or in Privacy settings. Each recording is then deleted as soon as it's transcribed, and only the words remain.
 

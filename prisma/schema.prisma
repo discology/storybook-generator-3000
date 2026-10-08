@@ -117,6 +117,9 @@ model Prompt {
   audience       String   @default("Everyone")
   childStage     String   @default("All stages")
   cardColor      String   @default("purple")
+  // Answered once per person: moves to the back of someone's deck after they
+  // record it, shows who in the family has answered, and can be the week's card.
+  answerOnce     Boolean  @default(false)
   artworkPath    String? // square card artwork; Baby Vambie art is used when empty
   status         String   @default("published") // draft | published | archived
   sortOrder      Int      @default(0)

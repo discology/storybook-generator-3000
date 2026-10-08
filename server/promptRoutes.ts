@@ -35,7 +35,7 @@ router.get("/prompts/:id", async (req, res) => {
 });
 
 router.post("/prompts", async (req, res) => {
-  const { question, supportingText, category, audience, childStage, cardColor, status } = req.body ?? {};
+  const { question, supportingText, category, audience, childStage, cardColor, status, answerOnce } = req.body ?? {};
   if (!question || !String(question).trim()) return res.status(400).json({ error: "question is required" });
   const badVariables = variableError(question, supportingText);
   if (badVariables) return res.status(400).json({ error: badVariables });
@@ -49,6 +49,7 @@ router.post("/prompts", async (req, res) => {
       audience: audience || "Everyone",
       childStage: childStage || "All stages",
       cardColor: cardColor || "purple",
+      answerOnce: answerOnce === true,
       status: status || "draft",
       sortOrder: count,
     },
@@ -67,7 +68,7 @@ router.put("/prompts/:id", async (req, res) => {
   const existing = await prisma.prompt.findUnique({ where: { id: req.params.id } });
   if (!existing) return res.status(404).json({ error: "Not found" });
 
-  const { question, supportingText, category, audience, childStage, cardColor, status, artworkPath } = req.body ?? {};
+  const { question, supportingText, category, audience, childStage, cardColor, status, artworkPath, answerOnce } = req.body ?? {};
   const badVariables = variableError(question, supportingText);
   if (badVariables) return res.status(400).json({ error: badVariables });
   if (typeof artworkPath === "string" && !(await isLibraryPicture(artworkPath))) {
@@ -82,6 +83,7 @@ router.put("/prompts/:id", async (req, res) => {
       ...(audience !== undefined ? { audience } : {}),
       ...(childStage !== undefined ? { childStage } : {}),
       ...(cardColor !== undefined ? { cardColor } : {}),
+      ...(typeof answerOnce === "boolean" ? { answerOnce } : {}),
       ...(status !== undefined ? { status } : {}),
       ...(artworkPath === null || typeof artworkPath === "string" ? { artworkPath } : {}),
     },

@@ -23,7 +23,27 @@ interface DeckCard {
   category: string;
   color: string;
   art: string | null;
+  // Question of the week and who has answered (VSB-113).
+  answerOnce?: boolean;
+  thisWeek?: boolean;
+  you?: boolean;
+  others?: string[];
 }
+
+interface PromptAnswers {
+  weekPromptId: string | null;
+  answers: Record<string, { you: boolean; others: string[] }>;
+}
+
+// "You", "You and Emma", "You, Emma and Sue", "Emma, Sue and 2 others".
+function answeredLine(names: string[]) {
+  if (names.length === 1) return `${names[0]} answered`;
+  if (names.length === 2) return `${names[0]} and ${names[1]} answered`;
+  if (names.length === 3) return `${names[0]}, ${names[1]} and ${names[2]} answered`;
+  return `${names[0]}, ${names[1]} and ${names.length - 2} others answered`;
+}
+
+const questionSize = (q: string) => (q.length > 85 ? " prompt-card__q--longer" : q.length > 60 ? " prompt-card__q--long" : "");
 
 const MAX_SECONDS = 15 * 60;
 const BARS = 26;
@@ -62,6 +82,7 @@ export default function Recorder() {
   const navigate = useNavigate();
   const { storybook, status } = useStorybookData(id);
   const [prompts, setPrompts] = useState<Prompt[]>([]);
+  const [answers, setAnswers] = useState<PromptAnswers | null>(null);
   const [category, setCategory] = useState("All");
   const [cardIndex, setCardIndex] = useState(0);
   const [chosen, setChosen] = useState<DeckCard | null>(null);
@@ -90,6 +111,11 @@ export default function Recorder() {
   useEffect(() => {
     apiGet("/api/prompts?status=published").then(setPrompts).catch(() => setPrompts([]));
   }, []);
+
+  useEffect(() => {
+    if (!storybook?.id) return;
+    apiGet(`/api/storybooks/${storybook.id}/prompt-answers`).then(setAnswers).catch(() => setAnswers(null));
+  }, [storybook?.id]);
 
   useEffect(() => {
     if (storybook) {
@@ -135,10 +161,22 @@ export default function Recorder() {
       me: storybook.me,
       parentName: storybook.family.find((f) => f.role === "owner")?.name ?? null,
     });
-    const list = fitting.filter((p) => category === "All" || p.category === category).map((p) => toCard(p, values));
+    // The week's card comes first; a card answered once that you've already
+    // recorded moves to the back. The sort is stable, so the deck order holds otherwise.
+    const rank = (c: DeckCard) => (c.thisWeek ? 0 : c.answerOnce && c.you ? 2 : 1);
+    const list = fitting
+      .filter((p) => category === "All" || p.category === category)
+      .map((p) => ({
+        ...toCard(p, values),
+        answerOnce: p.answerOnce,
+        thisWeek: p.id === answers?.weekPromptId,
+        you: !!answers?.answers[p.id]?.you,
+        others: answers?.answers[p.id]?.others ?? [],
+      }))
+      .sort((a, b) => rank(a) - rank(b));
     const asked = params.get("q");
     return asked && category === "All" ? [{ ...FREEFORM, question: asked, category: "Sample prompt" }, ...list] : list;
-  }, [prompts, storybook, category, params]);
+  }, [prompts, storybook, category, params, answers]);
 
   const categories = useMemo(() => ["All", ...new Set(prompts.map((p) => p.category))], [prompts]);
 
@@ -636,13 +674,37 @@ export default function Recorder() {
             {cards.map((c, i) => (
               <button
                 key={`${c.id}-${i}`}
-                className={`prompt-card prompt-card--${c.color}`}
+                className={`prompt-card prompt-card--${c.color}${c.answerOnce && (c.you || (c.others?.length ?? 0) > 0) ? " prompt-card--answered" : ""}`}
                 onClick={() => void startRecording(c)}
                 aria-label={`Record: ${c.question}`}
                 style={{ border: 0, cursor: "pointer", font: "inherit" }}
               >
-                <span className={`badge badge--caps badge--sm prompt-card__badge ${c.color === "purple" ? "badge--pink" : "badge--purple"}`}>{c.category}</span>
-                <span className="prompt-card__q">{c.question}</span>
+                {c.thisWeek ? (
+                  <span className="prompt-card__badges">
+                    <span className="badge badge--caps badge--sm badge--lime">This week</span>
+                    <span className={`badge badge--caps badge--sm ${c.color === "purple" ? "badge--pink" : "badge--purple"}`}>{c.category}</span>
+                  </span>
+                ) : (
+                  <span className={`badge badge--caps badge--sm prompt-card__badge ${c.color === "purple" ? "badge--pink" : "badge--purple"}`}>{c.category}</span>
+                )}
+                <span className={`prompt-card__q${questionSize(c.question)}`}>{c.question}</span>
+                {c.answerOnce && (c.you || (c.others?.length ?? 0) > 0) && (
+                  <span className="prompt-card__answers">
+                    <span className="prompt-card__faces" aria-hidden="true">
+                      {[...(c.you ? [storybook.me.name || "You"] : []), ...(c.others ?? [])].slice(0, 3).map((n, k) => (
+                        <span key={k} className={`prompt-card__face${c.you && k === 0 ? " prompt-card__face--you" : ""}`}>
+                          {n.trim().charAt(0).toUpperCase()}
+                          {c.you && k === 0 && (
+                            <span className="prompt-card__face-check">
+                              <IconCheck size={9} strokeWidth={4} />
+                            </span>
+                          )}
+                        </span>
+                      ))}
+                    </span>
+                    {answeredLine([...(c.you ? ["You"] : []), ...(c.others ?? [])])}
+                  </span>
+                )}
                 {c.art ? (
                   <img src={`/${c.art}`} alt="" className="prompt-card__art" style={{ borderRadius: 16, aspectRatio: "1", objectFit: "cover" }} />
                 ) : (

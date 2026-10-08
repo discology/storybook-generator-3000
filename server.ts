@@ -26,6 +26,7 @@ import costRoutes from "./server/costRoutes";
 import guestRoutes, { startGuestCleanup } from "./server/guests";
 import textRoutes from "./server/textRoutes";
 import feedbackRoutes from "./server/feedbackRoutes";
+import promptAnswerRoutes from "./server/promptAnswers";
 import { startWeeklyDigest } from "./server/feedbackAnalysis";
 import { startTextCleanup } from "./server/texts";
 import { startReminders } from "./server/reminders";
@@ -104,6 +105,7 @@ app.use("/api", guestRoutes);
 app.use("/api", jobRoutes);
 app.use("/api", textRoutes);
 app.use("/api", feedbackRoutes);
+app.use("/api", promptAnswerRoutes);
 
 // In production this server also serves the built web app (npm run build);
 // in development Vite serves it.

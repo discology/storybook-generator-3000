@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { flushSync } from "react-dom";
 import { apiGet, apiSend, ApiError } from "../../lib/api";
 import { IconImage, IconInfo, IconMenu, IconMic, IconSparkle, IconTrash, IconUpload } from "../../components/icons";
-import { Chev, Field, Select } from "../../components/ui";
+import { Check, Chev, Field, Select } from "../../components/ui";
 import { CARD_ART, PromptArt, PromptText } from "./AdminPromptLibrary";
 import { PROMPT_VARIABLES, unknownPromptVariables } from "../../lib/promptVariables";
 import PromptArtworkDialog, { type ArtworkTab } from "./PromptArtworkDialog";
@@ -48,7 +48,7 @@ export default function AdminPromptEdit() {
 
   const categories = useMemo(() => [...new Set(all.map((p) => p.category))], [all]);
   const dirty =
-    !!form && !!saved && (["question", "supportingText", "category", "audience", "childStage", "cardColor", "artworkPath"] as const).some((k) => (form[k] ?? "") !== (saved[k] ?? ""));
+    !!form && !!saved && (["question", "supportingText", "category", "audience", "childStage", "cardColor", "artworkPath", "answerOnce"] as const).some((k) => (form[k] ?? "") !== (saved[k] ?? ""));
   const index = Math.max(0, all.filter((p) => p.status === "published").findIndex((p) => p.id === id));
 
   const set = <K extends keyof Prompt>(key: K, value: Prompt[K]) => setForm((f) => (f ? { ...f, [key]: value } : f));
@@ -89,6 +89,7 @@ export default function AdminPromptEdit() {
         audience: form.audience,
         childStage: form.childStage,
         cardColor: form.cardColor,
+        answerOnce: form.answerOnce,
         artworkPath: form.artworkPath,
         status,
       });
@@ -224,6 +225,14 @@ export default function AdminPromptEdit() {
             <Field label="Child stage" htmlFor="stage">
               <Select id="stage" value={form.childStage} onChange={(v) => set("childStage", v)} options={STAGES} />
             </Field>
+            <Check
+              id="answer-once"
+              checked={!!form.answerOnce}
+              onChange={(v) => setForm({ ...form, answerOnce: v })}
+              sub="Shows on the card which family members have answered, and moves to the back of someone's deck once they record it. With the audience set to Everyone, it can be the question of the week."
+            >
+              Answer once per person
+            </Check>
             <div className="field">
               <span className="field__label">Card color</span>
               <div className="swatches" role="radiogroup">

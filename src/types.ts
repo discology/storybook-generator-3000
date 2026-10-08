@@ -149,6 +149,7 @@ export interface Prompt {
   audience: string;
   childStage: string;
   cardColor: string;
+  answerOnce: boolean;
   artworkPath: string | null;
   status: "draft" | "published" | "archived";
   sortOrder: number;

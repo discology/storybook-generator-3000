@@ -2374,6 +2374,20 @@ label.chip {
   width: 82%;
   align-self: center;
 }
+/* Question of the week and who answered (VSB-113) */
+.prompt-card__badges { align-self: flex-start; display: flex; flex-wrap: wrap; gap: 6px; }
+.prompt-card__q--long { font-size: 28px; }
+.prompt-card__q--longer { font-size: 25px; }
+.prompt-card__answers { align-self: center; display: inline-flex; align-items: center; gap: 8px; margin: 2px 0 10px; padding: 5px 12px 5px 5px; border-radius: 999px; background: rgba(255, 255, 255, 0.18); font-family: var(--font-title); font-weight: 600; font-size: 15px; line-height: 1.1; }
+.prompt-card--gold .prompt-card__answers,
+.prompt-card--pink .prompt-card__answers,
+.prompt-card--green .prompt-card__answers { background: rgba(0, 0, 0, 0.1); }
+.prompt-card__faces { display: inline-flex; }
+.prompt-card__face { position: relative; width: 26px; height: 26px; box-sizing: border-box; border-radius: 999px; border: 2px solid rgba(255, 255, 255, 0.9); background: var(--purple-soft); color: var(--ink); display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; }
+.prompt-card__face + .prompt-card__face { margin-left: -7px; }
+.prompt-card__face--you { background: #ffd9a8; }
+.prompt-card__face-check { position: absolute; right: -5px; bottom: -5px; width: 15px; height: 15px; border-radius: 999px; background: var(--green); color: var(--white); display: inline-flex; align-items: center; justify-content: center; }
+.prompt-card--answered .prompt-card__art { width: 70%; }
 
 .deck-dots {
   display: flex;
