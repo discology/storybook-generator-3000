@@ -53,6 +53,7 @@ export const STEP_LABELS: Record<string, { label: string; kind: UsageKind; group
   page_check: { label: "Checking the pages", kind: "text", group: "chapter" },
   guardian: { label: "Guardian review", kind: "text", group: "chapter" },
   page_revise: { label: "Rewriting a page", kind: "text", group: "chapter" },
+  shot_replan: { label: "Replanning a shot before drawing", kind: "text", group: "chapter" },
   chapter_sheet: { label: "Chapter character sheet", kind: "image", group: "chapter" },
   page_picture: { label: "Drawing pages", kind: "image", group: "chapter" },
   page_fix: { label: "Automatic redraws (character didn't match)", kind: "image", group: "chapter" },
@@ -68,6 +69,7 @@ export const STEP_LABELS: Record<string, { label: string; kind: UsageKind; group
   admin_test: { label: "Admin test runs", kind: "text", group: "admin" },
   feedback_redraw: { label: "Feedback redraws (compare)", kind: "image", group: "admin" },
   feedback_analysis: { label: "Feedback analysis", kind: "text", group: "admin" },
+  feedback_replan: { label: "Feedback replans (compare)", kind: "text", group: "admin" },
 };
 
 export interface UsageTags {

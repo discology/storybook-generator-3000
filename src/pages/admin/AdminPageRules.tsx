@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { apiGet, apiSend, ApiError } from "../../lib/api";
+import ShotReviews, { type ShotReviewItem } from "./ShotReviews";
 
 interface ReadingProfile {
   label: string;
@@ -11,12 +12,28 @@ interface ReadingProfile {
   pictures?: string;
 }
 
+interface ShotType {
+  key: string;
+  label: string;
+  framing: string;
+}
+
+interface BlockedShot {
+  id: string;
+  pattern: string;
+  why: string;
+  instead: string;
+}
+
 interface PageRules {
   readingProfiles: Record<string, ReadingProfile>;
   embellishment: string;
   illustrationStyle: string;
   peopleStyle: string;
   pictureDirection?: string;
+  shotTypes?: ShotType[];
+  blockedShots?: BlockedShot[];
+  shotReviewThreshold?: number;
   imageModel: string;
   imageQuality: string;
 }
@@ -42,14 +59,25 @@ export default function AdminPageRules() {
   const [rules, setRules] = useState<PageRules | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [reviews, setReviews] = useState<{ threshold: number; items: ShotReviewItem[] } | null>(null);
 
   const load = () =>
     apiGet("/api/admin/page-rules").then((d: RulesResponse) => {
-      setData(d);
-      setRules(d.rules);
+      // Versions from before the Shot list existed show the defaults, so saving keeps them.
+      const filled: PageRules = {
+        ...d.rules,
+        shotTypes: d.rules.shotTypes ?? d.defaults.shotTypes,
+        blockedShots: d.rules.blockedShots ?? d.defaults.blockedShots,
+        shotReviewThreshold: d.rules.shotReviewThreshold ?? d.defaults.shotReviewThreshold,
+      };
+      setData({ ...d, rules: filled });
+      setRules(filled);
     });
+  const loadReviews = () => apiGet("/api/admin/shot-reviews").then(setReviews);
   useEffect(() => {
     load();
+    loadReviews();
   }, []);
 
   if (!data || !rules) return <p>Loading…</p>;
@@ -62,6 +90,14 @@ export default function AdminPageRules() {
   };
   const setProfile = (band: string, key: keyof ReadingProfile, value: string | number) =>
     update({ ...rules, readingProfiles: { ...rules.readingProfiles, [band]: { ...rules.readingProfiles[band], [key]: value } } });
+  const shotTypes = rules.shotTypes ?? [];
+  const blockedShots = rules.blockedShots ?? [];
+  const setShotType = (i: number, key: "label" | "framing", value: string) => update({ ...rules, shotTypes: shotTypes.map((t, j) => (j === i ? { ...t, [key]: value } : t)) });
+  const setBlocked = (i: number, key: "pattern" | "why" | "instead", value: string) => update({ ...rules, blockedShots: blockedShots.map((b, j) => (j === i ? { ...b, [key]: value } : b)) });
+  const addBlocked = () => {
+    const next = Math.max(0, ...blockedShots.map((b) => Number(b.id.replace(/\D/g, "")) || 0)) + 1;
+    update({ ...rules, blockedShots: [...blockedShots, { id: `B-${next}`, pattern: "", why: "", instead: "" }] });
+  };
 
   const save = async () => {
     try {
@@ -97,6 +133,7 @@ export default function AdminPageRules() {
         checks pages is worded under AI Instructions → Plan pages / Check pages.
       </p>
       {error && <p className="status-line" style={{ color: "#d94c4c" }}>{error}</p>}
+      {notice && <p className="status-line">{notice}</p>}
 
       <div className="card">
         <h3 style={{ marginTop: 0 }}>Reading stages</h3>
@@ -194,6 +231,102 @@ export default function AdminPageRules() {
           attached to every picture they're in.
         </p>
       </div>
+
+      <div className="card">
+        <h3 style={{ marginTop: 0 }}>Shot list</h3>
+        <p className="status-line">
+          The shot types the planner may use, each with the framing line its picture prompt gets, and the shots that don't work on a Vambie. Before anything is drawn, a planned shot that
+          mixes types, isn't on the list or matches a blocked shot is replanned once; if it still doesn't fit, the page is flagged and drawn anyway. The planner is always asked for one
+          focus per shot.
+        </p>
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th>Shot type</th>
+              <th>Framing line in the picture prompt</th>
+            </tr>
+          </thead>
+          <tbody>
+            {shotTypes.map((t, i) => (
+              <tr key={t.key}>
+                <td style={{ whiteSpace: "nowrap" }}>
+                  <input value={t.label} onChange={(e) => setShotType(i, "label", e.target.value)} style={{ width: 170 }} aria-label={`Name of the ${t.key} shot`} />
+                </td>
+                <td>
+                  <textarea rows={2} value={t.framing} onChange={(e) => setShotType(i, "framing", e.target.value)} aria-label={`Framing line for ${t.label}`} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <h4 style={{ margin: "16px 0 4px" }}>Shots that don't work on a Vambie</h4>
+        <p className="status-line">A shot matches when any of its words appear in the planned type, angle or focus.</p>
+        <table className="admin-table">
+          <thead>
+            <tr>
+              <th></th>
+              <th>Words that mark the shot</th>
+              <th>Why it doesn't work</th>
+              <th>Use instead</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            {blockedShots.map((b, i) => (
+              <tr key={b.id}>
+                <td style={{ whiteSpace: "nowrap" }}>
+                  <strong>{b.id}</strong>
+                </td>
+                <td>
+                  <textarea rows={2} value={b.pattern} onChange={(e) => setBlocked(i, "pattern", e.target.value)} placeholder="feet, ankle height" aria-label={`${b.id} words`} />
+                </td>
+                <td>
+                  <textarea rows={2} value={b.why} onChange={(e) => setBlocked(i, "why", e.target.value)} aria-label={`${b.id} why`} />
+                </td>
+                <td>
+                  <textarea rows={2} value={b.instead} onChange={(e) => setBlocked(i, "instead", e.target.value)} aria-label={`${b.id} use instead`} />
+                </td>
+                <td style={{ whiteSpace: "nowrap" }}>
+                  <button className="btn-link" onClick={() => update({ ...rules, blockedShots: blockedShots.filter((_, j) => j !== i) })}>
+                    Remove
+                  </button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        <button className="btn-link" onClick={addBlocked}>
+          Add a shot that doesn't work
+        </button>
+        <div className="row" style={{ alignItems: "center", gap: 12 }}>
+          <label htmlFor="shot-threshold" style={{ margin: 0 }}>
+            Propose a shot for review once it's flagged on this many pages
+          </label>
+          <input
+            id="shot-threshold"
+            type="number"
+            min={1}
+            max={50}
+            value={rules.shotReviewThreshold ?? 3}
+            onChange={(e) => update({ ...rules, shotReviewThreshold: Number(e.target.value) })}
+            style={{ width: 70 }}
+          />
+        </div>
+      </div>
+
+      {reviews && (
+        <ShotReviews
+          items={reviews.items}
+          threshold={reviews.threshold}
+          disabled={dirty}
+          disabledNote="Save or discard your changes above first: blocking a shot saves a new version."
+          onChanged={(n) => {
+            setNotice(n);
+            void load();
+            void loadReviews();
+          }}
+        />
+      )}
 
       {JSON.stringify(rules) !== JSON.stringify(data.defaults) && (
         <button className="btn-link" onClick={() => update(data.defaults)}>

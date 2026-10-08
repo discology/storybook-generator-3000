@@ -7,6 +7,7 @@ import { getActiveRules, type PageRules } from "./pageRules";
 import { PRICES, withUsage } from "./aiUsage";
 import { FLAG_CATEGORIES } from "./flagCategories";
 import { ENFORCEMENT_TARGETS, describeGuide, getGuide } from "./guideBook";
+import { describeShotRules } from "./shotRules";
 import { drawComparison } from "./storyPages";
 import { DAYS, zonedParts, zonedToUtc } from "./weeklyChapters";
 
@@ -78,6 +79,7 @@ async function currentWording() {
     `Page Rules: Art style (page_rules.illustrationStyle):\n${rules.illustrationStyle}`,
     `Page Rules: How people are drawn (page_rules.peopleStyle):\n${rules.peopleStyle}`,
     `Page Rules: Camera and acting (page_rules.pictureDirection):\n${rules.pictureDirection ?? "(not set)"}`,
+    `Page Rules: Shot list (page_rules.shotRules):\n${describeShotRules(rules)}`,
     `AI instruction: Plan pages (instruction.page_plan):\n${plan.body}`,
     `AI instruction: Check illustration (instruction.illustration_check):\n${check.body}`,
   ].join("\n\n");

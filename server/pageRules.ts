@@ -1,5 +1,6 @@
 import { prisma } from "./db";
 import { STAGE_KEYS, normalizeStage } from "./readingStages";
+import { BlockedShot, DEFAULT_BLOCKED_SHOTS, DEFAULT_SHOT_REVIEW_THRESHOLD, DEFAULT_SHOT_TYPES, SHOT_KEYS, ShotType } from "./shotRules";
 
 // Admin-configurable rules for turning a chapter into illustrated pages. Saving
 // creates a new GenerationRuleSet version; chapters keep the version they used.
@@ -29,6 +30,12 @@ export interface PageRules {
   // Camera and acting for page pictures (VSB-90). Absent on older versions, whose
   // chapters keep the pictures they were made with.
   pictureDirection?: string;
+  // The Shot list (VSB-108): allowed shot types with their framing lines, the
+  // shots that don't work on a Vambie, and how many flagged pages propose a
+  // shot for review. Absent on older versions, which read the defaults.
+  shotTypes?: ShotType[];
+  blockedShots?: BlockedShot[];
+  shotReviewThreshold?: number;
   imageModel: string;
   imageQuality: "low" | "medium" | "high";
 }
@@ -117,6 +124,9 @@ export const DEFAULT_RULES: PageRules = {
   illustrationStyle: INK_AND_WASH_STYLE,
   peopleStyle: PEOPLE_AS_VAMBIES,
   pictureDirection: PICTURE_DIRECTION,
+  shotTypes: DEFAULT_SHOT_TYPES,
+  blockedShots: DEFAULT_BLOCKED_SHOTS,
+  shotReviewThreshold: DEFAULT_SHOT_REVIEW_THRESHOLD,
   imageModel: "gpt-image-2",
   imageQuality: "medium",
 };
@@ -154,6 +164,28 @@ export function validateRules(rules: any): string | null {
     if (typeof rules[field] !== "string" || !rules[field].trim()) return `${field} can't be empty.`;
   }
   if (rules.pictureDirection !== undefined && typeof rules.pictureDirection !== "string") return "Camera and acting must be text.";
+  if (rules.shotTypes !== undefined) {
+    if (!Array.isArray(rules.shotTypes)) return "The shot list must be a list.";
+    for (const key of SHOT_KEYS) {
+      const t = rules.shotTypes.find((x: any) => x?.key === key);
+      if (!t) return `The shot list is missing "${key}".`;
+      if (typeof t.label !== "string" || !t.label.trim() || typeof t.framing !== "string" || !t.framing.trim()) return `Shot "${key}" needs a label and a framing line.`;
+    }
+  }
+  if (rules.blockedShots !== undefined) {
+    if (!Array.isArray(rules.blockedShots)) return "Shots that don't work must be a list.";
+    const ids = new Set<string>();
+    for (const b of rules.blockedShots) {
+      if (!b || !/^B-\d+$/.test(b.id ?? "")) return `"${b?.id ?? ""}" isn't a shot rule number like B-3.`;
+      if (ids.has(b.id)) return `${b.id} is used twice.`;
+      ids.add(b.id);
+      if (typeof b.pattern !== "string" || !b.pattern.trim()) return `${b.id}: say which words mark the shot (for example: feet, ankle height).`;
+      if (typeof b.why !== "string" || typeof b.instead !== "string") return `${b.id}: "why" and "use instead" must be text.`;
+    }
+  }
+  if (rules.shotReviewThreshold !== undefined && (!Number.isInteger(rules.shotReviewThreshold) || rules.shotReviewThreshold < 1 || rules.shotReviewThreshold > 50)) {
+    return "Shots to review: the number of flagged pages must be a whole number from 1 to 50.";
+  }
   if (!IMAGE_MODELS.includes(rules.imageModel)) return "Pick one of the listed image models.";
   if (!["low", "medium", "high"].includes(rules.imageQuality)) return "Pick an image quality.";
   return null;

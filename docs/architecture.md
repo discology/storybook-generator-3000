@@ -56,7 +56,8 @@ docs/                 these guides
 | `memoryPipeline.ts` | Transcribing, titling and interpreting new recordings |
 | `weeklyChapters.ts` | The weekly chapter schedule |
 | `readingStages.ts` | The five reading stages and Baby Vambie's name by age |
-| `pageRules.ts` | Versioned page rules: reading profiles, art direction, image model and quality |
+| `pageRules.ts` | Versioned page rules: reading profiles, art direction, the Shot list, image model and quality |
+| `shotRules.ts` | The Shot list: allowed shot types with their framing lines, shots that don't work, matching a planned shot, and grouping flagged shots for review |
 | `characters.ts`, `familyCharacters.ts` | Character cards, casting, reference art and render choice, design proposals |
 | `aiService.ts`, `aiInstructions.ts` | Calling the AI provider; each AI step's instructions and reply format |
 | `imageQueue.ts` | Pacing image requests to the OpenAI account's per-minute limit |
@@ -75,7 +76,7 @@ The schema is in `prisma/schema.prisma`. Here are the models, grouped by what th
 - **Chapters:** `Chapter` (with its rules snapshot), `ChapterSource` (which memories it came from), `StoryPage`, `PageAsset` (every picture attempt for a page), `GuardianFinding`, `ChapterAccess` and `ChapterShare` (sharing), `ChapterMark` (bookmarks and reading progress), `StoryFeedback`.
 - **Characters:** `Character` and `CharacterArt` (the Vambies), `FamilyCharacter`, `CharacterDesign` (versioned looks per age), `DesignProposal`, `PageAppearance` (which design of a family member is on a page, and what they're wearing).
 - **Visitors:** a visitor's draft is an ordinary `Household` with a guest token (and, for a relative recording before joining, the invitation it came from), holding a storybook with status `guest`. `GuestPreview` logs each free preview for the daily limits, and `AppSetting` holds the daily cap.
-- **Configuration:** `Prompt`, `PromptArtwork` (pictures generated or uploaded for prompt cards), `MessageTemplate`, `AiInstruction`, `GenerationRuleSet` (one row per page rules version).
+- **Configuration:** `Prompt`, `PromptArtwork` (pictures generated or uploaded for prompt cards), `MessageTemplate`, `AiInstruction`, `GenerationRuleSet` (one row per page rules version), `ShotReview` (a flagged shot pattern the team accepted or blocked).
 - **Exports:** `ExportRequest`.
 - **Costs:** `AiUsage` (one row per AI call: step, model, tokens, cost in dollars, and the family, chapter or memory it was for).
 
@@ -103,7 +104,7 @@ The story steps (`page_plan`, `page_check`, `page_revise`, `guardian`) also read
 | `interpret` | A memory has been transcribed | A title, what happened, feelings and possible themes |
 | `page_plan` | A chapter is made or fully rewritten | The page-by-page plan, extras and Who's who questions |
 | `page_check` | After planning, and after a page is edited or revised | Notes for pages that need attention |
-| `page_revise` | A parent asks to change one page | The rewritten page |
+| `page_revise` | A parent asks to change one page, or a planned shot breaks the Shot list (one replan before drawing) | The rewritten page, or a new shot |
 | `illustration_check` | Each new picture (the image is attached) | Whether it matches the page, and which family members don't match their design |
 | `describe_person` | A photo is uploaded for a family member | A draft of their fixed features and usual clothing |
 | `guardian` | After planning, or when an admin re-runs it | Findings for continuity, reader fit and private details |

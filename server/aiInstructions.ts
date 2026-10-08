@@ -86,6 +86,7 @@ Do not diagnose anyone or state things the parent didn't say. If something is un
       { name: "cast", description: "The chapter's recurring characters from the Character Library: required ones, and optional ones with their casting notes", sample: "- baby_vambie: Baby Vambie. Required in this chapter.\n  Role: Stands in for the child in every story; witnesses feelings rather than fixing them.\n  Look: Teal-blue; oversized rounded head; huge round eyes; tiny fangs; simple body and limbs\n  Never: No spikes, horns, wings or tail.\n  Personality: Curious compassion. Sits beside a feeling rather than fighting it." },
       { name: "family_cast", description: "The family's saved characters (Our Characters): permanent refs, relationships, aliases, context and approved looks", sample: "- F1: Grandma Rose\n  Relationship to the child: Grandmother (Mom's mother)\n  Also called: Grandma, Nana\n  Context: Lives nearby and keeps a vegetable garden.\n  Approved looks: \"today\" (round face, warm brown skin, short silver curls, round tortoiseshell glasses, small and sturdy)" },
       { name: "revision_request", description: "A reviewer's revision note, or empty on a first draft", sample: "" },
+      { name: "shot_rules", description: "The Shot list from Page Rules: the allowed shot types and the shots that don't work on a Vambie", sample: "Allowed shot types (write the type exactly as one of these, never two combined): Wide establishing; Medium; Close-up; Extreme close-up; Over-the-shoulder; Bird's-eye; Low angle.\nOne focus per shot: \"focus\" names the single thing the picture centers on.\nShots that don't work on a Vambie (never plan these):\n- B-1: feet, foot, toes, legs, ankle. Tiny legs under a huge head read as extra feet. Use instead: a medium shot from the side with the whole body in the frame." },
       { name: "world", description: "The Vambie world, storybook edition (edit it under AI instructions > The Vambie world)", sample: "(the current text of The Vambie world)" },
     ],
     defaultBody: `You are the Storyteller of the Vambie storybooks: a picture-book author and a poet who writes for children. Turn one real family memory into the next illustrated chapter of <child_name>'s storybook, planned page by page, in the voice of the Vambie world.
@@ -151,7 +152,8 @@ Scene and continuity
 - Track every state that changes during the memory (eyes closed or open, awake or asleep, dry or wet, held or put down, dressed for outside or not). Say the state on every page in visibleAction and continuity, so no page shows a change before the memory makes it. A newborn starts curled, swaddled and eyes shut until the memory says the eyes open.
 
 Shot list
-- Plan every page's camera like a picture-book illustrator: the shot type (wide establishing, medium, close-up, extreme close-up, over-the-shoulder, bird's-eye or low angle), the camera angle, and the one thing the picture focuses on.
+<shot_rules>
+- Plan every page's camera like a picture-book illustrator: the shot type (exactly one of the allowed types above), the camera angle, and the one thing the picture focuses on.
 - Open with a wide establishing shot that shows where we are, unless the whole memory happens in one place and one embrace: then open with a medium shot and let the room show at the edges. Use close-ups for the most emotional moments and for important small objects.
 - Two pages in a row with the same subject must change the viewpoint, not only the distance: the other side, from behind, from above, or the point of view of the person holding or watching (one point-of-view shot per chapter suits an intimate memory). Never the same composition at two zooms.
 - In intimate scenes, extras face away or stay at the edge of the frame, so the family holds the picture.
@@ -247,6 +249,7 @@ Otherwise mark it ok. Keep each note to one sentence a parent can act on.`,
       { name: "previous_page", description: "The page before, for continuity (or none)", sample: "Page 2: Baby Vambie checks the bare soil each morning, wearing the yellow sun hat." },
       { name: "next_page", description: "The page after, for continuity (or none)", sample: "Page 4: Grandma and Baby Vambie water the sprout together." },
       { name: "revision_request", description: "What the parent asked to change", sample: "Grandma should be the one who spots it first." },
+      { name: "shot_rules", description: "The Shot list from Page Rules: the allowed shot types and the shots that don't work on a Vambie", sample: "Allowed shot types (write the type exactly as one of these, never two combined): Wide establishing; Medium; Close-up; Extreme close-up; Over-the-shoulder; Bird's-eye; Low angle.\nOne focus per shot: \"focus\" names the single thing the picture centers on.\nShots that don't work on a Vambie (never plan these):\n- B-1: feet, foot, toes, legs, ankle. Tiny legs under a huge head read as extra feet. Use instead: a medium shot from the side with the whole body in the frame." },
       { name: "world", description: "The Vambie world, storybook edition (edit it under AI instructions > The Vambie world)", sample: "(the current text of The Vambie world)" },
     ],
     defaultBody: `You are revising one page of an illustrated storybook chapter.
@@ -277,7 +280,10 @@ Next page: <next_page>
 
 The parent asked: "<revision_request>"
 
-Rewrite page <page_number> to make that change. Keep it one main action or emotional moment, keep it consistent with the previous and next pages, keep family facts as told, and make sure the scene and the exact text agree. Choose a camera shot that suits the moment and differs from the shot type of the previous and next pages. In "characters", name cast members by their key and family characters by their ref (F1), and give each family character an "appearances" entry with their look and what they wear in this scene.`,
+Rewrite page <page_number> to make that change. Keep it one main action or emotional moment, keep it consistent with the previous and next pages, keep family facts as told, and make sure the scene and the exact text agree. Choose a camera shot that suits the moment, differs from the shot type of the previous and next pages, and follows the shot rules below. In "characters", name cast members by their key and family characters by their ref (F1), and give each family character an "appearances" entry with their look and what they wear in this scene.
+
+Shot rules
+<shot_rules>`,
     outputFormat: `Respond with ONLY a JSON object, no markdown fences, for the single revised page: {"storyMoment": "...", "characters": ["cast keys, family refs and extras' names"], "appearances": [{"ref": "F1", "variant": "today", "outfit": "..."}], "setting": "...", "visibleAction": "...", "emotionalTone": "...", "continuity": "...", "shot": {"type": "...", "angle": "...", "focus": "..."}, "pictureSize": "vignette | framed | full | wordless | none (keep the current one unless the change calls for another)", "text": "exact words shown beneath the illustration (empty on a wordless page)", "sourceMemory": 1, "sourceQuote": "...", "interpretationNote": "..."}`,
   },
   {

@@ -29,6 +29,7 @@ model User {
   flags            Flag[]
   actionItems      ActionItem[]
   guideVersions    GuideBook[]
+  shotReviews      ShotReview[]
   contributors Contributor[]
   sessions    Session[]
   ownedHouseholds Household[]
@@ -332,6 +333,7 @@ model StoryPage {
   emotionalTone      String
   continuity         String
   shot               String? // JSON: { type, angle, focus }
+  shotReplan         String? // JSON: the shot the app replaced before drawing, and why (VSB-108)
   pictureSize        String      @default("") // vignette | framed | full | wordless; "" on pages made before sizes existed
   text               String // exact words shown beneath the illustration (empty on wordless pages)
   interpretationNote String
@@ -625,8 +627,10 @@ model FlagRedraw {
   id             String   @id @default(cuid())
   flagId         String
   flag           Flag     @relation(fields: [flagId], references: [id], onDelete: Cascade)
-  // "today": the live rules; "trial": a suggested wording on a test copy of them (VSB-104).
+  // "today": the live rules; "trial": a suggested wording on a test copy of them
+  // (VSB-104); "replan": a different shot planned with today's Shot list (VSB-108).
   kind           String   @default("today")
+  shot           String? // JSON: the replanned shot a "replan" redraw used
   suggestionId   String?
   suggestion     AnalysisSuggestion? @relation(fields: [suggestionId], references: [id], onDelete: Cascade)
   status         String   @default("drawing") // drawing | ready | failed
@@ -686,4 +690,20 @@ model AnalysisSuggestion {
   actionItemId String?
   trials       FlagRedraw[]
   createdAt    DateTime         @default(now())
+}
+
+// A shot pattern the team decided on after it was flagged on enough pages
+// (VSB-108): accepted as fine (proposed again only past the count it had), or
+// blocked by adding a rule to the Page Rules Shot list.
+model ShotReview {
+  id          String   @id @default(cuid())
+  signature   String   @unique // the pattern as the queue groups it (server/shotRules.ts)
+  status      String // accepted | blocked
+  count       Int // flagged pages when decided
+  blockedId   String? // the B-n rule added to Page Rules
+  note        String   @default("")
+  createdById String?
+  createdBy   User?    @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 }

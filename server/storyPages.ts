@@ -22,6 +22,7 @@ import { getOpenAI } from "./openaiClient";
 import { MAX_REFERENCE_IMAGES, withImageRateLimit } from "./imageQueue";
 import { linkUsage, recordImage } from "./aiUsage";
 import { effectiveStage, vambieName } from "./readingStages";
+import { checkShot, describeShotRules, isCloseUpShot, primaryShotKey, shotFramingFor, withShotRules } from "./shotRules";
 import {
   EMBELLISHMENT_LEVELS,
   PageRules,
@@ -150,21 +151,13 @@ const parseShot = (json: string | null): Shot | null => {
 const describeShot = (shot: Shot | null) =>
   shot ? `${shot.type}${shot.angle ? `, ${shot.angle}` : ""}${shot.focus ? `. Focus: ${shot.focus}` : ""}` : "";
 
-// What each planned shot type means for the frame, spelled out so pictures don't
-// drift back to a medium shot of everyone (VSB-90). Matched on the type only.
-const SHOT_FRAMING: [RegExp, string][] = [
-  [/extreme close/, "Extreme close-up: only the focus (an eye, a mouth, hands, a small object) fills the frame, cropped tight. Nothing else of the scene or the characters' bodies shows."],
-  [/close/, "Close-up: the focus fills most of the frame. A face is cropped at the shoulders or tighter, and little of the room shows."],
-  [/establishing|wide/, "Wide shot: the place fills the frame and the characters are small in it."],
-  [/over.the.shoulder/, "Over-the-shoulder: one character's back, shoulder and head are large in the near foreground at one side, cut off by the frame, and we look past them at the other."],
-  [/bird/, "Bird's-eye view: looking straight down from high above, so we see the tops of heads and the floor around them."],
-  [/low/, "Low angle: the camera is near the ground looking up, so the subject looms above."],
-  [/medium/, "Medium shot: characters from about the knees or waist up, filling the frame; most of the room is cropped out."],
-];
-const shotFraming = (shot: Shot | null) => (shot ? SHOT_FRAMING.find(([pattern]) => pattern.test(shot.type.toLowerCase()))?.[1] ?? "" : "");
+// The framing line each shot type adds to its picture prompt comes from the Shot
+// list in Page Rules (VSB-108; the lines began as code in VSB-90). A composite
+// type on an older page ("low close-up") is framed as its first type.
+const shotFraming = (shot: Shot | null, rules?: PageRules) => shotFramingFor(shot, rules);
 // Close-ups leave out the full-body character sheet, which pulls pictures back
 // to whole figures, and repeat their framing at the end of the prompt.
-const isCloseUp = (shot: Shot | null) => /close/.test(shot?.type.toLowerCase() ?? "");
+const isCloseUp = (shot: Shot | null) => isCloseUpShot(shot);
 
 const findCastMember = (cast: CastMember[], nameOrKey: string) => {
   const n = nameOrKey.trim().toLowerCase();
@@ -456,9 +449,10 @@ export async function createPagedChapter(input: CreateChapterInput) {
         memories: formatMemories(input.memories),
         previous_chapters: priorChapters.map((c) => c.title).join(", ") || "(none yet — this is the first chapter)",
         revision_request: input.revisionRequest ? `A reviewer asked for this revision: "${input.revisionRequest}"` : "",
+        shot_rules: describeShotRules(snapshot.rules),
         ...snapshotCharacterValues(snapshot),
       }),
-      { body: named(snapshot, snapshot.instructions.page_plan) },
+      { body: withShotRules(named(snapshot, snapshot.instructions.page_plan)) },
       [],
       { chapterId: existing?.id ?? null, householdId: storybook.child.householdId }
     );
@@ -555,6 +549,7 @@ export async function createPagedChapter(input: CreateChapterInput) {
     })),
   });
 
+  await enforceShots(chapterId);
   await checkPages(chapterId);
   await runGuardian(chapterId);
   if (!unresolved.length && input.illustrate !== false) void illustrateChapter(chapterId);
@@ -691,8 +686,17 @@ export async function checkPages(chapterId: string, pageNumbers?: number[]) {
   for (const page of targets) {
     const shot = parseShot(page.shot);
     const before = parseShot(chapter.pages.find((p) => p.pageNumber === page.pageNumber - 1)?.shot ?? null);
-    if (shot && before && shot.type.toLowerCase() === before.type.toLowerCase()) {
-      notes.get(page.pageNumber)?.push(`Same shot type (${shot.type}) as page ${page.pageNumber - 1}; vary the framing.`);
+    const same = shot && before && (primaryShotKey(shot.type) ?? shot.type.toLowerCase()) === (primaryShotKey(before.type) ?? before.type.toLowerCase());
+    if (same) {
+      notes.get(page.pageNumber)?.push(`Same shot type (${shot!.type}) as page ${page.pageNumber - 1}; vary the framing.`);
+    }
+    // Shot rules (VSB-108): a blocked or mixed shot the app couldn't fix by
+    // replanning once is noted for the parent; the page is still drawn. (A focus
+    // that names two things only shapes the replan request, not a note.)
+    const check = checkShot(shot, snapshot.rules);
+    if (shot && check.replan) {
+      const replanned = parseReplan(page.shotReplan);
+      notes.get(page.pageNumber)?.push(`Blocked shot: ${check.reasons.join("; ")}.${replanned ? " The app asked for a different shot once." : ""}`);
     }
   }
 
@@ -754,6 +758,102 @@ export async function editPageText(pageId: string, text: string) {
   await runGuardian(page.chapterId);
 }
 
+type Loaded = Awaited<ReturnType<typeof loadChapter>>;
+
+const parseReplan = (json: string | null | undefined): { previous: Shot; reasons: string[]; at: string; stillBlocked?: boolean; failed?: string } | null => {
+  try {
+    return json ? JSON.parse(json) : null;
+  } catch {
+    return null;
+  }
+};
+
+// The values Revise page receives, shared by a parent's revision, a shot replan
+// before drawing and a replan for the feedback compare (VSB-108).
+function reviseValues(target: PageRow, ctx: Loaded, request: string, rules: PageRules | undefined = ctx.snapshot?.rules) {
+  const { chapter, snapshot, characterSheet, memories, unresolved } = ctx;
+  if (!snapshot) throw new Error("This chapter wasn't generated with page rules.");
+  const neighbor = (n: number) => {
+    const p = chapter.pages.find((x) => x.pageNumber === n);
+    return p ? `Page ${n}: ${p.storyMoment} Text: "${p.text}"` : "(none)";
+  };
+  return namedValues(snapshot, {
+    reading_level: describeProfile(snapshot.readingProfile),
+    embellishment_rules: embellishmentRule(snapshot.rules),
+    memories: formatMemories(memories),
+    characters: formatCharacters(characterSheet),
+    page_number: String(target.pageNumber),
+    current_page: formatPage(target, snapshot, unresolved),
+    previous_page: neighbor(target.pageNumber - 1),
+    next_page: neighbor(target.pageNumber + 1),
+    revision_request: request,
+    shot_rules: describeShotRules(rules),
+    ...snapshotCharacterValues(snapshot),
+  });
+}
+
+const shotOnlyRequest = (shot: Shot | null, why: string) =>
+  `Change only the camera shot of this page. The planned shot (${describeShot(shot) || "none"}) doesn't work: ${why}. Keep the story moment, the words, the characters and everything else exactly as they are; give the page a different shot type, angle and single focus that follow the shot rules, and adjust only the framing of the visible action if the new shot needs it.`;
+
+// Asks the planner for a different shot for one page, with the given rules.
+async function replanShot(target: PageRow, ctx: Loaded, why: string, rules: PageRules | undefined, tags: Parameters<typeof runAiStep>[4]): Promise<Shot | null> {
+  const { snapshot } = ctx;
+  if (!snapshot) throw new Error("This chapter wasn't generated with page rules.");
+  const { output } = await runAiStep(
+    "page_revise",
+    reviseValues(target, ctx, shotOnlyRequest(parseShot(target.shot), why), rules),
+    { body: withShotRules(named(snapshot, snapshot.instructions.page_revise)) },
+    [],
+    tags
+  );
+  return normalizePage(output).shot;
+}
+
+// Shot rules (VSB-108): before anything is drawn, a planned shot that mixes
+// types, isn't an allowed type or matches "Shots that don't work" gets one
+// replan of the shot. If the new shot is still blocked, the page check notes it
+// and the page is drawn anyway, so a chapter never gets stuck on a camera choice.
+export async function enforceShots(chapterId: string, pageNumbers?: number[]) {
+  const ctx = await loadChapter(chapterId);
+  const { chapter, snapshot } = ctx;
+  if (!snapshot || chapter.isMock || !isAiConfigured()) return;
+  for (const page of chapter.pages) {
+    if (pageNumbers && !pageNumbers.includes(page.pageNumber)) continue;
+    const shot = parseShot(page.shot);
+    const check = checkShot(shot, snapshot.rules);
+    if (!shot || !check.replan || parseReplan(page.shotReplan)) continue;
+    const at = new Date().toISOString();
+    try {
+      const next = await replanShot(page, ctx, check.reasons.join("; "), snapshot.rules, { chapterId, step: "shot_replan" });
+      const after = checkShot(next, snapshot.rules);
+      await prisma.storyPage.update({
+        where: { id: page.id },
+        data: {
+          shot: next ? JSON.stringify(next) : page.shot,
+          shotReplan: JSON.stringify({ previous: shot, reasons: check.reasons, at, stillBlocked: !next || (!after.ok && after.replan) }),
+        },
+      });
+    } catch (error: any) {
+      console.error(`Shot replan failed for page ${page.id}:`, error?.message);
+      await prisma.storyPage.update({ where: { id: page.id }, data: { shotReplan: JSON.stringify({ previous: shot, reasons: check.reasons, at, stillBlocked: true, failed: String(error?.message ?? "Failed").slice(0, 200) }) } });
+    }
+  }
+}
+
+// A different shot for a flagged page, planned with today's Shot list, for
+// "Replan the shot and redraw" in the feedback compare. The page never changes.
+export async function replanShotForCompare(pageId: string, rules: PageRules): Promise<Shot> {
+  const target = await prisma.storyPage.findUniqueOrThrow({ where: { id: pageId } });
+  const ctx = await loadChapter(target.chapterId);
+  if (!ctx.snapshot) throw new Error("This chapter wasn't generated with page rules.");
+  if (!isAiConfigured()) throw new Error("No AI provider configured.");
+  const check = checkShot(parseShot(target.shot), rules);
+  const why = check.ok ? "the team flagged this picture's camera and framing" : check.reasons.join("; ");
+  const next = await replanShot(target, ctx, why, rules, { step: "feedback_replan" });
+  if (!next) throw new Error("The AI didn't choose a new shot. Try again.");
+  return next;
+}
+
 // Rewrites one page's story moment, rechecks its neighbors for continuity and
 // redraws its illustration.
 export async function revisePage(pageId: string, request: string) {
@@ -761,26 +861,10 @@ export async function revisePage(pageId: string, request: string) {
   const { chapter, snapshot, characterSheet, memories, unresolved } = await loadChapter(target.chapterId);
   if (!snapshot) throw new Error("This chapter wasn't generated with page rules.");
   if (!isAiConfigured()) throw new Error("No AI provider configured.");
-  const neighbor = (n: number) => {
-    const p = chapter.pages.find((x) => x.pageNumber === n);
-    return p ? `Page ${n}: ${p.storyMoment} Text: "${p.text}"` : "(none)";
-  };
-
   const { output } = await runAiStep(
     "page_revise",
-    namedValues(snapshot, {
-      reading_level: describeProfile(snapshot.readingProfile),
-      embellishment_rules: embellishmentRule(snapshot.rules),
-      memories: formatMemories(memories),
-      characters: formatCharacters(characterSheet),
-      page_number: String(target.pageNumber),
-      current_page: formatPage(target, snapshot, unresolved),
-      previous_page: neighbor(target.pageNumber - 1),
-      next_page: neighbor(target.pageNumber + 1),
-      revision_request: request,
-      ...snapshotCharacterValues(snapshot),
-    }),
-    { body: named(snapshot, snapshot.instructions.page_revise) },
+    reviseValues(target, { chapter, snapshot, characterSheet, memories, unresolved }, request),
+    { body: withShotRules(named(snapshot, snapshot.instructions.page_revise)) },
     [],
     { chapterId: target.chapterId }
   );
@@ -807,7 +891,7 @@ export async function revisePage(pageId: string, request: string) {
     return variant ? [{ characterId: relative.characterId, designId: variant.designId, outfit: planned?.outfit || before?.outfit || "" }] : [];
   });
 
-  await prisma.storyPage.update({ where: { id: pageId }, data: { ...pageData(revised, memories), approvedAt: null } });
+  await prisma.storyPage.update({ where: { id: pageId }, data: { ...pageData(revised, memories), approvedAt: null, shotReplan: null } });
   await prisma.pageAppearance.deleteMany({ where: { pageId } });
   await prisma.pageAppearance.createMany({
     data: appearances.map((a) => ({ pageId, familyCharacterId: a.characterId, designId: a.designId, outfit: a.outfit })),
@@ -818,6 +902,7 @@ export async function revisePage(pageId: string, request: string) {
     data: { approvedAt: null },
   });
   await syncChapterContent(chapter.id);
+  await enforceShots(chapter.id, [target.pageNumber]);
   await checkPages(chapter.id, [target.pageNumber - 1, target.pageNumber, target.pageNumber + 1]);
   await runGuardian(chapter.id);
   void generateIllustration(pageId).then(() => updatePagesStatus(chapter.id));
@@ -915,7 +1000,7 @@ function buildImagePrompt(page: PageRow, ctx: PromptContext, references: ImageRe
   const shot = parseShot(page.shot);
   return [
     shot ? `Camera: ${describeShot(shot)}.` : "",
-    shotFraming(shot),
+    shotFraming(shot, ctx.rules),
     pictureFormat(page).framing,
     ctx.rules.pictureDirection ?? "",
     ctx.rules.illustrationStyle,
@@ -930,7 +1015,7 @@ function buildImagePrompt(page: PageRow, ctx: PromptContext, references: ImageRe
     `Show: ${page.visibleAction}`,
     `Mood: ${page.emotionalTone}`,
     page.continuity ? `Keep consistent: ${page.continuity}` : "",
-    isCloseUp(shot) ? `Framing, above all: ${shotFraming(shot)} Characters who aren't the focus may be cut off by the frame or left out.` : "",
+    isCloseUp(shot) ? `Framing, above all: ${shotFraming(shot, ctx.rules)} Characters who aren't the focus may be cut off by the frame or left out.` : "",
     "Do not include any text, letters or words in the image.",
   ]
     .filter(Boolean)
@@ -1114,7 +1199,7 @@ export async function generateIllustration(pageId: string, options: Illustration
 // Rules and Character Library art, to compare with the flagged picture. Saved
 // under uploads/feedback/ (admins only); the family's chapter never changes.
 // VSB-104 passes a test copy of the rules with a suggested change in it.
-export async function drawComparison(pageId: string, fileName: string, testRules?: PageRules) {
+export async function drawComparison(pageId: string, fileName: string, testRules?: PageRules, shotOverride?: Shot) {
   const page = await prisma.storyPage.findUniqueOrThrow({ where: { id: pageId } });
   if (!hasPicture(page)) throw new Error("This page has no picture to redraw.");
   const client = getOpenAI();
@@ -1124,7 +1209,8 @@ export async function drawComparison(pageId: string, fileName: string, testRules
   const version = active.version;
   const rules = testRules ?? active.rules;
   const cast = await currentCast(snapshot?.cast ?? []);
-  const { references, prompt } = await composePagePicture(page, chapter, { rules, cast, family: snapshot?.family ?? [], people: characterSheet });
+  const drawn = shotOverride ? { ...page, shot: JSON.stringify(shotOverride) } : page;
+  const { references, prompt } = await composePagePicture(drawn, chapter, { rules, cast, family: snapshot?.family ?? [], people: characterSheet });
   const common = { model: rules.imageModel, prompt, size: pictureFormat(page).size, quality: rules.imageQuality, output_format: "jpeg" as const };
   const response = await withImageRateLimit(references.length, async () =>
     references.length

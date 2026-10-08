@@ -74,6 +74,7 @@ app.post(
     "/api/admin/characters/:id/art/restyle",
     "/api/admin/characters/:id/art/expressions",
     "/api/admin/flags/:id/redraw",
+    "/api/admin/flags/:id/replan-redraw",
     "/api/designs/:designId/proposals",
     "/api/prompts/:id/artwork/generate",
     "/api/pages/:pageId/revise",

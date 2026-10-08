@@ -3,18 +3,21 @@ import { Link } from "react-router-dom";
 import { apiGet, apiSend, ApiError } from "../../lib/api";
 import { ACTION_AREAS, FLAG_CATEGORIES, PICTURE_CATEGORIES } from "../../lib/flags";
 import FeedbackAnalysis from "./FeedbackAnalysis";
+import ShotReviews, { type ShotReviewItem } from "./ShotReviews";
 
 // Admin → Feedback (VSB-94): flags on pages from the team and parents, how often
 // each problem comes up, redraws to compare, action items (and Jira), and export.
 
 interface Redraw {
   id: string;
+  kind: "today" | "replan";
   status: "drawing" | "ready" | "failed";
   imagePath: string | null;
   ruleSetVersion: number | null;
   error: string | null;
   createdAt: string;
   prompt: string;
+  shot: { type: string; angle: string; focus: string } | null;
 }
 
 interface Flag {
@@ -39,6 +42,7 @@ interface Flag {
     picture?: { imagePath: string | null; prompt: string; model: string | null; version: number } | null;
   };
   actionItem: { id: string; title: string; status: string; jiraKey: string | null } | null;
+  shotSignature: string | null;
   redraws: Redraw[];
 }
 
@@ -67,7 +71,16 @@ const FILTER = { width: "auto", minHeight: 40, fontSize: 15, padding: "0 10px" }
 export default function AdminFeedback() {
   const [tab, setTab] = useState<"flags" | "analysis" | "actions">("flags");
   const [filters, setFilters] = useState({ target: "", category: "", source: "", status: "open", stage: "", from: "", to: "" });
-  const [data, setData] = useState<{ flags: Flag[]; counts: { key: string; label: string; count: number }[]; jira: boolean } | null>(null);
+  const [data, setData] = useState<{
+    flags: Flag[];
+    counts: { key: string; label: string; count: number }[];
+    shotCounts: { key: string; count: number }[];
+    shotsToReview: ShotReviewItem[];
+    shotThreshold: number;
+    jira: boolean;
+  } | null>(null);
+  // Narrows the list to one planned-shot pattern (VSB-108); kept in the page, not the address.
+  const [shotFilter, setShotFilter] = useState<string | null>(null);
   const [actions, setActions] = useState<{ items: ActionItem[]; jira: boolean } | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [creating, setCreating] = useState<string[] | null>(null);
@@ -110,6 +123,7 @@ export default function AdminFeedback() {
     setFilters({ ...filters, [k]: v });
     setSelected([]);
   };
+  const visible = data ? (shotFilter ? data.flags.filter((f) => f.shotSignature === shotFilter) : data.flags) : [];
 
   return (
     <div>
@@ -177,6 +191,17 @@ export default function AdminFeedback() {
             </a>
           </div>
 
+          {data && (
+            <ShotReviews
+              items={data.shotsToReview}
+              threshold={data.shotThreshold}
+              onChanged={(n) => {
+                setNotice(n);
+                void load();
+              }}
+            />
+          )}
+
           {data && data.counts.length > 0 && (
             <div className="fb-counts" aria-label="How often each problem comes up">
               {data.counts.map((c) => (
@@ -194,6 +219,17 @@ export default function AdminFeedback() {
             </div>
           )}
 
+          {data && data.shotCounts.length > 0 && (
+            <div className="fb-counts" aria-label="Which planned shots get flagged">
+              <span className="t-small t-muted" style={{ alignSelf: "center" }}>By planned shot:</span>
+              {data.shotCounts.map((c) => (
+                <button key={c.key} className={`flag-chip ${shotFilter === c.key ? "flag-chip--on" : ""}`} onClick={() => setShotFilter(shotFilter === c.key ? null : c.key)}>
+                  {c.key} · {c.count}
+                </button>
+              ))}
+            </div>
+          )}
+
           {selected.length > 0 && (
             <p className="status-line">
               {selected.length} selected ·{" "}
@@ -205,10 +241,10 @@ export default function AdminFeedback() {
 
           {!data ? (
             <p>Loading…</p>
-          ) : data.flags.length === 0 ? (
+          ) : visible.length === 0 ? (
             <p className="status-line">Nothing flagged here yet. Flag a page from Story Review, or wait for parents' feedback.</p>
           ) : (
-            data.flags.map((f) => <FlagCard key={f.id} flag={f} busy={busy} act={act} selected={selected.includes(f.id)} onSelect={(on) => setSelected((s) => (on ? [...s, f.id] : s.filter((x) => x !== f.id)))} onAction={() => setCreating([f.id])} />)
+            visible.map((f) => <FlagCard key={f.id} flag={f} busy={busy} act={act} selected={selected.includes(f.id)} onSelect={(on) => setSelected((s) => (on ? [...s, f.id] : s.filter((x) => x !== f.id)))} onAction={() => setCreating([f.id])} />)
           )}
         </>
       )}
@@ -256,7 +292,14 @@ function FlagCard({ flag: f, busy, act, selected, onSelect, onAction }: { flag: 
                 {latest.status === "drawing" && <p className="t-small t-muted">Drawing…</p>}
                 {latest.status === "failed" && <p className="error-text">{latest.error}</p>}
                 <figcaption className="t-xs t-muted">
-                  Today's rules{latest.ruleSetVersion ? ` (v${latest.ruleSetVersion})` : ""}, {new Date(latest.createdAt).toLocaleDateString()}
+                  {latest.kind === "replan" ? "Replanned shot, today's rules" : "Today's rules"}
+                  {latest.ruleSetVersion ? ` (v${latest.ruleSetVersion})` : ""}, {new Date(latest.createdAt).toLocaleDateString()}
+                  {latest.shot && (
+                    <>
+                      <br />
+                      {[latest.shot.type, latest.shot.angle, latest.shot.focus && `focus: ${latest.shot.focus}`].filter(Boolean).join(", ")}
+                    </>
+                  )}
                 </figcaption>
               </figure>
             </div>
@@ -325,6 +368,7 @@ function FlagCard({ flag: f, busy, act, selected, onSelect, onAction }: { flag: 
             {plan && (
               <p className="t-small">
                 <strong>Camera:</strong> {[plan.shot?.type, plan.shot?.angle, plan.shot?.focus && `focus: ${plan.shot.focus}`].filter(Boolean).join(", ") || "none"}
+                {f.shotSignature && <span className="t-muted"> · grouped as “{f.shotSignature}”</span>}
                 <br />
                 <strong>Action:</strong> {plan.visibleAction}
                 <br />
@@ -341,9 +385,19 @@ function FlagCard({ flag: f, busy, act, selected, onSelect, onAction }: { flag: 
         )}
         <div className="row inline" style={{ gap: 8, flexWrap: "wrap", marginTop: 10 }}>
           {f.target !== "words" && f.target !== "chapter" && f.pageId && (
-            <button className="btn-small btn-secondary" disabled={busy !== null || latest?.status === "drawing"} onClick={() => void act(`redraw-${f.id}`, () => apiSend(`/api/admin/flags/${f.id}/redraw`, "POST"), "Redrawn with today's rules.")}>
-              {busy === `redraw-${f.id}` ? "Redrawing… (about a minute)" : "Redraw to compare"}
-            </button>
+            <>
+              <button className="btn-small btn-secondary" disabled={busy !== null || latest?.status === "drawing"} onClick={() => void act(`redraw-${f.id}`, () => apiSend(`/api/admin/flags/${f.id}/redraw`, "POST"), "Redrawn with today's rules.")}>
+                {busy === `redraw-${f.id}` ? "Redrawing… (about a minute)" : "Redraw to compare"}
+              </button>
+              <button
+                className="btn-small btn-secondary"
+                disabled={busy !== null || latest?.status === "drawing"}
+                title="Plans a different shot with today's Shot list, then draws it with today's rules. The family's page never changes."
+                onClick={() => void act(`replan-${f.id}`, () => apiSend(`/api/admin/flags/${f.id}/replan-redraw`, "POST"), "Replanned the shot and redrew it with today's rules.")}
+              >
+                {busy === `replan-${f.id}` ? "Replanning and redrawing… (about two minutes)" : "Replan the shot and redraw"}
+              </button>
+            </>
           )}
           {f.actionItem ? (
             <span className="t-small">

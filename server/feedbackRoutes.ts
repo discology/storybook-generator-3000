@@ -3,9 +3,11 @@ import { prisma } from "./db";
 import type { Prisma } from "../src/generated/prisma/client";
 import { getCurrentUser } from "./session";
 import { appUrl } from "./messageTemplates";
-import { drawComparison } from "./storyPages";
+import { drawComparison, replanShotForCompare } from "./storyPages";
 import { createJiraIssue, jiraConfigured } from "./jira";
 import { normalizeStage } from "./readingStages";
+import { getActiveRules, saveRules, validateRules } from "./pageRules";
+import { blockedShotHits, blockedShotsOf, draftBlockedPattern, shotSignature, shotThresholdOf, shotTypesOf, type Shot } from "./shotRules";
 import { ENFORCEMENT_TARGETS, GUIDE_SECTIONS, getGuide, saveGuide, validateGuide } from "./guideBook";
 import { PICTURE_RULE_FIELDS, estimateAnalysis, flagsToAnalyze, startAnalysis, startTrial, trialFlags } from "./feedbackAnalysis";
 import { ACTION_AREAS, FAMILY_CATEGORIES, FLAG_CATEGORIES, FLAG_STATUSES, PICTURE_CATEGORIES, WORDS_CATEGORIES } from "./flagCategories";
@@ -163,11 +165,13 @@ const presentFlag = (f: FlagWithAll) => {
     pageId: f.pageId,
     snapshot,
     actionItem: f.actionItem ? { id: f.actionItem.id, title: f.actionItem.title, status: f.actionItem.status, jiraKey: f.actionItem.jiraKey } : null,
+    // How the queue groups this page's planned shot (VSB-108).
+    shotSignature: shotSignature(snapshot.plan?.shot ?? null),
     // Trial redraws (a suggested wording) belong to their suggestion, not here.
     redraws: f.redraws
-      .filter((r) => r.kind === "today")
+      .filter((r) => r.kind === "today" || r.kind === "replan")
       .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
-      .map((r) => ({ id: r.id, status: r.status, imagePath: r.imagePath, ruleSetVersion: r.ruleSetVersion, error: r.error, createdAt: r.createdAt, prompt: r.prompt })),
+      .map((r) => ({ id: r.id, kind: r.kind, status: r.status, imagePath: r.imagePath, ruleSetVersion: r.ruleSetVersion, error: r.error, createdAt: r.createdAt, prompt: r.prompt, shot: parse<Shot | null>(r.shot ?? "", null) })),
   };
 };
 
@@ -198,11 +202,20 @@ router.get("/admin/flags", async (req, res) => {
   // How often each category comes up in this view, most common first.
   const counts: Record<string, number> = {};
   for (const f of flags) for (const c of f.categories) counts[c] = (counts[c] ?? 0) + 1;
+  // Which planned shots get flagged most (VSB-108).
+  const byShot: Record<string, number> = {};
+  for (const f of flags) if (f.shotSignature) byShot[f.shotSignature] = (byShot[f.shotSignature] ?? 0) + 1;
+  const review = await shotsToReview();
   res.json({
     flags,
     counts: Object.entries(counts)
       .sort((a, b) => b[1] - a[1])
       .map(([key, count]) => ({ key, label: FLAG_CATEGORIES[key] ?? key, count })),
+    shotCounts: Object.entries(byShot)
+      .sort((a, b) => b[1] - a[1])
+      .map(([key, count]) => ({ key, count })),
+    shotsToReview: review.items,
+    shotThreshold: review.threshold,
     jira: jiraConfigured(),
   });
 });
@@ -235,6 +248,115 @@ router.post("/admin/flags/:id/redraw", async (req, res) => {
   const result = await redraw(flag.id);
   if (result.status === "failed") return res.status(502).json({ error: result.error });
   res.json(result);
+});
+
+// --- Shot rules: replan to compare, and shots to review (VSB-108) ---
+
+// "Replan the shot and redraw": a different shot planned with today's Shot
+// list, drawn with today's rules, beside the flagged picture. The page itself
+// never changes.
+router.post("/admin/flags/:id/replan-redraw", async (req, res) => {
+  const flag = await prisma.flag.findUnique({ where: { id: req.params.id } });
+  if (!flag?.pageId || flag.target === "words") return res.status(400).json({ error: "Only a flagged picture can be replanned." });
+  const row = await prisma.flagRedraw.create({ data: { flagId: flag.id, kind: "replan" } });
+  try {
+    const { rules } = await getActiveRules();
+    const shot = await replanShotForCompare(flag.pageId, rules);
+    const drawn = await drawComparison(flag.pageId, `${flag.id}-replan-${Date.now()}.jpg`, undefined, shot);
+    const result = await prisma.flagRedraw.update({ where: { id: row.id }, data: { status: "ready", shot: JSON.stringify(shot), ...drawn } });
+    res.json({ ...result, shot });
+  } catch (error: any) {
+    const message = String(error?.message ?? "Replan failed").slice(0, 300);
+    await prisma.flagRedraw.update({ where: { id: row.id }, data: { status: "failed", error: message } });
+    res.status(502).json({ error: message });
+  }
+});
+
+const SHOT_FLAG_CATEGORIES = ["camera", "composition"];
+
+// Shot patterns flagged for camera or composition on at least N different pages
+// (N from Page Rules), each with the pictures that show it. Patterns the team
+// accepted stay out until they're flagged on more pages than when accepted, and
+// patterns a rule already blocks stay out.
+export async function shotsToReview() {
+  const { rules } = await getActiveRules();
+  const threshold = shotThresholdOf(rules);
+  const flags = await prisma.flag.findMany({
+    where: { status: { not: "dismissed" }, pageId: { not: null } },
+    include: { chapter: { select: { id: true, title: true } } },
+    orderBy: { createdAt: "desc" },
+  });
+  interface Example { id: string; note: string; source: string; picture: string | null; chapter: { id: string; title: string }; pageNumber: number | null; createdAt: Date }
+  const groups = new Map<string, { pages: Set<string>; shots: Shot[]; flags: Example[] }>();
+  for (const f of flags) {
+    if (!parse<string[]>(f.categories, []).some((c) => SHOT_FLAG_CATEGORIES.includes(c))) continue;
+    const s = parse<Record<string, any>>(f.snapshot, {});
+    const planned = s.plan?.shot;
+    if (!planned?.type) continue;
+    const shot: Shot = { type: String(planned.type), angle: String(planned.angle ?? ""), focus: String(planned.focus ?? "") };
+    const signature = shotSignature(shot, rules);
+    if (!signature) continue;
+    const g = groups.get(signature) ?? { pages: new Set<string>(), shots: [], flags: [] };
+    g.pages.add(f.pageId!);
+    g.shots.push(shot);
+    g.flags.push({ id: f.id, note: f.note, source: f.source, picture: s.picture?.imagePath ?? null, chapter: f.chapter, pageNumber: s.pageNumber ?? null, createdAt: f.createdAt });
+    groups.set(signature, g);
+  }
+  const reviews = await prisma.shotReview.findMany();
+  const items = [...groups.entries()]
+    .map(([signature, g]) => ({
+      signature,
+      pages: g.pages.size,
+      examples: g.shots.filter((x, i) => g.shots.findIndex((y) => y.type === x.type && y.focus === x.focus) === i).slice(0, 3),
+      flags: g.flags.slice(0, 6),
+      draft: draftBlockedPattern(g.shots),
+      review: reviews.find((r) => r.signature === signature) ?? null,
+      covered: g.shots.every((x) => blockedShotHits(x, rules).length > 0),
+    }))
+    .filter((g) => g.pages >= threshold && !g.covered)
+    .filter((g) => !g.review || (g.review.status === "accepted" && g.pages > g.review.count))
+    .sort((a, b) => b.pages - a.pages);
+  return { threshold, items };
+}
+
+router.get("/admin/shot-reviews", async (_req, res) => {
+  res.json(await shotsToReview());
+});
+
+// "This shot is fine": stays out of the list until it's flagged on more pages.
+router.post("/admin/shot-reviews/accept", async (req, res) => {
+  const user = await getCurrentUser(req);
+  const signature = String(req.body?.signature ?? "").trim();
+  if (!signature) return res.status(400).json({ error: "Which shot?" });
+  const item = (await shotsToReview()).items.find((i) => i.signature === signature);
+  if (!item) return res.status(404).json({ error: "That shot isn't up for review any more." });
+  const data = { status: "accepted", count: item.pages, note: String(req.body?.note ?? "").slice(0, 500), createdById: user?.id ?? null };
+  const review = await prisma.shotReview.upsert({ where: { signature }, update: data, create: { signature, ...data } });
+  res.json(review);
+});
+
+// "Block this shot": adds it to "Shots that don't work" as a new Page Rules version.
+router.post("/admin/shot-reviews/block", async (req, res) => {
+  const user = await getCurrentUser(req);
+  const signature = String(req.body?.signature ?? "").trim();
+  const pattern = String(req.body?.pattern ?? "").trim().slice(0, 300);
+  const why = String(req.body?.why ?? "").trim().slice(0, 500);
+  const instead = String(req.body?.instead ?? "").trim().slice(0, 500);
+  if (!pattern) return res.status(400).json({ error: "Say which words mark the shot (for example: feet, ankle height)." });
+  const count = signature ? ((await shotsToReview()).items.find((i) => i.signature === signature)?.pages ?? 0) : 0;
+  const active = await getActiveRules();
+  const blocked = blockedShotsOf(active.rules);
+  const next = Math.max(0, ...blocked.map((b) => Number(b.id.replace(/\D/g, "")) || 0)) + 1;
+  const rule = { id: `B-${next}`, pattern, why, instead };
+  const rules = { ...active.rules, shotTypes: shotTypesOf(active.rules), blockedShots: [...blocked, rule], shotReviewThreshold: shotThresholdOf(active.rules) };
+  const error = validateRules(rules);
+  if (error) return res.status(400).json({ error });
+  const saved = await saveRules(rules);
+  if (signature) {
+    const data = { status: "blocked", count, blockedId: rule.id, note: "", createdById: user?.id ?? null };
+    await prisma.shotReview.upsert({ where: { signature }, update: data, create: { signature, ...data } });
+  }
+  res.json({ version: saved.version, rule });
 });
 
 // The average cost of one page picture lately, for estimates.

@@ -57,11 +57,12 @@ It follows these rules:
 - **How much may be imagined** is set in Page Rules: minimal, moderate (the default) or imaginative.
 - **The reading stage** sets the number of pages, words per page and sentence length (see [Reading stages](#reading-stages)).
 - **Shots change** from page to page, so no two pages in a row repeat the same view.
+- **The Shot list** in Page Rules says which seven shot types exist and which shots don't work on a Vambie (feet or legs as the focus, a camera below waist height). A planned shot that breaks it is replanned once before any picture is drawn.
 - **People.** Family members are referred to by permanent references, never by name alone, because two people can both be called "Grandma". If the AI can't tell who someone is, or someone hasn't been designed yet, it asks the parent a question (**Who's who?**) instead of guessing. No pictures are drawn until the parent answers.
 
 ### Checking the words
 
-- **Code** checks word and sentence limits and repeated shots on every page.
+- **Code** checks word and sentence limits and repeated shots on every page, and notes a shot that still breaks the Shot list after one replan.
 - The **`page_check`** AI step checks that each page is faithful to the memories, consistent with its neighbors, and that the words fit the picture.
 - The **Guardian** AI step reviews the whole chapter for continuity with earlier chapters, fit for the reader's stage, and private adult details. A chapter with an issue is held for the Vambie team in Story Review.
 
