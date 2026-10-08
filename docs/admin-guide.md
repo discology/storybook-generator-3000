@@ -78,7 +78,7 @@ Where the team learns from what went wrong in pictures and words.
 
 ## Guide Book
 
-The rules a good Vambie storybook follows, in numbered sections: Voice (V-), World (W-), Pictures (P-), Characters (C-), Safety and privacy (S-). Each rule has a title, the rule, why it matters, a good and a bad example, and where it's enforced (a Page Rules field, an AI instruction, the Character Library, family designs, or app code). The prompts stay where they are; the Guide Book is what flags are analyzed against, so a suggested fix can name the exact place to change.
+The rules a good Vambie storybook follows, in numbered sections: Voice (V-), World (W-), Pictures (P-), Characters (C-), Safety and privacy (S-). Each rule has a title, the rule, why it matters, a good and a bad example, and where it's enforced (a Page Rules field, an AI instruction, the Character Library, family designs, or app code). The prompts stay where they are; the Guide Book is what flags are analyzed against, so a suggested fix can name the exact place to change. When an app update brings a new default rule (P-10, "Shots that don't work on a Vambie", came with the Shot list), a saved Guide Book gets it as a new version the next time the app starts, with a note saying so; a rule you removed in a later version stays removed.
 
 Version 1 was drafted from the Vambie world bible, the voice rules, the art direction, camera and acting, the people rule and the Character Library. Edit, add or remove rules, then save: every save is a new version with a note, and earlier versions can be viewed from the version menu.
 

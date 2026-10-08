@@ -14,6 +14,9 @@ export interface GuideRule {
   good: string;
   bad: string;
   enforcedIn: string[]; // keys of ENFORCEMENT_TARGETS
+  // The day the app added this rule to the defaults. A Guide Book saved before
+  // that day gets the rule as a new version on start-up (VSB-112).
+  since?: string;
 }
 
 export const GUIDE_SECTIONS: Record<string, string> = {
@@ -42,7 +45,7 @@ export const ENFORCEMENT_TARGETS: Record<string, string> = {
   code: "App code (needs a developer)",
 };
 
-const r = (id: string, title: string, rule: string, why: string, good: string, bad: string, enforcedIn: string[]): GuideRule => ({
+const r = (id: string, title: string, rule: string, why: string, good: string, bad: string, enforcedIn: string[], since?: string): GuideRule => ({
   id,
   section: id.split("-")[0],
   title,
@@ -51,6 +54,7 @@ const r = (id: string, title: string, rule: string, why: string, good: string, b
   good,
   bad,
   enforcedIn,
+  ...(since ? { since } : {}),
 });
 
 // Version 1, drafted from the Vambie world bible, the voice rules and stage
@@ -80,7 +84,7 @@ export const DEFAULT_GUIDE: GuideRule[] = [
   r("P-7", "Continuity: states, outfits and objects", "Outfits, objects and states (eyes shut or open, asleep, swaddled, wet or dry, held or put down) stay right across pages, and nothing changes before the memory says it does.", "A newborn with open eyes before the memory's \"first look\" breaks the story.", "Curled, swaddled and eyes shut until the page where the eyes open.", "Eyes already open on page 1 of a \"first look\" memory.", ["instruction.page_plan", "instruction.page_check", "instruction.illustration_check"]),
   r("P-8", "No words in pictures", "No letters, numbers, captions or signs anywhere in an illustration.", "The words belong under the picture, where they can be read aloud.", "", "A sign on the door that says \"Mia's room\".", ["page_rules.illustrationStyle", "instruction.illustration_check"]),
   r("P-9", "Faces clear of the edges on full pages", "On tall full-page and wordless pictures, keep faces away from the very edges: phones may trim them.", "A cropped face on the phone reader ruins the biggest moment.", "", "A face cut in half at the edge of the phone screen.", ["code"]),
-  r("P-10", "Shots that don't work on a Vambie", "The camera never goes below waist height; no close-ups on feet or legs; a low angle keeps the whole head in frame; one focus per shot; the shot type is exactly one of the allowed types in the Shot list.", "A huge head on tiny legs distorts from below, and a feet-first frame reads as extra feet.", "A low angle from waist height, Baby Vambie's whole head in frame, one eye the focus.", "A low close-up at ankle height on Baby Vambie's feet and one eye.", ["page_rules.shotRules", "code"]),
+  r("P-10", "Shots that don't work on a Vambie", "The camera never goes below waist height; no close-ups on feet or legs; a low angle keeps the whole head in frame; one focus per shot; the shot type is exactly one of the allowed types in the Shot list.", "A huge head on tiny legs distorts from below, and a feet-first frame reads as extra feet.", "A low angle from waist height, Baby Vambie's whole head in frame, one eye the focus.", "A low close-up at ankle height on Baby Vambie's feet and one eye.", ["page_rules.shotRules", "code"], "2026-10-08"),
   r("C-1", "Baby Vambie is always the child", "The child is never drawn as themselves. Whatever the child did, said or felt, Baby Vambie does, says and feels, in the words and the pictures.", "No picture of a real child is ever made, and every child can see themselves in Baby Vambie.", "Baby Vambie reaching for the bottle.", "A human toddler beside Baby Vambie.", ["instruction.page_plan", "instruction.world", "characters"]),
   r("C-2", "Baby Vambie stays on-model", "Teal-blue, an oversized rounded head, huge round eyes, tiny fangs, a simple body and limbs. Smooth skin: no spikes, horns, wings or tail. Never a generic monster, alien or cartoon creature.", "Baby Vambie is the brand.", "", "A green alien with antennae.", ["characters"]),
   r("C-3", "Everyone else is a Vambie in their own skin tone", "Every person has Baby Vambie's creature design (big ringed eyes, tiny fangs, big head on a small body) in their own skin tone, recognizable by hair, glasses, clothes and accessories. Pale gray-white when the skin tone isn't known. Teal-blue belongs to Baby Vambie alone.", "The whole book is the Vambie world, and every family sees itself in it.", "Grandma Rose with warm brown skin, silver curls and her tortoiseshell glasses.", "Papa drawn teal like Baby Vambie, or as a human.", ["page_rules.peopleStyle", "family_designs"]),
@@ -132,6 +136,36 @@ export async function saveGuide(rules: GuideRule[], note: string, userId: string
     enforcedIn: x.enforcedIn,
   }));
   return prisma.guideBook.create({ data: { version: version + 1, rules: JSON.stringify(clean), note: note.trim().slice(0, 500), createdById: userId } });
+}
+
+// Rules the app added after the Guide Book was last saved join it as a new
+// version on start-up, with a note (VSB-112). Only rules newer than the saved
+// version count, so a rule the team removed later stays removed. With no saved
+// Guide Book the defaults already show, and nothing is saved.
+export async function addNewDefaultRules() {
+  const latest = await prisma.guideBook.findFirst({ orderBy: { version: "desc" } });
+  if (!latest) return [];
+  const rules: GuideRule[] = JSON.parse(latest.rules);
+  const ids = new Set(rules.map((x) => x.id));
+  const added = DEFAULT_GUIDE.filter((x) => x.since && new Date(x.since) > latest.createdAt && !ids.has(x.id));
+  if (!added.length) return [];
+  // Each new rule goes after the last rule of its section, so sections stay together.
+  const merged = [...rules];
+  for (const rule of added) {
+    const { since: _since, ...clean } = rule;
+    let at = merged.length;
+    for (let i = merged.length - 1; i >= 0; i--) {
+      if (merged[i].section === rule.section) {
+        at = i + 1;
+        break;
+      }
+    }
+    merged.splice(at, 0, clean);
+  }
+  const note = `${added.map((x) => `${x.id} ${x.title}`).join("; ")}: added by the app with an update (${added.map((x) => x.since).join(", ")}).`.slice(0, 500);
+  await prisma.guideBook.create({ data: { version: latest.version + 1, rules: JSON.stringify(merged), note } });
+  console.log(`Guide Book: ${added.map((x) => x.id).join(", ")} added as version ${latest.version + 1}.`);
+  return added.map((x) => x.id);
 }
 
 // The Guide Book as text, for the analysis prompt.

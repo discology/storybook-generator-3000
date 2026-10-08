@@ -14,6 +14,7 @@ import characterRoutes from "./server/characterRoutes";
 import familyCharacterRoutes from "./server/familyCharacterRoutes";
 import { failInterruptedIllustrations } from "./server/storyPages";
 import { resumeUnfinishedMemories } from "./server/memoryPipeline";
+import { addNewDefaultRules } from "./server/guideBook";
 import { startWeeklyChapters } from "./server/weeklyChapters";
 import guardianRoutes from "./server/guardianRoutes";
 import exportRoutes, { failInterruptedExports } from "./server/exportRoutes";
@@ -121,6 +122,8 @@ app.listen(PORT, () => {
   console.log(`Storybook Generator 3000 backend listening on http://localhost:${PORT}`);
   void failInterruptedIllustrations();
   void resumeUnfinishedMemories();
+  // Guide Book rules the app added since the team last saved it (server/guideBook.ts).
+  void addNewDefaultRules().catch((e) => console.error("Guide Book defaults:", e?.message));
   void failInterruptedExports();
   startGuestCleanup();
   startTextCleanup();
