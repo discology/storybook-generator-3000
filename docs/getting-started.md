@@ -62,7 +62,7 @@ In VS Code, press **F5**. It starts the same two servers and opens Chrome at the
 
 1. Open http://localhost:5174 and choose **Start their story**.
 2. Enter your mobile number. In development mode, the six-digit code appears on screen.
-3. Set up the storybook in three steps: who it's for, how the stories read, and the reminder schedule.
+3. Set up the storybook in three steps: who it's for, how the stories read, and the reminder schedule. A fourth step, **You, in the pictures**, asks what the child calls you and for an optional photo of you, so the artist can draw you. You can skip it.
 4. Record a memory. On This week's chapter, choose **Make it now** to make a chapter right away instead of waiting for the weekly one.
 
 The admin panel is at http://localhost:5174/admin. Put your number in `ADMIN_PHONES` first. The [admin guide](admin-guide.md) explains each part of it.

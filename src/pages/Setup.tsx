@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import TopBar from "../components/TopBar";
 import { IconCalendar, IconChevronDown, IconHeart, IconSmile } from "../components/icons";
 import { Check, Chev, Field, Masthead, Note, ProgressSteps, RadioCard, Select, Sheet, Loading } from "../components/ui";
+import YouInThePictures from "../components/YouInThePictures";
 import { useAuth } from "../auth/AuthContext";
 import { RELATIONSHIPS } from "../lib/relationships";
 import { READING_STAGES, ageInYears, stageForAge, stageInfo } from "../lib/stages";
@@ -38,6 +39,8 @@ export default function Setup() {
   const { user, loading, logout } = useAuth();
   const navigate = useNavigate();
   const [step, setStep] = useState(1);
+  // Step 4 comes after the storybook exists: the parent's own family character.
+  const [createdId, setCreatedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showLevels, setShowLevels] = useState(false);
@@ -102,7 +105,8 @@ export default function Setup() {
         setError(data.error || "Something went wrong. Try again.");
         return;
       }
-      navigate(`/storybooks/${data.storybook.id}`, { replace: true });
+      setCreatedId(data.storybook.id);
+      goTo(4);
     } catch {
       setError("We couldn't reach Vambie. Check your connection and try again.");
     } finally {
@@ -144,9 +148,9 @@ export default function Setup() {
 
   return (
     <div className="page">
-      <TopBar back={step === 1 ? true : () => goTo(step - 1)} wordmark />
+      <TopBar back={step === 1 ? true : step === 4 && createdId ? () => navigate(`/storybooks/${createdId}`, { replace: true }) : () => goTo(step - 1)} wordmark />
       <div className="setup-head">
-        <ProgressSteps step={step} total={3} />
+        <ProgressSteps step={step} total={4} />
       </div>
 
       {step === 1 && (
@@ -380,6 +384,16 @@ export default function Setup() {
             </p>
           </Sheet>
         </>
+      )}
+      {step === 4 && createdId && (
+        <YouInThePictures
+          storybookId={createdId}
+          childName={form.childName}
+          myName={form.parentName}
+          relationship={form.relationship}
+          expecting={form.stage === "expecting"}
+          onDone={() => navigate(`/storybooks/${createdId}`, { replace: true })}
+        />
       )}
     </div>
   );

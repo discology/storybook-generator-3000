@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
 import { IconBook, IconCheck, IconClock, IconMic, IconPeople, IconWarning } from "../components/icons";
 import { Chev, Field, Loading, Mascot, Masthead, Note, Sheet } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
-import { apiSend, ApiError } from "../lib/api";
+import { apiGet, apiSend, ApiError } from "../lib/api";
+import YouInThePictures from "../components/YouInThePictures";
 import { possessive } from "../lib/format";
 
 interface InvitationInfo {
@@ -30,6 +31,11 @@ export default function InvitationAccept() {
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // After joining: "You, in the pictures", unless the family already drew this person.
+  const [joined, setJoined] = useState<{ storybookId: string; name: string } | null>(null);
+  // Joining refreshes the signed-in user, which re-runs the invitation lookup below;
+  // its "already a member" redirect must not skip the step that follows joining.
+  const justJoined = useRef(false);
 
   useEffect(() => {
     fetch(`/api/invitations/${token}`)
@@ -40,7 +46,7 @@ export default function InvitationAccept() {
           return;
         }
         setInfo(data);
-        if (data.joinedByMe && data.storybookId) navigate(`/storybooks/${data.storybookId}`, { replace: true });
+        if (data.joinedByMe && data.storybookId && !justJoined.current) navigate(`/storybooks/${data.storybookId}`, { replace: true });
       })
       .catch(() => setProblem("not_found"));
   }, [token, navigate, user]);
@@ -64,8 +70,15 @@ export default function InvitationAccept() {
     setError(null);
     try {
       const data = await apiSend(`/api/invitations/${token}/accept`, "POST", { name: name.trim() });
+      justJoined.current = true;
       refresh();
-      navigate(data.storybookId ? `/storybooks/${data.storybookId}` : "/", { replace: true });
+      const myName = (name.trim() || user.name || "").trim();
+      if (!data.storybookId) return navigate("/", { replace: true });
+      const list = await apiGet(`/api/storybooks/${data.storybookId}/characters`).catch(() => null);
+      const characters: { name: string }[] = Array.isArray(list) ? list : list?.characters ?? [];
+      const alreadyDrawn = characters.some((c) => c.name.trim().toLowerCase() === myName.toLowerCase());
+      if (alreadyDrawn || !myName) return navigate(`/storybooks/${data.storybookId}`, { replace: true });
+      setJoined({ storybookId: data.storybookId, name: myName });
     } catch (err) {
       if (err instanceof ApiError && (err.message === "revoked" || err.message === "expired")) setProblem(err.message);
       else setError(err instanceof ApiError ? err.message : "Couldn't join. Try again.");
@@ -73,6 +86,21 @@ export default function InvitationAccept() {
       setBusy(false);
     }
   };
+
+  if (joined) {
+    return (
+      <div className="page">
+        <TopBar back={() => navigate(`/storybooks/${joined.storybookId}`, { replace: true })} wordmark />
+        <YouInThePictures
+          storybookId={joined.storybookId}
+          childName={info?.childName ?? ""}
+          myName={joined.name}
+          relationship={info?.relationship ?? null}
+          onDone={() => navigate(`/storybooks/${joined.storybookId}`, { replace: true })}
+        />
+      </div>
+    );
+  }
 
   if (problem === "revoked" || problem === "not_found") {
     return (

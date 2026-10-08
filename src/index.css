@@ -2555,6 +2555,14 @@ label.chip {
   gap: 10px;
 }
 
+.choices--wrap {
+  flex-wrap: wrap;
+}
+
+.choices--wrap .choice {
+  flex: 1 0 auto;
+}
+
 .choice {
   flex: 1;
   min-height: 54px;
@@ -2597,6 +2605,14 @@ label.chip {
   background: var(--purple-soft);
   color: var(--ink);
 }
+/* "You, in the pictures": the optional photo picker */
+.photo-pick { position: relative; display: flex; align-items: center; gap: 14px; min-height: 88px; padding: 12px 14px; border: 2px dashed var(--line); border-radius: 18px; background: var(--white); color: var(--ink); cursor: pointer; }
+.photo-pick:focus-within { outline: 3px solid var(--purple); outline-offset: 2px; }
+.photo-pick input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+.photo-pick img { flex: none; width: 64px; height: 64px; border-radius: 999px; object-fit: cover; }
+.photo-pick__icon { flex: none; width: 64px; height: 64px; border-radius: 999px; background: var(--purple-soft); color: var(--purple-ink); display: inline-flex; align-items: center; justify-content: center; }
+.photo-pick__text { display: flex; flex-direction: column; gap: 2px; font-size: 15px; color: var(--ink-3); }
+.photo-pick__text strong { font-family: var(--font-title); font-weight: 700; font-size: 19px; color: var(--ink); }
 
 .choice--radio.choice--on .radio-card__dot {
   border: 6px solid var(--purple);
