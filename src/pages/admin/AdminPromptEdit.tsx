@@ -225,6 +225,7 @@ export default function AdminPromptEdit() {
             <Field label="Child stage" htmlFor="stage">
               <Select id="stage" value={form.childStage} onChange={(v) => set("childStage", v)} options={STAGES} />
             </Field>
+            <div style={{ gridColumn: "1 / -1", marginTop: 6 }}>
             <Check
               id="answer-once"
               checked={!!form.answerOnce}
@@ -233,6 +234,7 @@ export default function AdminPromptEdit() {
             >
               Answer once per person
             </Check>
+            </div>
             <div className="field">
               <span className="field__label">Card color</span>
               <div className="swatches" role="radiogroup">

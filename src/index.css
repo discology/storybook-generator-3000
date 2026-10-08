@@ -2385,6 +2385,7 @@ label.chip {
 .prompt-card__faces { display: inline-flex; }
 .prompt-card__face { position: relative; width: 26px; height: 26px; box-sizing: border-box; border-radius: 999px; border: 2px solid rgba(255, 255, 255, 0.9); background: var(--purple-soft); color: var(--ink); display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; }
 .prompt-card__face + .prompt-card__face { margin-left: -7px; }
+.prompt-card__face--you + .prompt-card__face { margin-left: 3px; }
 .prompt-card__face--you { background: #ffd9a8; }
 .prompt-card__face-check { position: absolute; right: -5px; bottom: -5px; width: 15px; height: 15px; border-radius: 999px; background: var(--green); color: var(--white); display: inline-flex; align-items: center; justify-content: center; }
 .prompt-card--answered .prompt-card__art { width: 70%; }
