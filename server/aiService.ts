@@ -6,6 +6,7 @@ import { WORLD_KEY, getAiInstruction } from "./aiInstructions";
 import { fillTemplate } from "./messageTemplates";
 import { characterCardValues } from "./characters";
 import { stageInfo } from "./readingStages";
+import { GUARDIAN_READER_LEVEL } from "./beforeBirth";
 import { geminiTextUsage, openAiTextUsage, recordText, recordUsage, recordVoice, type TextUsage, type UsageTags } from "./aiUsage";
 
 const GEMINI_MODEL = "gemini-2.5-flash";
@@ -191,6 +192,8 @@ export interface GuardianFindingResult {
 }
 
 export interface GuardianReviewInput {
+  // Made before the birth (VSB-118): the family's own words, so reader fit isn't judged.
+  beforeBirth?: boolean;
   chapterContent: string;
   readerAgeBand: string;
   priorChapterTitles: string[];
@@ -214,12 +217,18 @@ export async function guardianReview(input: GuardianReviewInput): Promise<{ find
 
   try {
     const { output } = await runAiStep("guardian", {
-      reader_level: readerAgeBandToInstruction(input.readerAgeBand),
+      reader_level: input.beforeBirth ? GUARDIAN_READER_LEVEL : readerAgeBandToInstruction(input.readerAgeBand),
       previous_chapters: input.priorChapterTitles.join(", ") || "(none yet — this is the first chapter)",
       chapter_text: input.chapterContent,
     }, undefined, [], { chapterId: input.chapterId });
     const findings = (Array.isArray(output) ? output : output.findings) as GuardianFindingResult[];
     if (!Array.isArray(findings) || findings.length === 0) throw new Error("reply had no findings");
+    if (input.beforeBirth) {
+      return {
+        isMock: false,
+        findings: findings.map((f) => (f.category === "reader_fit" ? { category: f.category, status: "ok" as const, note: "Not judged before the birth: these are the family's own words." } : f)),
+      };
+    }
     return { isMock: false, findings };
   } catch (error: any) {
     return {

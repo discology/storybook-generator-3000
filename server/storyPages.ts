@@ -5,7 +5,8 @@ import { prisma } from "./db";
 import { runAiStep, isAiConfigured, guardianReview } from "./aiService";
 import { getAiInstruction } from "./aiInstructions";
 import { CastMember, buildCast, characterCardValues, currentCast, describeCast, moodArt, renderReferences } from "./characters";
-import { appUrl, renderMessage } from "./messageTemplates";
+import { appUrl, fillTemplate, renderMessage } from "./messageTemplates";
+import { BEFORE_BIRTH_KEY, BEFORE_BIRTH_PROFILE, CHECK_NOTE, DEFAULT_BEFORE_BIRTH, arrivalNote, isBeforeBirth, withBeforeBirth } from "./beforeBirth";
 import { sendText, storybookOwner } from "./texts";
 import {
   AppearanceWithDesign,
@@ -49,6 +50,7 @@ export interface SourceMemory {
   emotions: string;
   themes: string;
   recordedBy?: string; // e.g. "Jordan (Parent)": tells "Mom" or "Grandma" apart
+  prompt?: string | null; // the question it answered, as worded then
 }
 
 // Extras: people in this chapter who aren't saved family characters.
@@ -72,7 +74,21 @@ interface GenerationSnapshot {
   family?: FamilyCastEntry[];
   // "Vambie" once the child reached the family's chosen age; absent means "Baby Vambie".
   vambieName?: string;
+  // Made while the family was expecting (VSB-118): the family's messages, one
+  // per page, and no Baby Vambie (VSB-119). Absent on every other chapter.
+  beforeBirth?: boolean;
+  // The first chapter after the birth, which opens with Baby Vambie's arrival (VSB-120).
+  arrival?: boolean;
 }
+
+// What <before_birth> holds for a chapter: the Before you arrive text, the
+// arrival note, or nothing.
+const beforeBirthValue = (snapshot: GenerationSnapshot, childName: string) =>
+  snapshot.beforeBirth
+    ? fillTemplate(snapshot.instructions[BEFORE_BIRTH_KEY] || DEFAULT_BEFORE_BIRTH, { child_name: childName })
+    : snapshot.arrival
+      ? arrivalNote(childName)
+      : "";
 
 // Once the child is old enough, Baby Vambie is called just "Vambie" in the
 // chapter: every instruction and value sent to the AI for it says so.
@@ -132,7 +148,7 @@ export const formatMemories = (memories: SourceMemory[]) =>
   memories
     .map(
       (m, i) =>
-        `Memory ${i + 1}:${m.recordedBy ? `\nRecorded by: ${m.recordedBy}` : ""}\nWhat happened: ${m.events}\nEmotions present: ${m.emotions}\nPossible themes: ${m.themes}\nOriginal account: "${m.transcript}"`
+        `Memory ${i + 1}:${m.recordedBy ? `\nRecorded by: ${m.recordedBy}` : ""}${m.prompt ? `\nAnswering: ${m.prompt}` : ""}\nWhat happened: ${m.events}\nEmotions present: ${m.emotions}\nPossible themes: ${m.themes}\nOriginal account: "${m.transcript}"`
     )
     .join("\n\n");
 
@@ -271,6 +287,7 @@ async function loadChapter(chapterId: string) {
     emotions: s.memory.interpretation?.emotions ?? "",
     themes: s.memory.interpretation?.themes ?? "",
     recordedBy: recordedBy(s.memory.contributor),
+    prompt: s.memory.promptText,
   }));
   return { chapter, snapshot, characterSheet, memories, unresolved: parseUnresolved(chapter.unresolvedPeople) };
 }
@@ -415,20 +432,30 @@ export async function createPagedChapter(input: CreateChapterInput) {
   } else {
     const active = await getActiveRules();
     const instructions: Record<string, string> = {};
-    for (const key of ["page_plan", "page_check", "page_revise", "illustration_check", "world"]) {
+    for (const key of ["page_plan", "page_check", "page_revise", "illustration_check", "world", BEFORE_BIRTH_KEY]) {
       instructions[key] = (await getAiInstruction(key)).body;
     }
     const stage = effectiveStage(storybook);
+    const beforeBirth = storybook.child.stage === "expecting";
+    const cast = await buildCast(input.castKeys ?? []);
     snapshot = {
       ruleSetVersion: active.version,
       rules: active.rules,
       readerAgeBand: stage,
-      readingProfile: profileFor(active.rules, stage),
+      // Before the birth, pages follow their own limits: the person's words, not a stage's.
+      readingProfile: beforeBirth ? BEFORE_BIRTH_PROFILE : profileFor(active.rules, stage),
       vambieName: vambieName(storybook),
       instructions,
-      cast: await buildCast(input.castKeys ?? []),
+      // No Baby Vambie before the birth, and no optional Vambies; one a parent picked stays.
+      cast: beforeBirth ? cast.filter((m) => m.key !== "baby_vambie" && m.required) : cast,
       characterCards: await characterCardValues(),
       family: await buildFamilyCast(storybook.child.householdId),
+      ...(beforeBirth ? { beforeBirth: true } : {}),
+      // The first chapter after the birth, when every chapter so far was made before it.
+      ...(!beforeBirth && storybook.chapters.some((c) => c.id !== existing?.id && isBeforeBirth(c.generationSnapshot)) &&
+      !storybook.chapters.some((c) => c.id !== existing?.id && !isBeforeBirth(c.generationSnapshot))
+        ? { arrival: true }
+        : {}),
     };
   }
   const profile = snapshot.readingProfile;
@@ -450,9 +477,10 @@ export async function createPagedChapter(input: CreateChapterInput) {
         previous_chapters: priorChapters.map((c) => c.title).join(", ") || "(none yet — this is the first chapter)",
         revision_request: input.revisionRequest ? `A reviewer asked for this revision: "${input.revisionRequest}"` : "",
         shot_rules: describeShotRules(snapshot.rules),
+        before_birth: beforeBirthValue(snapshot, storybook.child.displayName),
         ...snapshotCharacterValues(snapshot),
       }),
-      { body: withShotRules(named(snapshot, snapshot.instructions.page_plan)) },
+      { body: withShotRules(withBeforeBirth(named(snapshot, snapshot.instructions.page_plan))) },
       [],
       { chapterId: existing?.id ?? null, householdId: storybook.child.householdId }
     );
@@ -477,6 +505,12 @@ export async function createPagedChapter(input: CreateChapterInput) {
   const family = snapshot.family ?? [];
   plan.pages = plan.pages.map((p) => ({ ...p, characters: toPageTokens(p.characters, cast, family) }));
   plan.characters = plan.characters.filter((c) => !findCastMember(cast, c.name) && !findFamily(family, c.name));
+  if (snapshot.beforeBirth) {
+    // Baby Vambie hasn't arrived (VSB-119), whatever the plan says; and every page has a picture.
+    const isBabyVambie = (t: string) => /^baby[\s_-]*vambie$/i.test(t.trim());
+    plan.pages = plan.pages.map((p) => ({ ...p, characters: p.characters.filter((t) => !isBabyVambie(t)), pictureSize: p.pictureSize === "none" ? "framed" : p.pictureSize }));
+    plan.characters = plan.characters.filter((c) => !isBabyVambie(c.name));
+  }
   let { unresolved, appearances } = placePeople(plan.pages, family, plan.unresolved);
   if (input.noQuestions && unresolved.length) {
     // A visitor has no family characters to ask about yet: people the planner
@@ -560,6 +594,7 @@ async function runGuardian(chapterId: string) {
   const chapter = await prisma.chapter.findUniqueOrThrow({ where: { id: chapterId }, include: { storybook: { include: { chapters: true } } } });
   const review = await guardianReview({
     chapterId,
+    beforeBirth: isBeforeBirth(chapter.generationSnapshot),
     chapterContent: chapter.content,
     readerAgeBand: chapter.storybook.readerAgeBand,
     priorChapterTitles: chapter.storybook.chapters.filter((c) => c.status === "published" && c.id !== chapterId).map((c) => c.title),
@@ -717,9 +752,10 @@ export async function checkPages(chapterId: string, pageNumbers?: number[]) {
           characters: formatCharacters(characterSheet),
           pages: chapter.pages.map((p) => formatPage(p, snapshot, unresolved)).join("\n\n"),
           pages_to_check: targets.map((p) => p.pageNumber).join(", "),
+          before_birth: snapshot.beforeBirth ? CHECK_NOTE : "",
           ...snapshotCharacterValues(snapshot),
         }),
-        { body: named(snapshot, snapshot.instructions.page_check) },
+        { body: withBeforeBirth(named(snapshot, snapshot.instructions.page_check)) },
         [],
         { chapterId }
       );
@@ -788,6 +824,7 @@ function reviseValues(target: PageRow, ctx: Loaded, request: string, rules: Page
     next_page: neighbor(target.pageNumber + 1),
     revision_request: request,
     shot_rules: describeShotRules(rules),
+    before_birth: beforeBirthValue(snapshot, chapter.storybook.child.displayName),
     ...snapshotCharacterValues(snapshot),
   });
 }
@@ -802,7 +839,7 @@ async function replanShot(target: PageRow, ctx: Loaded, why: string, rules: Page
   const { output } = await runAiStep(
     "page_revise",
     reviseValues(target, ctx, shotOnlyRequest(parseShot(target.shot), why), rules),
-    { body: withShotRules(named(snapshot, snapshot.instructions.page_revise)) },
+    { body: withShotRules(withBeforeBirth(named(snapshot, snapshot.instructions.page_revise))) },
     [],
     tags
   );
@@ -864,7 +901,7 @@ export async function revisePage(pageId: string, request: string) {
   const { output } = await runAiStep(
     "page_revise",
     reviseValues(target, { chapter, snapshot, characterSheet, memories, unresolved }, request),
-    { body: withShotRules(named(snapshot, snapshot.instructions.page_revise)) },
+    { body: withShotRules(withBeforeBirth(named(snapshot, snapshot.instructions.page_revise))) },
     [],
     { chapterId: target.chapterId }
   );
@@ -994,7 +1031,10 @@ interface PromptContext {
   family: FamilyCastEntry[];
   people: CharacterSheetEntry[];
   appearances: AppearanceWithDesign[];
+  beforeBirth?: boolean; // VSB-119: Baby Vambie isn't in any picture
 }
+
+const NOT_BABY_VAMBIE = "Baby Vambie, the small teal-blue Vambie, is not in this picture and must not be drawn. No one here is teal-blue.";
 
 function buildImagePrompt(page: PageRow, ctx: PromptContext, references: ImageReference[], correction?: string) {
   const shot = parseShot(page.shot);
@@ -1005,12 +1045,14 @@ function buildImagePrompt(page: PageRow, ctx: PromptContext, references: ImageRe
     ctx.rules.pictureDirection ?? "",
     ctx.rules.illustrationStyle,
     // Chapters from before the Character Library described Baby Vambie in the rules.
-    ctx.cast.length ? "" : ctx.rules.babyVambieAppearance ?? "",
+    ctx.cast.length || ctx.beforeBirth ? "" : ctx.rules.babyVambieAppearance ?? "",
     ctx.rules.peopleStyle,
     describeReferences(references),
     references.length ? BELONG_NOTE : "",
     correction ?? "",
-    `Characters in this scene (draw no one else):\n${describePageCharacters(JSON.parse(page.characters), ctx).join("\n") || "Baby Vambie"}`,
+    // A page with nobody on it shows the place or the object, never Baby Vambie by default (VSB-119).
+    `Characters in this scene (draw no one else):\n${describePageCharacters(JSON.parse(page.characters), ctx).join("\n") || "No one: show the place and the objects only."}`,
+    ctx.beforeBirth ? NOT_BABY_VAMBIE : "",
     `Setting: ${page.setting}`,
     `Show: ${page.visibleAction}`,
     `Mood: ${page.emotionalTone}`,
@@ -1030,11 +1072,12 @@ function buildCharacterSheetPrompt(ctx: PromptContext, references: ImageReferenc
   ];
   return [
     ctx.rules.illustrationStyle,
-    ctx.cast.length ? "" : ctx.rules.babyVambieAppearance ?? "",
+    ctx.cast.length || ctx.beforeBirth ? "" : ctx.rules.babyVambieAppearance ?? "",
     ctx.rules.peopleStyle,
     describeReferences(references),
     "A character reference sheet for a picture book: show each character below exactly once, full body, standing side by side in a relaxed neutral pose and facing the viewer, on a plain warm-cream background. No scenery, no props, no labels.",
-    `Characters:\n${characters.join("\n") || "Baby Vambie"}`,
+    `Characters:\n${characters.join("\n")}`,
+    ctx.beforeBirth ? NOT_BABY_VAMBIE : "",
     "Do not include any text, letters or words in the image.",
   ]
     .filter(Boolean)
@@ -1062,6 +1105,8 @@ export async function generateCharacterSheet(chapterId: string): Promise<string 
     orderBy: { page: { pageNumber: "asc" } },
   });
   const appearances = all.filter((a, i) => all.findIndex((b) => b.familyCharacterId === a.familyCharacterId) === i);
+  // Nobody to show (a chapter of places and objects): no sheet; page 1 becomes the reference.
+  if (!cast.length && !appearances.length && !characterSheet.length) return null;
   const references = [
     ...cast.filter((m) => m.referenceImage).map((m) => ({ path: m.referenceImage!, label: castArtLabel(m) })),
     ...appearances.flatMap((a) => appearanceReferences(a).slice(0, 1)),
@@ -1069,7 +1114,7 @@ export async function generateCharacterSheet(chapterId: string): Promise<string 
   try {
     const common = {
       model: snapshot.rules.imageModel,
-      prompt: buildCharacterSheetPrompt({ rules: snapshot.rules, cast, family: snapshot.family ?? [], people: characterSheet, appearances }, references),
+      prompt: buildCharacterSheetPrompt({ rules: snapshot.rules, cast, family: snapshot.family ?? [], people: characterSheet, appearances, beforeBirth: snapshot.beforeBirth }, references),
       size: "1536x1024",
       quality: snapshot.rules.imageQuality,
       output_format: "jpeg" as const,
@@ -1141,7 +1186,7 @@ async function composePagePicture(
   const correction = fixNote
     ? `Correction: in the previous version of this page, ${fixNote} didn't look like their approved design. Match the attached approved design exactly: same face shape, skin tone, eyes, hair, build and signature accessories.`
     : undefined;
-  const ctx = { rules: rules!, cast, family: base.family, people: base.people, appearances };
+  const ctx = { rules: rules!, cast, family: base.family, people: base.people, appearances, beforeBirth: isBeforeBirth(chapter.generationSnapshot) };
   const prompt = rules ? buildImagePrompt(page, ctx, references, correction) : "";
   return { references, prompt, fixNote };
 }
@@ -1234,7 +1279,7 @@ async function checkIllustration(assetId: string): Promise<string[]> {
   const { snapshot, characterSheet } = await loadChapter(asset.page.chapterId);
   const tokens = JSON.parse(asset.page.characters) as string[];
   const appearances = (await pageAppearances(asset.pageId)).filter((a) => a.design.portraitPath);
-  const ctx = { rules: snapshot?.rules as PageRules, cast: snapshot?.cast ?? [], family: snapshot?.family ?? [], people: characterSheet, appearances };
+  const ctx = { rules: snapshot?.rules as PageRules, cast: snapshot?.cast ?? [], family: snapshot?.family ?? [], people: characterSheet, appearances, beforeBirth: snapshot?.beforeBirth };
   try {
     const image = fs.readFileSync(path.join(process.cwd(), asset.imagePath)).toString("base64");
     const { output } = await runAiStep(
@@ -1242,7 +1287,12 @@ async function checkIllustration(assetId: string): Promise<string[]> {
       {
         page_text: asset.page.text,
         visible_action: asset.page.visibleAction,
-        characters: describePageCharacters(tokens, ctx).join("\n"),
+        characters: [
+          describePageCharacters(tokens, ctx).join("\n") || "No one: the place and the objects only.",
+          ctx.beforeBirth ? "Must not appear: Baby Vambie, the small teal-blue Vambie. Flag the picture if Baby Vambie or any teal-blue figure is in it." : "",
+        ]
+          .filter(Boolean)
+          .join("\n"),
         people_style: ctx.rules?.peopleStyle ?? "",
         reference_images: appearances.length
           ? appearances.map((a, i) => `Image ${i + 2} (R${i + 1}): ${a.familyCharacter.name}'s approved design`).join("\n")

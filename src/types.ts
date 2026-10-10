@@ -368,6 +368,7 @@ export interface StorybookChapter {
   version: number;
   excerpt: string;
   isMock: boolean;
+  beforeBirth?: boolean; // made while the family was expecting (VSB-120)
 }
 
 export interface FamilyMember {
@@ -465,7 +466,17 @@ export interface ReaderChapter {
   status: string;
   content: string;
   publishedAt: string | null;
-  pages: { id: string; pageNumber: number; text: string; pictureSize: string; visibleAction: string; image: string | null }[];
+  pages: {
+    id: string;
+    pageNumber: number;
+    text: string;
+    pictureSize: string;
+    visibleAction: string;
+    image: string | null;
+    // Before the birth: the speaker's recording, when the reader may hear it (VSB-118).
+    voice?: { src: string | null; name: string; durationSec: number | null } | null;
+  }[];
+  beforeBirth?: boolean;
   mark: { favorite: boolean; lastPage: number; readAt: string | null; finishedAt: string | null } | null;
   storybook: { id: string; title: string; childName: string };
   nextChapterId: string | null;

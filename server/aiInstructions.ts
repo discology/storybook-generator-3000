@@ -1,5 +1,6 @@
 import { prisma } from "./db";
 import type { MessageVariable } from "./messageTemplates";
+import { BEFORE_BIRTH_KEY, DEFAULT_BEFORE_BIRTH } from "./beforeBirth";
 
 // The AI steps are fixed in code because the code decides when each runs and reads
 // its reply. Admins edit the instructions (stored in AiInstruction); the reply
@@ -50,6 +51,15 @@ Not in this storybook: profanity, the bite, Dan and his company, the Vambie Offi
     outputFormat: "",
   },
   {
+    key: BEFORE_BIRTH_KEY,
+    name: "Before you arrive",
+    kind: "block",
+    trigger: "Chapters made while the family is expecting (VSB-118): Plan pages, Check pages and Revise page read it as <before_birth>; chapters keep the version they were made with. <child_name> is filled in.",
+    variables: [{ name: "child_name", description: "Child's name or nickname", sample: "Peanut" }],
+    defaultBody: DEFAULT_BEFORE_BIRTH,
+    outputFormat: "",
+  },
+  {
     key: "interpret",
     name: "Interpret memory",
     trigger: "Runs after a voice memory is transcribed, to pull out what happened and how it felt",
@@ -86,6 +96,7 @@ Do not diagnose anyone or state things the parent didn't say. If something is un
       { name: "cast", description: "The chapter's recurring characters from the Character Library: required ones, and optional ones with their casting notes", sample: "- baby_vambie: Baby Vambie. Required in this chapter.\n  Role: Stands in for the child in every story; witnesses feelings rather than fixing them.\n  Look: Teal-blue; oversized rounded head; huge round eyes; tiny fangs; simple body and limbs\n  Never: No spikes, horns, wings or tail.\n  Personality: Curious compassion. Sits beside a feeling rather than fighting it." },
       { name: "family_cast", description: "The family's saved characters (Our Characters): permanent refs, relationships, aliases, context and approved looks", sample: "- F1: Grandma Rose\n  Relationship to the child: Grandmother (Mom's mother)\n  Also called: Grandma, Nana\n  Context: Lives nearby and keeps a vegetable garden.\n  Approved looks: \"today\" (round face, warm brown skin, short silver curls, round tortoiseshell glasses, small and sturdy)" },
       { name: "revision_request", description: "A reviewer's revision note, or empty on a first draft", sample: "" },
+      { name: "before_birth", description: "For chapters made before the birth: the Before you arrive text. For the first chapter after the birth: how it opens with Baby Vambie’s arrival. Empty otherwise.", sample: "" },
       { name: "shot_rules", description: "The Shot list from Page Rules: the allowed shot types and the shots that don't work on a Vambie", sample: "Allowed shot types (write the type exactly as one of these, never two combined): Wide establishing; Medium; Close-up; Extreme close-up; Over-the-shoulder; Bird's-eye; Low angle.\nOne focus per shot: \"focus\" names the single thing the picture centers on.\nShots that don't work on a Vambie (never plan these):\n- B-1: feet, foot, toes, legs, ankle. Tiny legs under a huge head read as extra feet. Use instead: a medium shot from the side with the whole body in the frame." },
       { name: "world", description: "The Vambie world, storybook edition (edit it under AI instructions > The Vambie world)", sample: "(the current text of The Vambie world)" },
     ],

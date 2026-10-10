@@ -35,7 +35,7 @@ export async function processMemory(memoryId: string) {
   try {
     let memory = await prisma.memory.findUniqueOrThrow({
       where: { id: memoryId },
-      include: { storybook: true, contributor: true, transcripts: { orderBy: { createdAt: "desc" }, take: 1 } },
+      include: { storybook: { include: { child: true } }, contributor: true, transcripts: { orderBy: { createdAt: "desc" }, take: 1 } },
     });
     const tags = { memoryId, userId: memory.contributor.userId };
 
@@ -51,10 +51,11 @@ export async function processMemory(memoryId: string) {
       }
       await prisma.transcriptVersion.create({ data: { memoryId, source: "machine", text: result.text } });
       await prisma.memory.update({ where: { id: memoryId }, data: { status: "transcribed" } });
-      if (!memory.storybook.keepRecordings) await removeAudio(memoryId, memory.audioUrl);
+      // Before the birth, recordings are kept so each page can play the speaker's voice (VSB-118).
+      if (!memory.storybook.keepRecordings && memory.storybook.child.stage !== "expecting") await removeAudio(memoryId, memory.audioUrl);
       memory = await prisma.memory.findUniqueOrThrow({
         where: { id: memoryId },
-        include: { storybook: true, contributor: true, transcripts: { orderBy: { createdAt: "desc" }, take: 1 } },
+        include: { storybook: { include: { child: true } }, contributor: true, transcripts: { orderBy: { createdAt: "desc" }, take: 1 } },
       });
     }
 

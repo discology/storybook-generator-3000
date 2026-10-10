@@ -15,6 +15,7 @@ export interface ReadingProfile {
   maxWordsPerSentence: number;
   vocabulary: string;
   pictures?: string; // the picture pattern for this stage
+  maxSentences?: number; // only pre-birth pages set this (VSB-118)
 }
 
 export type EmbellishmentLevel = "minimal" | "moderate" | "imaginative";
@@ -206,7 +207,7 @@ export const profileFor = (rules: PageRules, band: string): ReadingProfile => {
 
 // Reading-level text given to the AI for the page plan and checks.
 export const describeProfile = (p: ReadingProfile) =>
-  `${p.label}. ${p.vocabulary} Use ${p.pagesMin}-${p.pagesMax} pages. Each page's text: at most ${p.maxWordsPerPage} words, and no sentence longer than ${p.maxWordsPerSentence} words.${p.pictures ? ` Pictures: ${p.pictures}` : ""}`;
+  `${p.label}. ${p.vocabulary} Use ${p.pagesMin}-${p.pagesMax} pages. Each page's text: at most ${p.maxWordsPerPage} words${p.maxSentences ? ` in at most ${p.maxSentences} sentences` : ""}, and no sentence longer than ${p.maxWordsPerSentence} words.${p.pictures ? ` Pictures: ${p.pictures}` : ""}`;
 
 // Deterministic limit checks; returns one note per problem.
 export function checkPageLimits(text: string, p: ReadingProfile): string[] {
@@ -219,5 +220,9 @@ export function checkPageLimits(text: string, p: ReadingProfile): string[] {
     .map((s) => s.trim().split(/\s+/).filter(Boolean).length)
     .reduce((a, b) => Math.max(a, b), 0);
   if (longest > p.maxWordsPerSentence) notes.push(`A sentence is ${longest} words; the limit is ${p.maxWordsPerSentence}.`);
+  if (p.maxSentences) {
+    const sentences = text.split(/[.!?…]+["”’)]*\s*/).filter((s) => s.trim().split(/\s+/).filter(Boolean).length > 0).length;
+    if (sentences > p.maxSentences) notes.push(`The page has ${sentences} sentences; keep it to ${p.maxSentences}.`);
+  }
   return notes;
 }

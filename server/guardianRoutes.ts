@@ -3,6 +3,7 @@ import { prisma } from "./db";
 import { guardianReview } from "./aiService";
 import { createPagedChapter, recordedBy } from "./storyPages";
 import { effectiveStage, stageInfo } from "./readingStages";
+import { isBeforeBirth } from "./beforeBirth";
 
 // The Vambie team's side: Story Review, family feedback, an overview and the
 // list of families. Every /api/admin route requires an admin (see server.ts).
@@ -113,6 +114,7 @@ router.post("/admin/chapters/:id/run-guardian", async (req, res) => {
 
   const result = await guardianReview({
     chapterId: chapter.id,
+    beforeBirth: isBeforeBirth(chapter.generationSnapshot),
     chapterContent: chapter.content,
     readerAgeBand: chapter.storybook.readerAgeBand,
     priorChapterTitles: chapter.storybook.chapters.filter((c) => c.id !== chapter.id).map((c) => c.title),
@@ -152,6 +154,7 @@ router.post("/admin/chapters/:id/request-revision", async (req, res) => {
         emotions: s.memory.interpretation?.emotions ?? "",
         themes: s.memory.interpretation?.themes ?? "",
         recordedBy: recordedBy(s.memory.contributor),
+        prompt: s.memory.promptText,
       })),
     });
     res.json({ ok: true });

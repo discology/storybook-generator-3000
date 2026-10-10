@@ -57,6 +57,7 @@ docs/                 these guides
 | `weeklyChapters.ts` | The weekly chapter schedule |
 | `readingStages.ts` | The five reading stages and Baby Vambie's name by age |
 | `pageRules.ts` | Versioned page rules: reading profiles, art direction, the Shot list, image model and quality |
+| `beforeBirth.ts` | Chapters made while expecting: the Before you arrive wording, the pre-birth page limits, at most two messages per person, the arrival note for the first chapter after the birth, and the speaker's name for the reader's voice button |
 | `shotRules.ts` | The Shot list: allowed shot types with their framing lines, shots that don't work, matching a planned shot, and grouping flagged shots for review |
 | `characters.ts`, `familyCharacters.ts` | Character cards, casting, reference art and render choice, design proposals |
 | `aiService.ts`, `aiInstructions.ts` | Calling the AI provider; each AI step's instructions and reply format |

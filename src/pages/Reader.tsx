@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import { Link, useNavigate, useParams } from "react-router-dom";
 import PagePicture from "../components/PagePicture";
 import AccessDenied from "../components/AccessDenied";
-import { IconBookmark, IconChevronLeft, IconChevronRight, IconClose, IconPeople, IconSparkle } from "../components/icons";
+import { IconBookmark, IconChevronLeft, IconChevronRight, IconClose, IconPause, IconPeople, IconPlay, IconSparkle } from "../components/icons";
 import { BottomSheet, Loading, Switch } from "../components/ui";
 import { useStorybookData } from "../hooks/useStorybookData";
 import { apiGet, apiSend, ApiError } from "../lib/api";
@@ -60,6 +60,24 @@ export default function Reader() {
   const wide = useMediaQuery("(min-width: 900px) and (min-aspect-ratio: 5/4)");
   const touchX = useRef<number | null>(null);
   const pageRef = useRef<HTMLDivElement | null>(null);
+  // The speaker's voice on pre-birth pages (VSB-118): one player for the chapter.
+  const voiceRef = useRef<HTMLAudioElement | null>(null);
+  const [playing, setPlaying] = useState<string | null>(null);
+  useEffect(() => {
+    voiceRef.current?.pause();
+    setPlaying(null);
+  }, [index]);
+  const toggleVoice = (src: string) => {
+    const audio = voiceRef.current;
+    if (!audio) return;
+    if (playing === src) {
+      audio.pause();
+      setPlaying(null);
+      return;
+    }
+    audio.src = src;
+    void audio.play().then(() => setPlaying(src)).catch(() => setPlaying(null));
+  };
 
   useEffect(() => {
     setState("loading");
@@ -157,7 +175,11 @@ export default function Reader() {
 
   const chapterHead = (
     <header className="reader__head">
-      <span className="reader__chapter">{chapterLabel(chapter.sequence)}</span>
+      <audio ref={voiceRef} preload="none" onEnded={() => setPlaying(null)} />
+      <span className="reader__chapter">
+        {chapterLabel(chapter.sequence)}
+        {chapter.beforeBirth ? " · Before you arrive" : ""}
+      </span>
       <h1 className="reader__title">{chapter.title}</h1>
     </header>
   );
@@ -166,6 +188,21 @@ export default function Reader() {
       {paragraphs(page.text).map((p, i) => (
         <p key={i}>{p}</p>
       ))}
+      {page.voice?.src && (
+        // Before the birth, the person's own voice, under their words (VSB-118).
+        <button
+          type="button"
+          className={`reader__voice ${playing === page.voice.src ? "reader__voice--on" : ""}`}
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleVoice(page.voice!.src!);
+          }}
+        >
+          <span className="reader__voice-icon">{playing === page.voice.src ? <IconPause size={16} /> : <IconPlay size={16} />}</span>
+          Hear {page.voice.name} say it
+          {page.voice.durationSec ? <span className="reader__voice-time">{Math.floor(page.voice.durationSec / 60)}:{String(page.voice.durationSec % 60).padStart(2, "0")}</span> : null}
+        </button>
+      )}
     </div>
   ) : null;
   const picture = page.image ? (

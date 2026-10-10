@@ -5439,3 +5439,50 @@ input[type="radio"] {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+/* Before the birth (VSB-118, VSB-120): the speaker's voice under their words, and the two parts of the book. */
+.reader__voice {
+  margin-top: 14px;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 6px 16px 6px 6px;
+  border: 1.5px solid var(--purple-line);
+  border-radius: 999px;
+  background: var(--purple-soft);
+  color: var(--purple-ink);
+  font-family: var(--font-title);
+  font-weight: 700;
+  font-size: 16px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+}
+.reader__voice--on {
+  background: var(--purple);
+  border-color: var(--purple);
+  color: #ffffff;
+}
+.reader__voice-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--purple);
+  color: #ffffff;
+  flex: none;
+}
+.reader__voice--on .reader__voice-icon {
+  background: #ffffff;
+  color: var(--purple);
+}
+.reader__voice-time {
+  font-weight: 500;
+  opacity: 0.75;
+  font-variant-numeric: tabular-nums;
+}
+.chapter-part {
+  margin-top: 22px;
+}

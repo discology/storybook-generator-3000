@@ -9,6 +9,7 @@ import { normalizePhone } from "./sms";
 import { appUrl, renderMessage } from "./messageTemplates";
 import { sendText } from "./texts";
 import { flagFromFeedback } from "./feedbackRoutes";
+import { isBeforeBirth, speakerOf } from "./beforeBirth";
 import { audioSrc, canSeeChapter, canSeeMemory, isOwner, memberForChapter, memberForMemory, parseIds, requireMember } from "./access";
 import { interpret, processMemory } from "./memoryPipeline";
 import { canStartStorybook } from "./admin";
@@ -85,7 +86,9 @@ router.post("/storybooks", async (req, res) => {
           ? b.readerAgeBand
           : stageForAge(b.stage === "expecting" ? null : ageInYears(b.birthDate)),
       growWithChild: b.growWithChild !== false,
-      keepRecordings: b.keepRecordings !== false,
+      // While expecting, the whole family hears each message and recordings are kept (VSB-118).
+      keepRecordings: b.stage === "expecting" ? true : b.keepRecordings !== false,
+      ...(b.stage === "expecting" ? { defaultVisibility: "household" } : {}),
       defaultStoryUse: b.defaultStoryUse !== false,
       reminderFrequency: b.reminderFrequency === "daily" ? "daily" : "weekly",
       reminderDay: DAYS.includes(b.reminderDay) ? b.reminderDay : "Sunday",
@@ -180,6 +183,7 @@ router.get("/storybooks/:id", async (req, res) => {
     .filter((c) => canSeeChapter(c, me))
     .map(({ pages, marks, access, generationSnapshot, characterSheet, content, ...c }) => ({
       ...c,
+      beforeBirth: isBeforeBirth(generationSnapshot),
       pageCount: pages.length,
       approvedPages: pages.filter((p) => p.approvedAt).length,
       cover: pages.find((p) => p.assets[0])?.assets[0]?.imagePath ?? null,
@@ -446,6 +450,10 @@ router.get("/chapters/:id/read", async (req, res) => {
     },
   });
   const readable = chapter.storybook.chapters.filter((c) => canSeeChapter(c, member.me)).sort((a, b) => a.sequence - b.sequence);
+  const beforeBirth = isBeforeBirth(chapter.generationSnapshot);
+  const sources = beforeBirth
+    ? await prisma.memory.findMany({ where: { id: { in: chapter.pages.map((p) => p.sourceMemoryId).filter((x): x is string => Boolean(x)) } }, include: { contributor: true } })
+    : [];
   const index = readable.findIndex((c) => c.id === chapter.id);
   res.json({
     id: chapter.id,
@@ -454,7 +462,16 @@ router.get("/chapters/:id/read", async (req, res) => {
     status: chapter.status,
     content: chapter.content,
     publishedAt: chapter.publishedAt,
-    pages: chapter.pages.map((p) => ({ id: p.id, pageNumber: p.pageNumber, text: p.text, pictureSize: p.pictureSize, visibleAction: p.visibleAction, image: p.assets[0]?.imagePath ?? null })),
+    beforeBirth,
+    pages: chapter.pages.map((p) => {
+      // Before the birth, a page made from a recorded message plays it, for anyone who may hear it (VSB-118).
+      // Only a page that quotes its speaker ("Grandma Rose says: …"); the opening and
+      // closing pages have no speaker even though they carry a default source.
+      const speaker = p.text ? speakerOf(p.text) : null;
+      const m = speaker ? sources.find((s) => s.id === p.sourceMemoryId) : undefined;
+      const voice = m && m.audioUrl && canSeeMemory(m, member.me) ? { src: audioSrc(m), name: speaker!, durationSec: m.durationSec } : null;
+      return { id: p.id, pageNumber: p.pageNumber, text: p.text, pictureSize: p.pictureSize, visibleAction: p.visibleAction, image: p.assets[0]?.imagePath ?? null, voice };
+    }),
     mark: chapter.marks[0] ?? null,
     storybook: { id: chapter.storybookId, title: chapter.storybook.title, childName: member.storybook.child.displayName },
     nextChapterId: index >= 0 ? readable[index + 1]?.id ?? null : null,
@@ -641,11 +658,14 @@ router.put("/storybooks/:id/settings", async (req, res) => {
   if ("readerAgeBand" in data && !STAGE_KEYS.includes(String(data.readerAgeBand))) delete data.readerAgeBand;
   const storybook = await prisma.storybook.update({ where: { id: member.storybook.id }, data });
 
-  const { childName, birthDate } = req.body ?? {};
+  const { childName, birthDate, born } = req.body ?? {};
   if (childName || birthDate) {
+    // "They're here": a birthday on an expecting child makes them born; chapters
+    // made before stay as they are, and the next one opens with the arrival (VSB-120).
+    const arrived = born === true && Boolean(birthDate) && member.storybook.child.stage === "expecting";
     await prisma.child.update({
       where: { id: storybook.childId },
-      data: { ...(childName ? { displayName: String(childName).trim() } : {}), ...(birthDate ? { birthDate: new Date(birthDate) } : {}) },
+      data: { ...(childName ? { displayName: String(childName).trim() } : {}), ...(birthDate ? { birthDate: new Date(birthDate) } : {}), ...(arrived ? { stage: "born" } : {}) },
     });
   }
   res.json(storybook);

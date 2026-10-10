@@ -54,6 +54,8 @@ export default function SettingsStoryPreferences() {
         title: form.title,
         childName: form.childName,
         ...(form.birthDate ? { birthDate: form.birthDate } : {}),
+        // "They're here": a birthday on a baby on the way marks them born (VSB-120).
+        ...(expecting && form.birthDate ? { born: true } : {}),
         growWithChild: form.growWithChild,
         readerAgeBand: form.readerAgeBand,
         vambieNameAge: Number(form.vambieNameAge),
@@ -80,6 +82,20 @@ export default function SettingsStoryPreferences() {
         <Field label="Child's name or nickname" htmlFor="childName">
           <input id="childName" className="input" value={form.childName} onChange={(e) => set("childName", e.target.value)} />
         </Field>
+        {expecting && (
+          <Field
+            label="They’re here? Add their birthday"
+            htmlFor="birthDate"
+            hint={`Saving a birthday marks ${name} as born. Chapters made before stay as they are, and the next chapter opens with Baby Vambie’s arrival.`}
+          >
+            <span className="input-icon">
+              <input id="birthDate" type="date" className="input" value={form.birthDate} max={new Date().toISOString().slice(0, 10)} onChange={(e) => set("birthDate", e.target.value)} />
+              <span className="input-icon__icon">
+                <IconCalendar size={24} />
+              </span>
+            </span>
+          </Field>
+        )}
         {!expecting && (
           <Field label="Date of birth" htmlFor="birthDate">
             <span className="input-icon">

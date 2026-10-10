@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, Fragment } from "react";
 import { Link, useParams, useSearchParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
 import BottomNav from "../components/BottomNav";
@@ -126,10 +126,17 @@ export default function Memories() {
                 text={favorites ? "Tap the bookmark on a chapter to keep it here." : "The week's memories become a new chapter each week."}
               />
             ) : (
-              chapters.map((c) => {
+              chapters.map((c, i) => {
                 const marked = marks[c.id] ?? c.favorite;
+                // One book, two parts: newest first, so "You're here" comes before "Before you arrive" (VSB-120).
+                const hasBefore = chapters.some((x) => x.beforeBirth);
+                const part = c.beforeBirth ? "Before you arrive" : "You’re here";
+                const prevPart = i > 0 ? (chapters[i - 1].beforeBirth ? "Before you arrive" : "You’re here") : null;
+                const divider = hasBefore && part !== prevPart ? <h2 className="section-label chapter-part">{part}</h2> : null;
                 return (
-                  <div key={c.id} className="chapter-tile">
+                  <Fragment key={c.id}>
+                  {divider}
+                  <div className="chapter-tile">
                     <Link to={`${base}/read/${c.id}`} className="hstack" style={{ flex: 1, color: "inherit", textDecoration: "none", gap: 14, minWidth: 0 }}>
                       {c.cover ? <img src={`/${c.cover}`} alt="" className="chapter-tile__cover" /> : <span className="chapter-tile__cover" />}
                       <span className="chapter-tile__text">
@@ -150,6 +157,7 @@ export default function Memories() {
                       <IconBookmark size={24} filled={marked} />
                     </button>
                   </div>
+                  </Fragment>
                 );
               })
             )}

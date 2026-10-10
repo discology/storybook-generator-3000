@@ -137,6 +137,8 @@ The instructions given to the AI at each step: interpret memory, plan pages, che
 
 **The Vambie world** is the first entry and isn't a step: it's the shared text that describes Baby Vambie, Parts, the band as background and the storybook's voice at each reading stage. Plan pages, Check pages, Revise page and the Guardian read it wherever their instructions say `<world>`. It has no model and no test run; to see its effect, test run Plan pages. Chapters keep the version of it they were made with.
 
+**Before you arrive** is a second block like it: the wording for chapters made while a family is expecting (one page per message, in the person's own words, and no Baby Vambie until the birth). Plan pages, Check pages and Revise page read it as `<before_birth>`, `<child_name>` is filled in, and pre-birth chapters keep the version they were made with.
+
 - Write variables in angle brackets. Each step lists its variables, and any Vambie can be included as `<key>`.
 - **Model:** each step can use its own model. Checking steps often work well on a smaller, cheaper model; see [Running costs](how-it-works.md#running-costs).
 - **The reply format** is shown, but it can't be edited, because the app reads the AI's reply.

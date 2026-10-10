@@ -245,6 +245,8 @@ async function createDraft(res: Response, details: Details, invite: string | nul
               readerAgeBand: stageForAge(details.stage === "expecting" ? null : ageInYears(details.birthDate)),
               remindersPaused: true, // weekly reminders are a separate choice, after saving
               defaultStoryUse: true,
+              // While expecting, the whole family hears each message and recordings are kept (VSB-118).
+              ...(details.stage === "expecting" ? { defaultVisibility: "household", keepRecordings: true } : {}),
               lastBatchAt: new Date(),
             },
           },

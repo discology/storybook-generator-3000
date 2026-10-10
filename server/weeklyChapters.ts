@@ -1,6 +1,7 @@
 import { prisma } from "./db";
 import { createPagedChapter, recordedBy } from "./storyPages";
 import { withUsage } from "./aiUsage";
+import { capPerPerson } from "./beforeBirth";
 import { appUrl, renderMessage } from "./messageTemplates";
 import { sendText, storybookOwner } from "./texts";
 
@@ -80,8 +81,10 @@ export async function makeWeeklyChapter(storybookId: string) {
   generating.add(storybookId);
   lastErrors.delete(storybookId);
   try {
-    const storybook = await prisma.storybook.findUniqueOrThrow({ where: { id: storybookId } });
-    const memories = await eligibleMemories(storybookId);
+    const storybook = await prisma.storybook.findUniqueOrThrow({ where: { id: storybookId }, include: { child: true } });
+    // Before the birth, at most two messages per person; the rest wait for next week (VSB-118).
+    const eligible = await eligibleMemories(storybookId);
+    const memories = storybook.child.stage === "expecting" ? capPerPerson(eligible) : eligible;
     if (memories.length === 0) {
       await prisma.storybook.update({ where: { id: storybookId }, data: { lastBatchAt: new Date() } });
       return null;
@@ -102,6 +105,7 @@ export async function makeWeeklyChapter(storybookId: string) {
         emotions: m.interpretation?.emotions ?? "",
         themes: m.interpretation?.themes ?? "",
         recordedBy: recordedBy(m.contributor),
+        prompt: m.promptText,
       })),
     });
     await prisma.memory.updateMany({ where: { id: { in: memories.map((m) => m.id) } }, data: { status: "ready" } });
