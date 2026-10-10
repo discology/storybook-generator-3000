@@ -38,6 +38,14 @@ export default function OurCharacters() {
       });
   }, [id, navigate]);
 
+  // A look drawn from a joining photo (VSB-115) appears on its own in about a minute.
+  const drawing = data?.characters.some((c) => c.drawing);
+  useEffect(() => {
+    if (!drawing) return;
+    const timer = setInterval(() => apiGet(`/api/storybooks/${id}/characters`).then(setData).catch(() => {}), 5000);
+    return () => clearInterval(timer);
+  }, [drawing, id]);
+
   const field = (key: keyof typeof form) => ({
     value: form[key],
     onChange: (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => setForm((f) => ({ ...f, [key]: e.target.value })),
@@ -98,6 +106,8 @@ export default function OurCharacters() {
                       {v}
                     </span>
                   ))
+                ) : c.drawing ? (
+                  <span className="pill">Drawing their look…</span>
                 ) : (
                   <span className="pill warn">Look not approved yet</span>
                 )}

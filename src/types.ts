@@ -271,6 +271,7 @@ export interface CharacterDesign {
   styleSnapshot: string;
   approvedAt: string | null;
   hasPhoto: boolean;
+  drawing?: boolean; // their first look is being drawn and approved for them (VSB-115)
   pages: number;
   publishedPages: number;
   proposals: DesignProposal[];
@@ -298,6 +299,7 @@ export interface FamilyCharacterSummary {
   portraitPath: string | null;
   variants: string[];
   hasDraft: boolean;
+  drawing?: boolean;
 }
 
 export interface PageAppearance {

@@ -14,8 +14,10 @@ import {
   approveDesign,
   approvedVariants,
   describePhoto,
+  drawFirstLook,
   generateProposal,
   generateReferenceSheet,
+  isDrawingLook,
   mimeTypeOf,
   parseAliases,
   savePhoto,
@@ -94,6 +96,7 @@ export async function present(characterId: string) {
     designs: c.designs.map(({ photoPath, ...d }) => ({
       ...d,
       hasPhoto: Boolean(photoPath),
+      drawing: isDrawingLook(d.id),
       pages: usage.filter((u) => u.designId === d.id).length,
       publishedPages: usage.filter((u) => u.designId === d.id && u.page.chapter.status === "published").length,
     })),
@@ -126,6 +129,7 @@ router.get("/storybooks/:id/characters", async (req, res) => {
         portraitPath: today?.portraitPath ?? null,
         variants: [...approved.keys()],
         hasDraft: c.designs.some((d) => d.status === "draft"),
+        drawing: c.designs.some((d) => isDrawingLook(d.id)),
       };
     }),
   });
@@ -261,6 +265,17 @@ router.post("/designs/:designId/photo", upload.single("photo"), usageFromRequest
     }
   } catch (error: any) {
     console.error("Describing the photo failed:", error?.message);
+  }
+
+  // "You, in the pictures" asks for their first look to be drawn and approved for
+  // them (VSB-115). Only a brand-new character's first draft: a change of look is
+  // always proposed and approved by hand.
+  if (req.body?.autoLook === "1" && design.version === 1 && design.variant === "today") {
+    const [approved, proposals] = await Promise.all([
+      prisma.characterDesign.count({ where: { familyCharacterId: design.familyCharacterId, status: "approved" } }),
+      prisma.designProposal.count({ where: { designId: design.id } }),
+    ]);
+    if (!approved && !proposals) drawFirstLook(design.id);
   }
   res.json({ ...(await present(design.familyCharacterId)), suggestion });
 });

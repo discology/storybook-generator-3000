@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
 import TextConsent from "../components/TextConsent";
+import YouInThePictures from "../components/YouInThePictures";
 import { IconMic, IconRefresh, IconSpinner } from "../components/icons";
 import { Chev, Field, Loading, Mascot, Masthead, Note, Segmented, Select, Sheet, Switch, type MascotName } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
@@ -681,6 +682,9 @@ export function TrySave() {
   const [day, setDay] = useState("Sunday");
   const [time, setTime] = useState("19:00");
   const tried = useRef(false);
+  // "You, in the pictures" follows when the family hasn't added them yet (VSB-114).
+  const [me, setMe] = useState<{ name: string; relationship: string | null; expecting: boolean } | null>(null);
+  const [pictures, setPictures] = useState(false);
 
   const claim = useCallback(
     async (withName?: string) => {
@@ -691,6 +695,12 @@ export function TrySave() {
         setChildName(draft.child.name);
         const r = await apiSend("/api/guest/claim", "POST", { name: withName ?? "" });
         refresh();
+        const myName = (withName || user?.name || "").trim();
+        const list = await apiGet(`/api/storybooks/${r.storybookId}/characters`).catch(() => null);
+        const characters: { name: string }[] = list?.characters ?? [];
+        if (myName && !characters.some((c) => c.name.trim().toLowerCase() === myName.toLowerCase())) {
+          setMe({ name: myName, relationship: draft.relationship, expecting: draft.child.stage === "expecting" });
+        }
         setResult(r);
       } catch (e) {
         if (e instanceof ApiError && e.status === 404) setError("This story was already saved, or it's been more than 7 days.");
@@ -699,7 +709,7 @@ export function TrySave() {
         setBusy(false);
       }
     },
-    [refresh]
+    [refresh, user?.name]
   );
 
   useEffect(() => {
@@ -724,8 +734,19 @@ export function TrySave() {
         reminderTime: time,
       }).catch(() => undefined);
     }
+    if (me) return setPictures(true);
     navigate(`/storybooks/${result.storybookId}`, { replace: true });
   };
+
+  if (pictures && result && me) {
+    const open = () => navigate(`/storybooks/${result.storybookId}`, { replace: true });
+    return (
+      <div className="page">
+        <TopBar back={open} wordmark />
+        <YouInThePictures storybookId={result.storybookId} childName={childName} myName={me.name} relationship={me.relationship} expecting={me.expecting} onDone={open} />
+      </div>
+    );
+  }
 
   if (loading || (busy && !result)) return <Working title={<>Saving<br />your story…</>} sub="Keeping everything you've made." />;
 
@@ -792,7 +813,7 @@ export function TrySave() {
         </>
       )}
       <button className="btn btn--lime btn--caps" style={{ marginTop: 20 }} onClick={() => void finish()}>
-        Open {possessive(childName)} storybook <Chev />
+        {me ? "Next: you, in the pictures" : <>Open {possessive(childName)} storybook</>} <Chev />
       </button>
     </Shell>
   );

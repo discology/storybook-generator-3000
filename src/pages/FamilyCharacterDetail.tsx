@@ -31,8 +31,9 @@ export default function FamilyCharacterDetail() {
   }, [characterId, navigate]);
   useEffect(load, [load]);
 
-  // Reference sheets are drawn in the background after approval.
-  const preparing = character?.designs.some((d) => d.sheetStatus === "generating");
+  // Reference sheets are drawn in the background after approval, and so is a first
+  // look from a joining photo (VSB-115).
+  const preparing = character?.designs.some((d) => d.sheetStatus === "generating" || d.drawing);
   useEffect(() => {
     if (!preparing) return;
     const timer = setInterval(load, 5000);
@@ -317,6 +318,17 @@ function DraftEditor({
   const isVariant = previous === null && design.version === 1 && design.variant !== "today";
   const draftPages = previous ? previous.pages - previous.publishedPages : 0;
   const save = () => apiSend(`/api/designs/${design.id}`, "PUT", form);
+
+  if (design.drawing) {
+    return (
+      <div className="card" style={{ borderColor: "var(--gold, #e0a622)" }}>
+        <span className="pill warn">Drawing {name}'s look</span>
+        <p className="status-line">
+          Drawing {name} as a Vambie from their photo. It takes about a minute, and the look is approved for them. They can change it any time after.
+        </p>
+      </div>
+    );
+  }
 
   const uploadPhoto = async (file: File) => {
     const body = new FormData();

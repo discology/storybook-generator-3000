@@ -317,6 +317,33 @@ export async function generateReferenceSheet(designId: string) {
   }
 }
 
+// --- A first look drawn for them (VSB-115) ---
+
+// Designs whose look is being drawn and approved in the background. Kept in memory:
+// after a restart the draft simply keeps its photo and waits for "Draw a proposed look".
+const drawingLooks = new Set<string>();
+export const isDrawingLook = (designId: string) => drawingLooks.has(designId);
+
+// Someone who adds a photo of themselves while joining is put in the book straight
+// away: one Vambie look is drawn from the photo and approved, then the reference
+// sheet follows. They can change it later with "Change appearance".
+export function drawFirstLook(designId: string) {
+  if (drawingLooks.has(designId)) return;
+  drawingLooks.add(designId);
+  void (async () => {
+    try {
+      const proposal = await generateProposal(designId);
+      await approveDesign(designId, proposal.id, "new_chapters");
+    } catch (error: any) {
+      console.error(`Drawing the first look failed for design ${designId}:`, error?.message);
+      return;
+    } finally {
+      drawingLooks.delete(designId);
+    }
+    await generateReferenceSheet(designId);
+  })();
+}
+
 // --- What illustrations receive ---
 
 export type AppearanceWithDesign = Prisma.PageAppearanceGetPayload<{ include: { design: true; familyCharacter: true } }>;

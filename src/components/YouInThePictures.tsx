@@ -86,6 +86,7 @@ export default function YouInThePictures({
         if (design) {
           const body = new FormData();
           body.append("photo", file);
+          body.append("autoLook", "1");
           const res = await settle(await fetch(`/api/designs/${design.id}/photo`, { method: "POST", body }));
           if (!res.ok) {
             const data = await res.json().catch(() => ({}));
@@ -148,7 +149,7 @@ export default function YouInThePictures({
           )}
         </Field>
 
-        <Field label="A photo of you (optional)" hint="It helps the artist get your face, hair and glasses right.">
+        <Field label="A photo of you (optional)" hint="We'll draw you as a Vambie from it, with your skin tone, hair and glasses. You can change your look any time.">
           <label className="photo-pick">
             <input type="file" accept={PHOTO_TYPES} onChange={(e) => pick(e.target.files?.[0])} />
             {preview ? <img src={preview} alt="Your photo" /> : <span className="photo-pick__icon"><IconImage size={28} /></span>}
