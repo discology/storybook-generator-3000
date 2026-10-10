@@ -10,7 +10,7 @@ The child never appears as themselves. **Baby Vambie stands in for the child on 
 
 ## 0. Trying it first
 
-New visitors see the value before they sign up. "Start their story" on the splash screen asks only for the child's name or nickname, their age (a birthday, or "on the way") and the visitor's relationship. Then the visitor records or types one memory.
+New visitors see the value before they sign up. "Start their story" on the splash screen asks only for the child's name or nickname, their age (a birthday, or "on the way" with an optional due date) and the visitor's relationship. Then the visitor records or types one memory.
 
 - From that memory, the app writes one complete chapter and shows its first three pages as a swipeable preview. The preview opens as soon as the words are ready (about 40 seconds), and each picture fades in as it's drawn (the last one about 2 to 3 minutes in). The rest of the pages are drawn only after the visitor saves.
 - Once texting is live, the wait screen also offers "Want a text when it's ready?". Verifying their number there saves the story straight away, and we text them when it's ready. Until the app can send texts, the offer is hidden.

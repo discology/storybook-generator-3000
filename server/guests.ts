@@ -210,6 +210,7 @@ interface Details {
   childName: string;
   stage: "born" | "expecting";
   birthDate: Date | null;
+  dueDate: Date | null; // VSB-121: asked when the baby is on the way, as in setup
   relationship: string;
 }
 
@@ -218,10 +219,12 @@ function readDetails(body: any): Details | string {
   const relationship = String(body?.relationship ?? "").trim().slice(0, 40);
   const stage = body?.stage === "expecting" ? "expecting" : "born";
   const birthDate = stage === "born" && body?.birthDate ? new Date(`${String(body.birthDate).slice(0, 10)}T00:00:00Z`) : null;
+  const due = stage === "expecting" && body?.dueDate ? new Date(`${String(body.dueDate).slice(0, 10)}T00:00:00Z`) : null;
+  const dueDate = due && !Number.isNaN(due.getTime()) ? due : null;
   if (!childName) return "Add your little one's name or nickname.";
   if (!relationship) return "Choose how you're related to them.";
   if (stage === "born" && (!birthDate || Number.isNaN(birthDate.getTime()) || birthDate > new Date())) return "Add their birthday, or choose \"On the way\".";
-  return { childName, stage, birthDate, relationship };
+  return { childName, stage, birthDate, dueDate, relationship };
 }
 
 async function createDraft(res: Response, details: Details, invite: string | null) {
@@ -238,6 +241,7 @@ async function createDraft(res: Response, details: Details, invite: string | nul
           displayName: details.childName,
           stage: details.stage,
           birthDate: details.birthDate,
+          dueDate: details.dueDate,
           storybooks: {
             create: {
               title: `${details.childName}'s growing story`,
@@ -269,7 +273,7 @@ router.post("/guest/start", async (req, res) => {
   if (typeof details === "string") return res.status(400).json({ error: details });
   const d = await loadDraft(req);
   if (d && !d.memory && !d.household.guestInvite) {
-    await prisma.child.update({ where: { id: d.child.id }, data: { displayName: details.childName, stage: details.stage, birthDate: details.birthDate } });
+    await prisma.child.update({ where: { id: d.child.id }, data: { displayName: details.childName, stage: details.stage, birthDate: details.birthDate, dueDate: details.dueDate } });
     await prisma.storybook.update({
       where: { id: d.storybook.id },
       data: { title: `${details.childName}'s growing story`, readerAgeBand: stageForAge(details.stage === "expecting" ? null : ageInYears(details.birthDate)) },
@@ -296,7 +300,7 @@ router.post("/guest/invite/:token", async (req, res) => {
   if (d) await discard(d);
   await createDraft(
     res,
-    { childName: child?.displayName ?? "their child", stage: child?.stage === "expecting" ? "expecting" : "born", birthDate: child?.birthDate ?? null, relationship: invitation!.relationship || "Family" },
+    { childName: child?.displayName ?? "their child", stage: child?.stage === "expecting" ? "expecting" : "born", birthDate: child?.birthDate ?? null, dueDate: child?.dueDate ?? null, relationship: invitation!.relationship || "Family" },
     req.params.token
   );
   res.status(201).json({ ok: true });

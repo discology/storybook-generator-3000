@@ -320,6 +320,7 @@ function Details({ onDone }: { onDone: () => void }) {
   const [childName, setChildName] = useState("");
   const [stage, setStage] = useState<"born" | "expecting">("born");
   const [birthDate, setBirthDate] = useState("");
+  const [dueDate, setDueDate] = useState("");
   const [relationship, setRelationship] = useState("Parent");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -329,7 +330,7 @@ function Details({ onDone }: { onDone: () => void }) {
     setBusy(true);
     setError(null);
     try {
-      await apiSend("/api/guest/start", "POST", { childName, stage, birthDate, relationship });
+      await apiSend("/api/guest/start", "POST", { childName, stage, birthDate, dueDate, relationship });
       onDone();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Something went wrong. Try again.");
@@ -353,6 +354,12 @@ function Details({ onDone }: { onDone: () => void }) {
         {stage === "born" && (
           <Field label="Their birthday" htmlFor="birthday" hint="Stories are written for their age.">
             <input id="birthday" type="date" className="input" value={birthDate} max={new Date().toISOString().slice(0, 10)} onChange={(e) => setBirthDate(e.target.value)} />
+          </Field>
+        )}
+        {stage === "expecting" && (
+          // As in setup (VSB-121): optional; it tells the family how many weeks are left.
+          <Field label="Due date" htmlFor="dueDate" hint="Roughly is fine.">
+            <input id="dueDate" type="date" className="input" value={dueDate} min={new Date().toISOString().slice(0, 10)} onChange={(e) => setDueDate(e.target.value)} />
           </Field>
         )}
         <Field label="You are their…" htmlFor="relationship">
