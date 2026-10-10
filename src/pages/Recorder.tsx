@@ -9,7 +9,7 @@ import { Chev, Field, Loading, Mascot, Masthead, Note, Select, Sheet, Switch, ty
 import { useStorybookData } from "../hooks/useStorybookData";
 import { apiGet, apiSend } from "../lib/api";
 import { formatDuration, possessive } from "../lib/format";
-import { ageInYears } from "../lib/stages";
+import { cardFitsChild } from "../lib/promptStages";
 import { fillPrompt, promptValues } from "../lib/promptVariables";
 import type { Prompt, StorybookView } from "../types";
 
@@ -57,13 +57,6 @@ const pickMimeType = () => {
 
 const audienceFor = (relationship: string | null) =>
   relationship === "Parent" || relationship === "Guardian" ? "Parents" : relationship === "Grandparent" ? "Grandparents" : null;
-
-function childStageFor(storybook: StorybookView) {
-  if (storybook.child.stage === "expecting") return "Expecting";
-  const age = ageInYears(storybook.child.birthDate);
-  if (age === null) return null;
-  return age < 1 ? "Newborn" : age < 4 ? "Toddler" : null;
-}
 
 // Cards can use variables like <child_name>; they're filled in for the person
 // recording, and the memory keeps the question as they saw it.
@@ -149,13 +142,15 @@ export default function Recorder() {
     return () => window.removeEventListener("beforeunload", warn);
   }, [unsaved]);
 
-  const cards = useMemo(() => {
+  // The cards meant for this person and this child's stage (VSB-117).
+  const fitting = useMemo(() => {
     if (!storybook) return [];
     const audience = audienceFor(storybook.me.relationship);
-    const childStage = childStageFor(storybook);
-    const fitting = prompts.filter(
-      (p) => (p.audience === "Everyone" || p.audience === audience) && (p.childStage === "All stages" || p.childStage === childStage)
-    );
+    return prompts.filter((p) => (p.audience === "Everyone" || p.audience === audience) && cardFitsChild(p.childStage, storybook.child));
+  }, [prompts, storybook]);
+
+  const cards = useMemo(() => {
+    if (!storybook) return [];
     const values = promptValues({
       child: storybook.child,
       me: storybook.me,
@@ -176,9 +171,9 @@ export default function Recorder() {
       .sort((a, b) => rank(a) - rank(b));
     const asked = params.get("q");
     return asked && category === "All" ? [{ ...FREEFORM, question: asked, category: "Sample prompt" }, ...list] : list;
-  }, [prompts, storybook, category, params, answers]);
+  }, [fitting, storybook, category, params, answers]);
 
-  const categories = useMemo(() => ["All", ...new Set(prompts.map((p) => p.category))], [prompts]);
+  const categories = useMemo(() => ["All", ...new Set(fitting.map((p) => p.category))], [fitting]);
 
   const onDeckScroll = () => {
     const el = deckRef.current;

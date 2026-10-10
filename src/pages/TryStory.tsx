@@ -8,6 +8,7 @@ import { Chev, Field, Loading, Mascot, Masthead, Note, Segmented, Select, Sheet,
 import { useAuth } from "../auth/AuthContext";
 import { apiGet, apiSend, ApiError } from "../lib/api";
 import { fillPrompt, promptValues } from "../lib/promptVariables";
+import { cardFitsChild } from "../lib/promptStages";
 import { formatClock, possessive } from "../lib/format";
 import { RELATIONSHIPS } from "../lib/relationships";
 import { TERMS_VERSION } from "../lib/legal";
@@ -391,6 +392,7 @@ function Memory({ draft, onDone, failed }: { draft: Draft; onDone: () => void; f
           list
             .map((p, i) => ({ p, pose: CARD_POSES[i % CARD_POSES.length] }))
             .filter(({ p }) => p.audience === "Everyone" || (p.audience === "Parents" && draft.relationship === "Parent") || (p.audience === "Grandparents" && draft.relationship === "Grandparent"))
+            .filter(({ p }) => cardFitsChild(p.childStage, draft.child))
             .filter(({ p }) => !NEEDS_FAMILY.test(`${p.question} ${p.supportingText ?? ""}`))
             .map(({ p, pose }) => ({ question: fillPrompt(p.question, values), category: p.category, color: p.cardColor, art: p.artworkPath, pose }))
         )

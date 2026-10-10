@@ -1,7 +1,7 @@
 import express, { Router } from "express";
 import { prisma } from "./db";
 import { canSeeMemory, requireMember } from "./access";
-import { ageInYears } from "./readingStages";
+import { cardStagesFor } from "./promptStages";
 
 // Question of the week and who has answered each card (VSB-113).
 // - The week's card is one published "answer once" card for everyone in the
@@ -12,21 +12,13 @@ import { ageInYears } from "./readingStages";
 
 const WEEK_MS = 7 * 24 * 60 * 60 * 1000;
 
-export function childStageOf(child: { stage: string; birthDate: Date | null }) {
-  if (child.stage === "expecting") return "Expecting";
-  const age = ageInYears(child.birthDate);
-  if (age === null) return null;
-  return age < 1 ? "Newborn" : age < 4 ? "Toddler" : null;
-}
-
 export async function weekPromptId(storybook: { createdAt: Date; child: { stage: string; birthDate: Date | null } }, now = new Date()) {
-  const stage = childStageOf(storybook.child);
   const candidates = await prisma.prompt.findMany({
     where: {
       status: "published",
       answerOnce: true,
       audience: "Everyone",
-      OR: [{ childStage: "All stages" }, ...(stage ? [{ childStage: stage }] : [])],
+      childStage: { in: cardStagesFor(storybook.child, now) },
     },
     orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
     select: { id: true },

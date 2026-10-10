@@ -20,7 +20,19 @@ const AUDIENCES = [
   { value: "Parents", label: "Parents" },
   { value: "Grandparents", label: "Grandparents" },
 ];
-const STAGES = ["All stages", "Expecting", "Newborn", "Toddler"];
+// Who the card is for (VSB-117). "Both" is stored as "All stages"; Born cards can
+// narrow to an age. See server/promptStages.ts.
+const FOR = [
+  { value: "All stages", label: "Both" },
+  { value: "Expecting", label: "Expecting" },
+  { value: "Born", label: "Born" },
+];
+const AGES = [
+  { value: "Born", label: "All ages" },
+  { value: "Newborn", label: "Newborn (under 1)" },
+  { value: "Toddler", label: "Toddler (1 to 3)" },
+];
+const forOf = (childStage: string) => (childStage === "All stages" || childStage === "Expecting" ? childStage : "Born");
 const NEW_CATEGORY = "__new__";
 
 export default function AdminPromptEdit() {
@@ -222,9 +234,14 @@ export default function AdminPromptEdit() {
             <Field label="Audience" htmlFor="audience">
               <Select id="audience" value={form.audience} onChange={(v) => set("audience", v)} options={AUDIENCES} />
             </Field>
-            <Field label="Child stage" htmlFor="stage">
-              <Select id="stage" value={form.childStage} onChange={(v) => set("childStage", v)} options={STAGES} />
+            <Field label="For" htmlFor="stage" hint="Expecting cards show only before the birth; Born cards only after.">
+              <Select id="stage" value={forOf(form.childStage)} onChange={(v) => set("childStage", v)} options={FOR} />
             </Field>
+            {forOf(form.childStage) === "Born" && (
+              <Field label="Age" htmlFor="age">
+                <Select id="age" value={form.childStage} onChange={(v) => set("childStage", v)} options={AGES} />
+              </Field>
+            )}
             <div style={{ gridColumn: "1 / -1", marginTop: 6 }}>
             <Check
               id="answer-once"
