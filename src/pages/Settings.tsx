@@ -8,7 +8,7 @@ import { Avatar, Loading, Masthead, MenuRow, Sheet } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
 import { useStorybookData } from "../hooks/useStorybookData";
 import { apiGet } from "../lib/api";
-import { formatClock, formatDate, possessive } from "../lib/format";
+import { childLabel, formatClock, formatDate, possessive } from "../lib/format";
 import type { StorybookView } from "../types";
 
 export function reminderSummary(s: Pick<StorybookView, "remindersPaused" | "remindersPausedUntil" | "reminderFrequency" | "reminderDay" | "reminderTime">) {
@@ -50,7 +50,7 @@ export default function Settings() {
           <span className="grow">
             <span className="person__name" style={{ display: "block" }}>{user?.name || storybook.me.name}</span>
             <span className="person__meta" style={{ display: "block" }}>
-              {storybook.me.relationship || "Family"} · {possessive(storybook.child.displayName)} story
+              {storybook.me.relationship || "Family"} · {possessive(childLabel(storybook.child.displayName, storybook.me.role === "owner"))} story
             </span>
           </span>
           <IconChevronRight size={22} />

@@ -4,6 +4,7 @@ import { prisma } from "./db";
 import { interpretMemory, transcribeAudio } from "./aiService";
 import { appUrl, renderMessage } from "./messageTemplates";
 import { sendText } from "./texts";
+import { childLabel } from "./beforeBirth";
 
 // VSB-9: the person who recorded a memory hears when its words couldn't be made out.
 async function textTranscriptionFailed(storybookId: string, storybookTitle: string, contributorId: string, memoryId: string) {
@@ -11,7 +12,7 @@ async function textTranscriptionFailed(storybookId: string, storybookTitle: stri
   const storybook = await prisma.storybook.findUnique({ where: { id: storybookId }, include: { child: true } });
   if (!recorder?.user || !storybook || storybook.status === "guest") return;
   const body = await renderMessage("transcription_failed", {
-    child_name: storybook.child.displayName,
+    child_name: childLabel(storybook.child.displayName, recorder.role === "owner"),
     storybook_title: storybookTitle,
     memory_url: appUrl(`/storybooks/${storybookId}/memories/${memoryId}`),
   });

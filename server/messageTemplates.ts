@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { startSentences } from "./beforeBirth";
 
 // The message types are fixed in code because the code decides when each one is
 // sent; admins edit the wording (stored in MessageTemplate) and can turn a type off.
@@ -20,7 +21,7 @@ export interface MessageType {
 
 const v = {
   parentName: { name: "parent_name", description: "Name of the parent who started the storybook", sample: "Jordan" },
-  childName: { name: "child_name", description: "Child's name or nickname", sample: "Mia" },
+  childName: { name: "child_name", description: "Child's name or nickname (\"your baby\" or \"the baby\" before an expected baby has one)", sample: "Mia" },
   storybookTitle: { name: "storybook_title", description: "Title of the storybook", sample: "Mia's Story" },
   storybookUrl: { name: "storybook_url", description: "Link to the storybook", sample: "https://vambie.app/s/ck29x" },
   recordUrl: { name: "record_url", description: "Link straight to recording a new memory", sample: "https://vambie.app/r/ck29x" },
@@ -159,7 +160,7 @@ export async function getTemplate(key: string) {
 // The text to send, or null when an admin has turned this message type off.
 export async function renderMessage(key: string, values: Record<string, string>): Promise<string | null> {
   const template = await getTemplate(key);
-  return template.enabled ? fillTemplate(template.body, values) : null;
+  return template.enabled ? startSentences(fillTemplate(template.body, values)) : null;
 }
 
 // Links in texts must be absolute; APP_URL is the public address of the app.

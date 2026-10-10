@@ -6,7 +6,7 @@ import { runAiStep, isAiConfigured, guardianReview } from "./aiService";
 import { getAiInstruction } from "./aiInstructions";
 import { CastMember, buildCast, characterCardValues, currentCast, describeCast, moodArt, renderReferences } from "./characters";
 import { appUrl, fillTemplate, renderMessage } from "./messageTemplates";
-import { BEFORE_BIRTH_KEY, BEFORE_BIRTH_PROFILE, CHECK_NOTE, DEFAULT_BEFORE_BIRTH, arrivalNote, isBeforeBirth, withBeforeBirth } from "./beforeBirth";
+import { BEFORE_BIRTH_KEY, BEFORE_BIRTH_PROFILE, CHECK_NOTE, DEFAULT_BEFORE_BIRTH, NO_NAME_NOTE, arrivalNote, childLabel, hasName, isBeforeBirth, withBeforeBirth } from "./beforeBirth";
 import { sendText, storybookOwner } from "./texts";
 import {
   AppearanceWithDesign,
@@ -83,11 +83,14 @@ interface GenerationSnapshot {
 
 // What <before_birth> holds for a chapter: the Before you arrive text, the
 // arrival note, or nothing.
+// Before a name is chosen, the pages say "you" (VSB-121).
 const beforeBirthValue = (snapshot: GenerationSnapshot, childName: string) =>
   snapshot.beforeBirth
-    ? fillTemplate(snapshot.instructions[BEFORE_BIRTH_KEY] || DEFAULT_BEFORE_BIRTH, { child_name: childName })
+    ? [fillTemplate(snapshot.instructions[BEFORE_BIRTH_KEY] || DEFAULT_BEFORE_BIRTH, { child_name: childLabel(childName) }), hasName(childName) ? "" : NO_NAME_NOTE]
+        .filter(Boolean)
+        .join("\n\n")
     : snapshot.arrival
-      ? arrivalNote(childName)
+      ? arrivalNote(childLabel(childName))
       : "";
 
 // Once the child is old enough, Baby Vambie is called just "Vambie" in the
@@ -464,13 +467,13 @@ export async function createPagedChapter(input: CreateChapterInput) {
   let isMock = false;
   let planUsageId: string | null = null;
   if (!isAiConfigured()) {
-    plan = mockPlan(storybook.child.displayName, input.memories, profile);
+    plan = mockPlan(childLabel(storybook.child.displayName), input.memories, profile);
     isMock = true;
   } else {
     const { output, usageId } = await runAiStep(
       "page_plan",
       namedValues(snapshot, {
-        child_name: storybook.child.displayName,
+        child_name: childLabel(storybook.child.displayName),
         reading_level: describeProfile(profile),
         embellishment_rules: embellishmentRule(snapshot.rules),
         memories: formatMemories(input.memories),
@@ -745,7 +748,7 @@ export async function checkPages(chapterId: string, pageNumbers?: number[]) {
       const { output } = await runAiStep(
         "page_check",
         namedValues(snapshot, {
-          child_name: chapter.storybook.child.displayName,
+          child_name: childLabel(chapter.storybook.child.displayName),
           reading_level: describeProfile(profile),
           embellishment_rules: embellishmentRule(snapshot.rules),
           memories: formatMemories(memories),
@@ -1345,7 +1348,7 @@ export async function updatePagesStatus(chapterId: string) {
       const owner = await storybookOwner(chapter.storybookId);
       if (!owner || owner.storybook.status === "guest") return;
       const body = await renderMessage("pictures_failed", {
-        child_name: owner.child.displayName,
+        child_name: childLabel(owner.child.displayName, true),
         storybook_title: owner.storybook.title,
         chapter_title: chapter.title,
         review_url: appUrl(`/storybooks/${chapter.storybookId}/chapters/${chapterId}/pages`),

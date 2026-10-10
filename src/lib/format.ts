@@ -14,6 +14,12 @@ export const chapterLabel = (sequence: number) => `Chapter ${String(sequence).pa
 // "Mia's" — and "James'" for names ending in s.
 export const possessive = (name: string) => (name.endsWith("s") ? `${name}'` : `${name}'s`);
 
+// The child's name, or before one is given "your baby" to the parents and "the
+// baby" to everyone else (VSB-121). Shared with the server.
+export { childLabel, hasName } from "../../server/childName";
+// For a label at the start of a sentence: "Your baby's story".
+export const capitalize = (text: string) => text.charAt(0).toUpperCase() + text.slice(1);
+
 const TIME_FORMAT = new Intl.DateTimeFormat("en-US", { hour: "numeric", minute: "2-digit" });
 
 // "19:00" → "7:00 PM"

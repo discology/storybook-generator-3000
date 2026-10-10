@@ -1,7 +1,7 @@
 import { prisma } from "./db";
 import { createPagedChapter, recordedBy } from "./storyPages";
 import { withUsage } from "./aiUsage";
-import { capPerPerson } from "./beforeBirth";
+import { capPerPerson, childLabel } from "./beforeBirth";
 import { appUrl, renderMessage } from "./messageTemplates";
 import { sendText, storybookOwner } from "./texts";
 
@@ -116,7 +116,7 @@ export async function makeWeeklyChapter(storybookId: string) {
       if (!owner) return;
       const body = await renderMessage("review_ready", {
         parent_name: owner.ownerName,
-        child_name: owner.child.displayName,
+        child_name: childLabel(owner.child.displayName, true),
         storybook_title: owner.storybook.title,
         chapter_title: chapter.title,
         review_url: appUrl(`/storybooks/${storybookId}/chapters/${chapter.id}/pages`),

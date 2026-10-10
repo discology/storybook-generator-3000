@@ -2,6 +2,7 @@ import express, { Router } from "express";
 import { prisma } from "./db";
 import { PRICES, PRICES_CHECKED, STEP_LABELS, type UsageKind } from "./aiUsage";
 import { READING_STAGES, effectiveStage, normalizeStage, stageInfo } from "./readingStages";
+import { adminChildLabel } from "./beforeBirth";
 
 // The admin Costs page: what the AI costs per chapter, per family and per week.
 // Spend counts each call on the day it was made. A chapter's cost is everything
@@ -62,7 +63,7 @@ router.get("/admin/costs", async (req, res) => {
         h.id,
         {
           id: h.id,
-          name: `${h.children.map((c) => c.displayName).join(" & ") || h.name || "Unnamed family"}${h.guestToken ? " (visitor, unsaved)" : ""}`,
+          name: `${h.children.map((c) => adminChildLabel(c.displayName)).join(" & ") || h.name || "Unnamed family"}${h.guestToken ? " (visitor, unsaved)" : ""}`,
           owner: owner?.name ?? h.owner?.name ?? h.owner?.phone ?? null,
           stage: storybook ? effectiveStage(storybook, now) : null,
           createdAt: h.createdAt,
@@ -104,7 +105,7 @@ router.get("/admin/costs", async (req, res) => {
         id: c.id,
         title: c.title,
         familyId: c.storybook.child.householdId,
-        family: c.storybook.child.displayName,
+        family: adminChildLabel(c.storybook.child.displayName),
         storybookId: c.storybook.id,
         createdAt: c.createdAt,
         status: c.status,

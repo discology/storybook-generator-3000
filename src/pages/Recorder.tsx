@@ -8,7 +8,7 @@ import { IconCheck, IconChevronLeft, IconDownload, IconEdit, IconLock, IconMic, 
 import { Chev, Field, Loading, Mascot, Masthead, Note, Select, Sheet, Switch, type MascotName } from "../components/ui";
 import { useStorybookData } from "../hooks/useStorybookData";
 import { apiGet, apiSend } from "../lib/api";
-import { formatDuration, possessive } from "../lib/format";
+import { childLabel, formatDuration, possessive } from "../lib/format";
 import { cardFitsChild } from "../lib/promptStages";
 import { fillPrompt, promptValues } from "../lib/promptVariables";
 import type { Prompt, StorybookView } from "../types";
@@ -364,7 +364,7 @@ export default function Recorder() {
   if (!storybook) return <Loading />;
 
   const base = `/storybooks/${storybook.id}`;
-  const child = storybook.child.displayName;
+  const child = childLabel(storybook.child.displayName, storybook.me?.role === "owner");
   const nextDay = new Date(storybook.nextChapterAt).toLocaleDateString("en-US", { weekday: "long" });
 
   if (stage === "mic-blocked") {

@@ -3,6 +3,7 @@ import fs from "fs";
 import path from "path";
 import { prisma } from "./db";
 import { SESSION_COOKIE, getCurrentUser } from "./session";
+import { childLabel } from "./beforeBirth";
 
 const router: Router = express.Router();
 
@@ -20,7 +21,7 @@ router.get("/account", async (req, res) => {
     include: { household: { include: { children: { include: { storybooks: true } } } } },
   });
   const storybooks = places.flatMap((c) =>
-    c.household.children.flatMap((child) => child.storybooks.map((s) => ({ id: s.id, title: s.title, childName: child.displayName, role: c.role })))
+    c.household.children.flatMap((child) => child.storybooks.map((s) => ({ id: s.id, title: s.title, childName: childLabel(child.displayName, c.role === "owner"), role: c.role })))
   );
   // Someone can hold two places in one family; list each storybook once, as owner if they own it.
   const unique = [...new Map(storybooks.sort((a, b) => (a.role === "owner" ? -1 : 1) - (b.role === "owner" ? -1 : 1)).map((s) => [s.id, s])).values()];
@@ -53,7 +54,7 @@ async function deletionPlan(userId: string) {
       householdId,
       storybookId: book?.id ?? null,
       title: book?.title ?? "Storybook",
-      childName: place.household.children[0]?.displayName ?? "",
+      childName: childLabel(place.household.children[0]?.displayName, true),
       memoryCount: book?._count.memories ?? 0,
       chapterCount: book?._count.chapters ?? 0,
       familyCount: place.household.contributors.filter((c) => c.inviteStatus !== "revoked" && c.userId !== userId).length,
@@ -67,7 +68,7 @@ async function deletionPlan(userId: string) {
       contributorId: place.id,
       storybookId: book?.id ?? null,
       title: book?.title ?? "Storybook",
-      childName: place.household.children[0]?.displayName ?? "",
+      childName: childLabel(place.household.children[0]?.displayName),
       memoryCount: memories.length,
       heldChapterCount: new Set(memories.flatMap((m) => m.chapterSources.map((s) => s.chapterId))).size,
     });

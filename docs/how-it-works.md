@@ -98,7 +98,8 @@ While a family is expecting, a chapter is a collection of the family's words for
 - **Their own limits.** Pages may run to about 45 words in two sentences, whatever the reading stage. The page check expects a faithful trim of what was said, and the Guardian checks continuity and private details but not reader fit.
 - **No Baby Vambie yet.** Pre-birth pictures show the family saying their words; a page with nobody on it shows the place or the objects. The picture check flags a Baby Vambie on a pre-birth page.
 - **Their voices.** While expecting, new messages default to everyone in the family, and recordings are kept even when "Keep voice recordings" is off. In the reader, a page made from a recording shows "Hear Grandma Rose say it" for anyone allowed to hear it.
-- **One book, two parts.** The chapter list shows "Before you arrive" and, once there are chapters after the birth, "You're here". Entering the birthday under Story preferences marks the child born; earlier chapters stay as they are, and the next chapter opens with Baby Vambie's arrival ("Baby Vambie chose you").
+- **No name needed yet.** Setup and the try-it form ask for a name only when the child is born. Until a name is given, pages speak to the child as "you" and never invent a name, the parents' screens and texts say "your baby", and everyone else's say "the baby". The book is called "The baby's growing story" until a name arrives (VSB-121).
+- **One book, two parts.** The chapter list shows "Before you arrive" and, once there are chapters after the birth, "You're here". Entering the birthday under Story preferences marks the child born, and asks for their name if the family hadn't given one; earlier chapters stay as they are, and the next chapter opens with Baby Vambie's arrival ("Baby Vambie chose you").
 
 The wording the planner follows is **Before you arrive** under AI instructions.
 

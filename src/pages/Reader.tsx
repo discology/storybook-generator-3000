@@ -6,7 +6,7 @@ import { IconBookmark, IconChevronLeft, IconChevronRight, IconClose, IconPause, 
 import { BottomSheet, Loading, Switch } from "../components/ui";
 import { useStorybookData } from "../hooks/useStorybookData";
 import { apiGet, apiSend, ApiError } from "../lib/api";
-import { chapterLabel, possessive } from "../lib/format";
+import { capitalize, chapterLabel, possessive } from "../lib/format";
 import type { ReaderChapter } from "../types";
 
 type Paper = "cream" | "white" | "dark";
@@ -280,7 +280,7 @@ export default function Reader() {
             <IconChevronLeft size={28} strokeWidth={2.4} />
           </Link>
         )}
-        <span className="tbar__title">{ended ? "" : `${possessive(chapter.storybook.childName)} story`}</span>
+        <span className="tbar__title">{ended ? "" : capitalize(`${possessive(chapter.storybook.childName)} story`)}</span>
         <div className="tbar__right">
           {!ended && (
             <button className="tbar__icon" onClick={() => setControls(true)} aria-label="Reading settings">

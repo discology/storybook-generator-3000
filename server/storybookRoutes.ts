@@ -9,7 +9,7 @@ import { normalizePhone } from "./sms";
 import { appUrl, renderMessage } from "./messageTemplates";
 import { sendText } from "./texts";
 import { flagFromFeedback } from "./feedbackRoutes";
-import { isBeforeBirth, speakerOf } from "./beforeBirth";
+import { UNNAMED_TITLE, childLabel, defaultTitle, hasName, isBeforeBirth, speakerOf } from "./beforeBirth";
 import { audioSrc, canSeeChapter, canSeeMemory, isOwner, memberForChapter, memberForMemory, parseIds, requireMember } from "./access";
 import { interpret, processMemory } from "./memoryPipeline";
 import { canStartStorybook } from "./admin";
@@ -53,8 +53,10 @@ router.post("/storybooks", async (req, res) => {
   const b = req.body ?? {};
   const childName = String(b.childName ?? "").trim();
   const parentName = String(b.parentName ?? "").trim();
-  if (!childName || !parentName || !b.relationship) {
-    return res.status(400).json({ error: "Add the child's name, your name and your relationship to them." });
+  // While expecting, the name can wait for the birthday (VSB-121).
+  const expecting = b.stage === "expecting";
+  if ((!childName && !expecting) || !parentName || !b.relationship) {
+    return res.status(400).json({ error: expecting ? "Add your name and your relationship to the baby." : "Add the child's name, your name and your relationship to them." });
   }
   // Reminder links are texted to this number; it defaults to the one they signed in with.
   const phone = normalizePhone(String(b.parentPhone || user.phone || ""));
@@ -79,7 +81,7 @@ router.post("/storybooks", async (req, res) => {
   const storybook = await prisma.storybook.create({
     data: {
       childId: child.id,
-      title: String(b.title ?? "").trim() || `${childName}'s growing story`,
+      title: String(b.title ?? "").trim() || defaultTitle(childName),
       // Growing with the child: the stored stage is where they start; new chapters follow their age.
       readerAgeBand:
         b.growWithChild === false && STAGE_KEYS.includes(b.readerAgeBand)
@@ -102,7 +104,7 @@ router.post("/storybooks", async (req, res) => {
 
   const welcome = await renderMessage("welcome", {
     parent_name: parentName,
-    child_name: childName,
+    child_name: childLabel(childName, true),
     storybook_title: storybook.title,
     storybook_url: appUrl(`/storybooks/${storybook.id}`),
     record_url: appUrl(`/storybooks/${storybook.id}/record`),
@@ -380,7 +382,7 @@ router.get("/memories/:id", async (req, res) => {
       .map((s) => s.chapter)
       .filter((c) => canSeeChapter(c, member.me))
       .map((c) => ({ id: c.id, title: c.title, sequence: c.sequence, status: c.status, cover: c.pages[0]?.assets[0]?.imagePath ?? null })),
-    storybook: { id: member.storybook.id, title: member.storybook.title, childName: member.storybook.child.displayName },
+    storybook: { id: member.storybook.id, title: member.storybook.title, childName: childLabel(member.storybook.child.displayName, isOwner(member.me)) },
     nextChapterAt: nextScheduledBatch(member.storybook),
     canDelete: memory.contributorId === member.me.id || isOwner(member.me),
   });
@@ -473,7 +475,7 @@ router.get("/chapters/:id/read", async (req, res) => {
       return { id: p.id, pageNumber: p.pageNumber, text: p.text, pictureSize: p.pictureSize, visibleAction: p.visibleAction, image: p.assets[0]?.imagePath ?? null, voice };
     }),
     mark: chapter.marks[0] ?? null,
-    storybook: { id: chapter.storybookId, title: chapter.storybook.title, childName: member.storybook.child.displayName },
+    storybook: { id: chapter.storybookId, title: chapter.storybook.title, childName: childLabel(member.storybook.child.displayName, isOwner(member.me)) },
     nextChapterId: index >= 0 ? readable[index + 1]?.id ?? null : null,
     previousChapterId: index > 0 ? readable[index - 1].id : null,
     canShare: isOwner(member.me),
@@ -533,7 +535,7 @@ export async function textNewChapter(chapterId: string, publisherId: string) {
   });
   const sb = chapter.storybook;
   const body = await renderMessage("chapter_ready", {
-    child_name: sb.child.displayName,
+    child_name: childLabel(sb.child.displayName),
     storybook_title: sb.title,
     chapter_title: chapter.title,
     chapter_url: appUrl(`/storybooks/${sb.id}/read/${chapter.id}`),
@@ -601,14 +603,14 @@ router.post("/chapters/:id/share", async (req, res) => {
   await prisma.chapterShare.create({ data: { chapterId: chapter.id, sentBy: member.me.id, recipientIds: JSON.stringify(recipientIds), message } });
   const link = appUrl(`/storybooks/${chapter.storybookId}/read/${chapter.id}`);
   const text = await renderMessage("chapter_ready", {
-    child_name: member.storybook.child.displayName,
+    child_name: childLabel(member.storybook.child.displayName),
     storybook_title: member.storybook.title,
     chapter_title: chapter.title,
     chapter_url: link,
   });
   const body = await renderMessage("chapter_shared", {
     sender_name: member.me.name,
-    child_name: member.storybook.child.displayName,
+    child_name: childLabel(member.storybook.child.displayName),
     storybook_title: member.storybook.title,
     chapter_title: chapter.title,
     chapter_url: link,
@@ -656,16 +658,23 @@ router.put("/storybooks/:id/settings", async (req, res) => {
   // 13 means "keep calling him Baby Vambie": the stages end at 12.
   if ("vambieNameAge" in data) data.vambieNameAge = Math.min(13, Math.max(1, Math.round(Number(data.vambieNameAge)) || 4));
   if ("readerAgeBand" in data && !STAGE_KEYS.includes(String(data.readerAgeBand))) delete data.readerAgeBand;
+  const { childName, birthDate, born } = req.body ?? {};
+  const name = typeof childName === "string" ? childName.trim().slice(0, 40) : "";
+  // "They're here": a birthday on an expecting child makes them born; chapters
+  // made before stay as they are, and the next one opens with the arrival (VSB-120).
+  // The name is asked for then, if the family hadn't given one (VSB-121).
+  const arrived = born === true && Boolean(birthDate) && member.storybook.child.stage === "expecting";
+  if (arrived && !name && !hasName(member.storybook.child.displayName)) {
+    return res.status(400).json({ error: "Add their name with their birthday." });
+  }
+  // A book still called "The baby's growing story" takes the name when it's given.
+  if (name && !hasName(member.storybook.child.displayName) && (data.title ?? member.storybook.title) === UNNAMED_TITLE) data.title = defaultTitle(name);
   const storybook = await prisma.storybook.update({ where: { id: member.storybook.id }, data });
 
-  const { childName, birthDate, born } = req.body ?? {};
-  if (childName || birthDate) {
-    // "They're here": a birthday on an expecting child makes them born; chapters
-    // made before stay as they are, and the next one opens with the arrival (VSB-120).
-    const arrived = born === true && Boolean(birthDate) && member.storybook.child.stage === "expecting";
+  if (name || birthDate) {
     await prisma.child.update({
       where: { id: storybook.childId },
-      data: { ...(childName ? { displayName: String(childName).trim() } : {}), ...(birthDate ? { birthDate: new Date(birthDate) } : {}), ...(arrived ? { stage: "born" } : {}) },
+      data: { ...(name ? { displayName: name } : {}), ...(birthDate ? { birthDate: new Date(birthDate) } : {}), ...(arrived ? { stage: "born" } : {}) },
     });
   }
   res.json(storybook);

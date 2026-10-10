@@ -5,7 +5,7 @@ import { IconBook, IconChevronRight, IconSignOut, IconTrash, IconUser } from "..
 import { Check, Chev, Field, Loading, Masthead, MenuRow, Note, Sheet, StepRow } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
 import { apiGet, apiSend, ApiError } from "../lib/api";
-import { possessive } from "../lib/format";
+import { capitalize, possessive } from "../lib/format";
 
 // "Account & sign-in": your name and phone number.
 export default function Account() {
@@ -198,7 +198,7 @@ export function DeleteAccount() {
                 <IconBook size={24} />
               </span>
               <span className="menu__text">
-                <span className="menu__title">{possessive(b.childName)} whole storybook</span>
+                <span className="menu__title">{capitalize(possessive(b.childName))} whole storybook</span>
                 <span className="menu__sub" style={{ display: "block" }}>
                   {b.memoryCount} {b.memoryCount === 1 ? "memory" : "memories"} and {b.chapterCount} {b.chapterCount === 1 ? "chapter" : "chapters"}
                   {b.familyCount > 0 ? `, including what ${b.familyCount} family ${b.familyCount === 1 ? "member" : "members"} recorded. They lose access too.` : "."}

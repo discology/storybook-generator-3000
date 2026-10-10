@@ -13,6 +13,7 @@ import { withUsage } from "./aiUsage";
 import { acceptInvitation, invitationProblem } from "./familyRoutes";
 import { appUrl, renderMessage } from "./messageTemplates";
 import { sendText, textsMode } from "./texts";
+import { childLabel, defaultTitle } from "./beforeBirth";
 
 // Try before you sign up (VSB-75). A visitor's first memory and story live in a
 // temporary family tied to this device's cookie: a household with a guest token,
@@ -112,7 +113,7 @@ async function notifyStoryReady(householdId: string) {
   const owner = storybook?.child.household.owner;
   if (!storybook || !owner?.phone) return;
   const body = await renderMessage("story_ready", {
-    child_name: storybook.child.displayName,
+    child_name: childLabel(storybook.child.displayName, true),
     storybook_title: storybook.title,
     storybook_url: appUrl(`/storybooks/${storybook.id}`),
   });
@@ -170,11 +171,12 @@ async function state(req: Request, d: Draft) {
   let invite = null;
   if (d.household.guestInvite) {
     const invitation = await prisma.invitation.findUnique({ where: { token: d.household.guestInvite } });
-    invite = invitation ? { invitedBy: invitation.invitedByName, childName: d.child.displayName } : null;
+    invite = invitation ? { invitedBy: invitation.invitedByName, childName: childLabel(d.child.displayName) } : null;
   }
   return {
     mode: d.household.guestInvite ? "invite" : "try",
-    child: { name: d.child.displayName, stage: d.child.stage, birthDate: d.child.birthDate },
+    // Before a name is given (VSB-121): "your baby" to a parent trying it, "the baby" to anyone else.
+    child: { name: childLabel(d.child.displayName, !d.household.guestInvite && d.me?.relationship === "Parent"), stage: d.child.stage, birthDate: d.child.birthDate },
     relationship: d.me?.relationship ?? null,
     invite,
     expiresAt: d.household.guestExpiresAt,
@@ -221,7 +223,8 @@ function readDetails(body: any): Details | string {
   const birthDate = stage === "born" && body?.birthDate ? new Date(`${String(body.birthDate).slice(0, 10)}T00:00:00Z`) : null;
   const due = stage === "expecting" && body?.dueDate ? new Date(`${String(body.dueDate).slice(0, 10)}T00:00:00Z`) : null;
   const dueDate = due && !Number.isNaN(due.getTime()) ? due : null;
-  if (!childName) return "Add your little one's name or nickname.";
+  // While expecting, the name can wait for the birthday (VSB-121).
+  if (!childName && stage === "born") return "Add your little one's name or nickname.";
   if (!relationship) return "Choose how you're related to them.";
   if (stage === "born" && (!birthDate || Number.isNaN(birthDate.getTime()) || birthDate > new Date())) return "Add their birthday, or choose \"On the way\".";
   return { childName, stage, birthDate, dueDate, relationship };
@@ -244,7 +247,7 @@ async function createDraft(res: Response, details: Details, invite: string | nul
           dueDate: details.dueDate,
           storybooks: {
             create: {
-              title: `${details.childName}'s growing story`,
+              title: defaultTitle(details.childName),
               status: "guest",
               readerAgeBand: stageForAge(details.stage === "expecting" ? null : ageInYears(details.birthDate)),
               remindersPaused: true, // weekly reminders are a separate choice, after saving
@@ -276,7 +279,7 @@ router.post("/guest/start", async (req, res) => {
     await prisma.child.update({ where: { id: d.child.id }, data: { displayName: details.childName, stage: details.stage, birthDate: details.birthDate, dueDate: details.dueDate } });
     await prisma.storybook.update({
       where: { id: d.storybook.id },
-      data: { title: `${details.childName}'s growing story`, readerAgeBand: stageForAge(details.stage === "expecting" ? null : ageInYears(details.birthDate)) },
+      data: { title: defaultTitle(details.childName), readerAgeBand: stageForAge(details.stage === "expecting" ? null : ageInYears(details.birthDate)) },
     });
     if (d.me) await prisma.contributor.update({ where: { id: d.me.id }, data: { relationship: details.relationship } });
   } else {
@@ -300,7 +303,7 @@ router.post("/guest/invite/:token", async (req, res) => {
   if (d) await discard(d);
   await createDraft(
     res,
-    { childName: child?.displayName ?? "their child", stage: child?.stage === "expecting" ? "expecting" : "born", birthDate: child?.birthDate ?? null, dueDate: child?.dueDate ?? null, relationship: invitation!.relationship || "Family" },
+    { childName: child?.displayName ?? "", stage: child?.stage === "expecting" ? "expecting" : "born", birthDate: child?.birthDate ?? null, dueDate: child?.dueDate ?? null, relationship: invitation!.relationship || "Family" },
     req.params.token
   );
   res.status(201).json({ ok: true });

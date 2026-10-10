@@ -5,6 +5,7 @@ import BottomNav from "../components/BottomNav";
 import { Loading, Masthead } from "../components/ui";
 import { apiGet, apiSend, ApiError } from "../lib/api";
 import type { FamilyCharacterDetail, FamilyCharacterSummary } from "../types";
+import { capitalize } from "../lib/format";
 
 interface CharactersResponse {
   childName: string;
@@ -79,7 +80,7 @@ export default function OurCharacters() {
         style={{ paddingTop: 0 }}
       />
       <div className="screen-pad">
-        <p className="t-small t-muted-dark" style={{ margin: "0 0 14px" }}>{data.childName} appears as Baby Vambie, so you don't need to add them. Everyone else is drawn as a Vambie too, in their own skin tone, with their hair, glasses and clothes.</p>
+        <p className="t-small t-muted-dark" style={{ margin: "0 0 14px" }}>{capitalize(data.childName)} appears as Baby Vambie, so you don't need to add them. Everyone else is drawn as a Vambie too, in their own skin tone, with their hair, glasses and clothes.</p>
 
         {data.characters.map((c) => (
           <Link

@@ -7,7 +7,7 @@ import { memoryTitle } from "../components/MemoryListRow";
 import { IconBook, IconBookmark, IconChevronRight, IconDots, IconDownload, IconEdit, IconLock, IconSpinner, IconTrash } from "../components/icons";
 import { BottomSheet, Chev, Loading, MenuRow, Note, RadioRow, Sheet } from "../components/ui";
 import { apiGet, apiSend, ApiError } from "../lib/api";
-import { formatDate, possessive } from "../lib/format";
+import { capitalize, formatDate, possessive } from "../lib/format";
 import type { MemoryDetail as Detail } from "../types";
 
 const PROCESSING = ["recorded", "transcribing", "transcribed"];
@@ -101,7 +101,7 @@ export default function MemoryDetail() {
     <div className="page">
       <TopBar
         back={`${base}/memories?tab=memories`}
-        title={`${possessive(memory.storybook.childName)} memories`}
+        title={capitalize(`${possessive(memory.storybook.childName)} memories`)}
         right={
           <button className="tbar__icon" onClick={() => void toggleFavorite()} aria-pressed={memory.favorite} aria-label={memory.favorite ? "Remove bookmark" : "Bookmark this memory"}>
             <IconBookmark size={26} filled={memory.favorite} />

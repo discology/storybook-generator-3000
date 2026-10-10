@@ -6,7 +6,7 @@ import { Chev, Loading, Masthead, Sheet, StepRow } from "../components/ui";
 import { memoryTitle } from "../components/MemoryListRow";
 import { useStorybookData } from "../hooks/useStorybookData";
 import { apiGet, apiSend, ApiError } from "../lib/api";
-import { possessive } from "../lib/format";
+import { childLabel, possessive } from "../lib/format";
 import type { ThisWeek as ThisWeekData } from "../types";
 
 const PROCESSING = ["recorded", "transcribing", "transcribed"];
@@ -61,7 +61,7 @@ export default function ThisWeek() {
   if (!data || !storybook) return <Loading />;
 
   const base = `/storybooks/${id}`;
-  const child = storybook.child.displayName;
+  const child = childLabel(storybook.child.displayName, storybook.me?.role === "owner");
   const owner = storybook.me.role === "owner";
   const chosen = picked ?? storybook.pendingCastKeys;
   // Extra Vambies for the next weekly chapter; "always" ones are in every chapter anyway.

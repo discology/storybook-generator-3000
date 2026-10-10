@@ -9,7 +9,7 @@ import { Chev, Loading, Mascot, Segmented } from "../components/ui";
 import { useStorybookData } from "../hooks/useStorybookData";
 import { useInlineAudio } from "../hooks/useInlineAudio";
 import { apiSend } from "../lib/api";
-import { chapterLabel, formatDate, formatMonth, possessive } from "../lib/format";
+import { capitalize, chapterLabel, childLabel, formatDate, formatMonth, possessive } from "../lib/format";
 import type { StorybookChapter } from "../types";
 
 const DATE_RANGES = [
@@ -69,7 +69,7 @@ export default function Memories() {
   if (!storybook) return <Loading />;
 
   const base = `/storybooks/${storybook.id}`;
-  const child = storybook.child.displayName;
+  const child = childLabel(storybook.child.displayName, storybook.me?.role === "owner");
   const filtered = query || who || month || favorites;
 
   const toggleMark = async (c: StorybookChapter) => {
@@ -88,7 +88,7 @@ export default function Memories() {
     <div className="page page--nav">
       <TopBar wordmark avatar={`${base}/settings`} />
       <header className="masthead" style={{ paddingTop: 0, paddingBottom: 18 }}>
-        <h1 className="h-display h-display--md masthead__title">{tab === "chapters" ? `${possessive(child)} growing story.` : `${possessive(child)} memories.`}</h1>
+        <h1 className="h-display h-display--md masthead__title">{capitalize(tab === "chapters" ? `${possessive(child)} growing story.` : `${possessive(child)} memories.`)}</h1>
       </header>
       <div className="pad">
         <Segmented

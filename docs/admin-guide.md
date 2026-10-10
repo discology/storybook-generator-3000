@@ -42,7 +42,7 @@ Prompt cards are the questions families see when they record.
 
   | Variable | Shows | If it's unknown |
   | --- | --- | --- |
-  | `<child_name>` | The child's name or nickname, as the family entered it (Mia) | — |
+  | `<child_name>` | The child's name or nickname, as the family entered it (Mia). Before an expected baby has a name: "your baby" to a parent, "the baby" to anyone else | — |
   | `<child_age>` | The child's age in words (8 months old, 2 years old), or "on the way" while expecting | "young" |
   | `<your_name>` | First name of the person recording (Rose, or "Grandma Rose" when the name starts with a family title) | "you" |
   | `<your_relationship>` | How the person recording is related to the child, in lowercase (grandparent, auntie) | "family member" |
@@ -127,7 +127,7 @@ A chapter's cost is everything ever spent on it, including later redraws and rew
 
 ### Text messages
 
-The wording of the welcome, family invite, memory reminder and new-chapter texts. Write variables like `<child_name>` or `<record_url>` in angle brackets; the editor lists the ones each message supports and previews the result. It also counts characters, so you can see how many texts a message takes. Each message can be turned off, or reset to the default wording.
+The wording of the welcome, family invite, memory reminder and new-chapter texts. Write variables like `<child_name>` or `<record_url>` in angle brackets (before an expected baby has a name, `<child_name>` reads "your baby" in texts to a parent and "the baby" in texts to anyone else, with a capital at the start of a sentence); the editor lists the ones each message supports and previews the result. It also counts characters, so you can see how many texts a message takes. Each message can be turned off, or reset to the default wording.
 
 The page also shows the texting mode (off, test or live), a "Text me a test" button for each message, and the log of recent texts with their delivery status. Every text starts "Vambie Storybook:". The events: welcome, memory reminder, new chapter published, chapter sent to you ("Send a little story"), someone joined, chapter ready for review, download ready, pictures need another try, a memory couldn't be transcribed, new invite link requested, and storybook ready (visitors). Invitations are texted only to numbers that have already verified in the app (they agreed to texts); for anyone else the parent shares the link, since carriers need the person's own consent.
 
@@ -137,7 +137,7 @@ The instructions given to the AI at each step: interpret memory, plan pages, che
 
 **The Vambie world** is the first entry and isn't a step: it's the shared text that describes Baby Vambie, Parts, the band as background and the storybook's voice at each reading stage. Plan pages, Check pages, Revise page and the Guardian read it wherever their instructions say `<world>`. It has no model and no test run; to see its effect, test run Plan pages. Chapters keep the version of it they were made with.
 
-**Before you arrive** is a second block like it: the wording for chapters made while a family is expecting (one page per message, in the person's own words, and no Baby Vambie until the birth). Plan pages, Check pages and Revise page read it as `<before_birth>`, `<child_name>` is filled in, and pre-birth chapters keep the version they were made with.
+**Before you arrive** is a second block like it: the wording for chapters made while a family is expecting (one page per message, in the person's own words, and no Baby Vambie until the birth). Plan pages, Check pages and Revise page read it as `<before_birth>`, `<child_name>` is filled in ("the baby" when there's no name yet, with a note to speak to the child as "you"), and pre-birth chapters keep the version they were made with.
 
 - Write variables in angle brackets. Each step lists its variables, and any Vambie can be included as `<key>`.
 - **Model:** each step can use its own model. Checking steps often work well on a smaller, cheaper model; see [Running costs](how-it-works.md#running-costs).

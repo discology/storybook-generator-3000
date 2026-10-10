@@ -7,7 +7,7 @@ import YouInThePictures from "../components/YouInThePictures";
 import { useAuth } from "../auth/AuthContext";
 import { RELATIONSHIPS } from "../lib/relationships";
 import { READING_STAGES, ageInYears, stageForAge, stageInfo } from "../lib/stages";
-import { formatClock, possessive } from "../lib/format";
+import { capitalize, childLabel, formatClock, possessive } from "../lib/format";
 
 const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
 const TIMEZONES = ["Pacific Time", "Mountain Time", "Central Time", "Eastern Time", "Alaska Time", "Hawaii Time"];
@@ -72,7 +72,9 @@ export default function Setup() {
   }, [user]);
 
   const set = <K extends keyof typeof form>(key: K, value: (typeof form)[K]) => setForm((f) => ({ ...f, [key]: value }));
-  const name = form.childName.trim() || "your child";
+  // While expecting, the name can wait for the birthday (VSB-121).
+  const name = childLabel(form.childName, true);
+  const unnamedTitle = form.stage === "expecting" && !form.childName.trim();
   const startStage = useMemo(
     () => (form.growWithChild ? stageForAge(form.stage === "expecting" ? null : ageInYears(form.birthDate || null)) : form.readerAgeBand),
     [form.growWithChild, form.stage, form.birthDate, form.readerAgeBand]
@@ -94,7 +96,8 @@ export default function Setup() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
-          title: form.title.trim() || `${possessive(form.childName.trim())} growing story`,
+          // With no name yet, the server titles it "The baby's growing story".
+          title: form.title.trim() || (unnamedTitle ? "" : `${possessive(form.childName.trim())} growing story`),
           reminderFrequency: skipReminders ? "off" : form.reminderFrequency,
           birthDate: form.stage === "born" ? form.birthDate : "",
           dueDate: form.stage === "expecting" ? form.dueDate : "",
@@ -144,7 +147,7 @@ export default function Setup() {
     );
   }
 
-  const step1Valid = form.childName.trim() && form.parentName.trim() && form.relationship;
+  const step1Valid = (form.childName.trim() || form.stage === "expecting") && form.parentName.trim() && form.relationship;
 
   return (
     <div className="page">
@@ -172,8 +175,12 @@ export default function Setup() {
                 if (step1Valid) goTo(2);
               }}
             >
-              <Field label="Child's name or nickname" htmlFor="childName">
-                <input id="childName" className="input" value={form.childName} onChange={(e) => set("childName", e.target.value)} placeholder="e.g. Mia" autoComplete="off" required />
+              <Field
+                label={form.stage === "expecting" ? "Name or nickname (optional)" : "Child's name or nickname"}
+                htmlFor="childName"
+                hint={form.stage === "expecting" ? "No name yet? That's fine. You'll add it with their birthday." : undefined}
+              >
+                <input id="childName" className="input" value={form.childName} onChange={(e) => set("childName", e.target.value)} placeholder="e.g. Mia" autoComplete="off" required={form.stage === "born"} />
               </Field>
               <Field label="Is your little one…">
                 <div className="choices">
@@ -228,12 +235,12 @@ export default function Setup() {
                 their story.
               </>
             }
-            sub={`${possessive(name)} storybook.`}
+            sub={`${capitalize(possessive(name))} storybook.`}
             style={{ paddingTop: 0, paddingRight: 140 }}
           />
           <Sheet peek="peek" grow>
             <Field label="Storybook title" htmlFor="title">
-              <input id="title" className="input" value={form.title} onChange={(e) => set("title", e.target.value)} placeholder={`${possessive(form.childName.trim() || "Mia")} growing story`} />
+              <input id="title" className="input" value={form.title} onChange={(e) => set("title", e.target.value)} placeholder={unnamedTitle ? "The baby's growing story" : `${possessive(form.childName.trim() || "Mia")} growing story`} />
             </Field>
             <div className="field">
               <span className="field__label field__label--strong">How should the stories read?</span>

@@ -3,7 +3,7 @@ import { prisma } from "./db";
 import { guardianReview } from "./aiService";
 import { createPagedChapter, recordedBy } from "./storyPages";
 import { effectiveStage, stageInfo } from "./readingStages";
-import { isBeforeBirth } from "./beforeBirth";
+import { adminChildLabel, childLabel, isBeforeBirth } from "./beforeBirth";
 
 // The Vambie team's side: Story Review, family feedback, an overview and the
 // list of families. Every /api/admin route requires an admin (see server.ts).
@@ -40,7 +40,7 @@ router.get("/admin/chapters", async (_req, res) => {
     id: c.id,
     title: c.title,
     sequence: c.sequence,
-    childName: c.storybook.child.displayName,
+    childName: adminChildLabel(c.storybook.child.displayName),
     storybookTitle: c.storybook.title,
     storybookId: c.storybookId,
     status: c.status,
@@ -88,8 +88,8 @@ router.get("/admin/chapters/:id", async (req, res) => {
     storybook: {
       id: chapter.storybookId,
       title: chapter.storybook.title,
-      childName: chapter.storybook.child.displayName,
-      stage: `${chapter.storybook.growWithChild ? `Grow with ${chapter.storybook.child.displayName}` : "Fixed level"} · ${stage.label}`,
+      childName: adminChildLabel(chapter.storybook.child.displayName),
+      stage: `${chapter.storybook.growWithChild ? `Grow with ${childLabel(chapter.storybook.child.displayName)}` : "Fixed level"} · ${stage.label}`,
     },
     pages: chapter.pages.map((p) => ({ id: p.id, pageNumber: p.pageNumber, text: p.text, pictureSize: p.pictureSize, image: p.assets[0]?.imagePath ?? null })),
     findings: chapter.findings.map((f) => ({ id: f.id, category: f.category, status: f.status, note: f.note, quote: f.quote })),
@@ -205,7 +205,7 @@ router.get("/admin/overview", async (_req, res) => {
   ]);
   res.json({
     counts: { families, memoriesThisWeek, chaptersThisWeek, held, openFeedback, failedMemories, pendingInvites },
-    needsAttention: needsAttention.map((c) => ({ id: c.id, title: c.title, childName: c.storybook.child.displayName })),
+    needsAttention: needsAttention.map((c) => ({ id: c.id, title: c.title, childName: adminChildLabel(c.storybook.child.displayName) })),
     recentFeedback: recentFeedback.map((f) => ({ id: f.id, chapterId: f.chapterId, chapterTitle: f.chapter.title, reason: f.reason, note: f.note, from: f.contributor.name, createdAt: f.createdAt })),
   });
 });
@@ -226,7 +226,7 @@ router.get("/admin/families", async (_req, res) => {
       return {
         id: s.id,
         title: s.title,
-        childName: s.child.displayName,
+        childName: adminChildLabel(s.child.displayName),
         owner: people.find((c) => c.role === "owner")?.name ?? null,
         members: people.filter((c) => c.inviteStatus === "joined").length,
         invited: people.filter((c) => c.inviteStatus === "pending").length,

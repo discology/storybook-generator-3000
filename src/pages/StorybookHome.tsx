@@ -9,7 +9,7 @@ import { Chev, Loading, Mascot, type MascotName } from "../components/ui";
 import { useStorybookData } from "../hooks/useStorybookData";
 import { useInlineAudio } from "../hooks/useInlineAudio";
 import { apiSend, ApiError } from "../lib/api";
-import { possessive } from "../lib/format";
+import { capitalize, childLabel, possessive } from "../lib/format";
 import type { StorybookChapter, StorybookView } from "../types";
 
 const PROCESSING = ["recorded", "transcribing", "transcribed"];
@@ -76,7 +76,7 @@ export default function StorybookHome() {
   if (!storybook) return <Loading />;
 
   const base = `/storybooks/${storybook.id}`;
-  const child = storybook.child.displayName;
+  const child = childLabel(storybook.child.displayName, storybook.me?.role === "owner");
 
   if (storybook.memories.length === 0 && storybook.chapters.length === 0) return <EmptyStorybook storybook={storybook} />;
 
@@ -99,7 +99,7 @@ export default function StorybookHome() {
       <TopBar wordmark avatar={`${base}/settings`} />
       <div className="pad">
         <h1 className="h-title" style={{ fontSize: 40, margin: "2px 0 16px" }}>
-          {possessive(child)} story
+          {capitalize(possessive(child))} story
         </h1>
 
         {pendingSteps.map(({ chapter, step }) => (
@@ -266,7 +266,7 @@ function EmptyStorybook({ storybook }: { storybook: StorybookView }) {
           starts somewhere.
         </h1>
         <p className="masthead__sub" style={{ marginTop: 8 }}>
-          {possessive(storybook.child.displayName)} story.
+          {capitalize(possessive(childLabel(storybook.child.displayName, storybook.me?.role === "owner")))} story.
         </p>
         <Mascot name="closedbook" className="masthead__art masthead__art--scene" />
         <p className="t-center" style={{ position: "relative", zIndex: 2, fontSize: 19, margin: "6px 0 0" }}>

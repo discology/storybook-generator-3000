@@ -2,6 +2,7 @@ import { prisma } from "./db";
 import { appUrl, renderMessage } from "./messageTemplates";
 import { sendText, textsMode } from "./texts";
 import { DAYS, TIMEZONES, zonedParts, zonedToUtc } from "./weeklyChapters";
+import { childLabel } from "./beforeBirth";
 
 // The memory reminder text (VSB-9), on the storybook's schedule: weekly on the
 // chosen day, or daily, at the chosen time in the family's time zone. It goes to
@@ -47,7 +48,7 @@ async function tick() {
       if (!owner.user?.phone) continue;
       const body = await renderMessage("reminder", {
         parent_name: owner.name,
-        child_name: sb.child.displayName,
+        child_name: childLabel(sb.child.displayName, true),
         storybook_title: sb.title,
         storybook_url: appUrl(`/storybooks/${sb.id}`),
         record_url: appUrl(`/storybooks/${sb.id}/record`),

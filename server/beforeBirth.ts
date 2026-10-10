@@ -67,3 +67,9 @@ export function speakerOf(text: string): string | null {
   const m = text.match(/^\s*([^:.!?]{1,40}?)\s+says:/i);
   return m ? m[1].trim() : null;
 }
+
+// What to call the child before a name is given: shared with the web app.
+export * from "./childName";
+
+// What the planner, the checks and revisions are told when there's no name yet.
+export const NO_NAME_NOTE = `The family hasn't chosen a name yet. Never make one up or use a nickname: speak to the child as "you", and say "the baby" only where "you" won't do.`;

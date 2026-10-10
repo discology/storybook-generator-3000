@@ -9,7 +9,7 @@ import { useAuth } from "../auth/AuthContext";
 import { apiGet, apiSend, ApiError } from "../lib/api";
 import { fillPrompt, promptValues } from "../lib/promptVariables";
 import { cardFitsChild } from "../lib/promptStages";
-import { formatClock, possessive } from "../lib/format";
+import { capitalize, formatClock, possessive } from "../lib/format";
 import { RELATIONSHIPS } from "../lib/relationships";
 import { TERMS_VERSION } from "../lib/legal";
 import type { Prompt } from "../types";
@@ -345,7 +345,11 @@ function Details({ onDone }: { onDone: () => void }) {
         Just what the story needs. No account yet: you'll see a preview first.
       </p>
       <form onSubmit={(e) => void submit(e)}>
-        <Field label="Their name or nickname" htmlFor="child">
+        <Field
+          label={stage === "expecting" ? "Their name or nickname (optional)" : "Their name or nickname"}
+          htmlFor="child"
+          hint={stage === "expecting" ? "No name yet? That's fine. You'll add it with their birthday." : undefined}
+        >
           <input id="child" className="input" value={childName} onChange={(e) => setChildName(e.target.value)} maxLength={40} autoComplete="off" placeholder="Mia" />
         </Field>
         <Field label="Are they here yet?">
@@ -366,7 +370,7 @@ function Details({ onDone }: { onDone: () => void }) {
           <Select id="relationship" value={relationship} onChange={setRelationship} options={[...RELATIONSHIPS]} />
         </Field>
         {error && <p className="error-text">{error}</p>}
-        <button className="btn btn--lime btn--caps" type="submit" style={{ marginTop: 20 }} disabled={busy || !childName.trim()}>
+        <button className="btn btn--lime btn--caps" type="submit" style={{ marginTop: 20 }} disabled={busy || (!childName.trim() && stage === "born")}>
           {busy ? "One moment…" : "Next: a memory"} <Chev />
         </button>
       </form>
@@ -592,7 +596,7 @@ function Preview({ draft, onSave, onRetry }: { draft: Draft; onSave: () => void;
         </Link>
       </div>
       <p className="try-title">
-        <span className="reader__chapter">{possessive(draft.child.name)} storybook</span>
+        <span className="reader__chapter">{capitalize(possessive(draft.child.name))} storybook</span>
         <span className="try-title__name">{draft.preview.title}</span>
       </p>
       <div
@@ -796,7 +800,7 @@ export function TrySave() {
       ) : (
         <>
           <p className="t-body" style={{ marginTop: 0 }}>
-            {possessive(childName)} storybook is yours. We're drawing the rest of the pages now; open the storybook to see them arrive.
+            {capitalize(possessive(childName))} storybook is yours. We're drawing the rest of the pages now; open the storybook to see them arrive.
           </p>
           <div className="try-remind">
             <div className="toggle-row">

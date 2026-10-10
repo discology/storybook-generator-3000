@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Chev, Field, Masthead, Note, Sheet } from "./ui";
 import { IconImage } from "./icons";
 import { ApiError, apiSend, settle } from "../lib/api";
+import { childLabel } from "../lib/format";
 
 // "You, in the pictures": shown once, right after someone starts a storybook or
 // accepts an invitation. It creates their family character with what the child
@@ -47,7 +48,7 @@ export default function YouInThePictures({
   expecting?: boolean;
   onDone: () => void;
 }) {
-  const child = childName.trim() || "your child";
+  const child = childLabel(childName, true);
   const { options, preset } = useMemo(() => childWords(relationship, myName), [relationship, myName]);
   const [word, setWord] = useState<string | null>(preset);
   const [other, setOther] = useState(false);

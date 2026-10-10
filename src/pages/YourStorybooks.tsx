@@ -5,7 +5,7 @@ import { IconChevronRight, IconPlus } from "../components/icons";
 import { Avatar, Loading, Masthead } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
 import { apiGet } from "../lib/api";
-import { possessive } from "../lib/format";
+import { capitalize, childLabel, hasName, possessive } from "../lib/format";
 import type { StorybookSummary } from "../types";
 
 // Everyone sees each child's storybook once, as the relationship they hold in
@@ -38,9 +38,9 @@ export default function YourStorybooks() {
       <div className="pad" style={{ paddingBottom: 28 }}>
         {books.map((b) => (
           <Link key={b.id} to={`/storybooks/${b.id}`} className="person" style={{ textDecoration: "none", color: "inherit" }}>
-            <Avatar name={b.child.displayName} />
+            <Avatar name={b.child.displayName} vambie={!hasName(b.child.displayName)} />
             <span className="grow" style={{ minWidth: 0 }}>
-              <span className="person__name" style={{ display: "block" }}>{possessive(b.child.displayName)} storybook</span>
+              <span className="person__name" style={{ display: "block" }}>{capitalize(possessive(childLabel(b.child.displayName, b.me?.role === "owner")))} storybook</span>
               <span className="person__meta" style={{ display: "block" }}>
                 {role(b)} · {chapters(b._count.chapters)}
               </span>

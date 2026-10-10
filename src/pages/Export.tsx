@@ -6,7 +6,7 @@ import { IconBook, IconCheck, IconClock, IconFileText, IconHelp, IconMic, IconWa
 import { Chev, CheckMark, Field, Loading, Masthead, Note, Select, Sheet } from "../components/ui";
 import { useStorybookData } from "../hooks/useStorybookData";
 import { apiGet, apiSend, ApiError } from "../lib/api";
-import { possessive } from "../lib/format";
+import { capitalize, childLabel, possessive } from "../lib/format";
 
 interface ExportView {
   id: string;
@@ -70,7 +70,7 @@ export default function ExportMemories() {
         <p className="t-body t-muted" style={{ marginTop: 4 }}>Choose what to include in your download.</p>
         <div className="inspired" style={{ marginTop: 14, borderWidth: 1.5, borderColor: "var(--line)" }}>
           {cover ? <img src={`/${cover}`} alt="" className="inspired__cover" style={{ width: 96, height: 64 }} /> : <span className="inspired__cover" style={{ width: 96, height: 64 }} />}
-          <span className="inspired__title grow">{possessive(storybook.child.displayName)} story</span>
+          <span className="inspired__title grow">{capitalize(possessive(childLabel(storybook.child.displayName, storybook.me?.role === "owner")))} story</span>
         </div>
         <div style={{ marginTop: 8 }}>
           {options.map(([key, icon, label]) => (
@@ -152,7 +152,7 @@ export function ExportStatus() {
         <Masthead title={<>Gathering<br />your moments.</>} art="papers" artMode="corner" style={{ paddingTop: 0 }} size="md" />
         <Sheet grow>
           <p className="h-title" style={{ fontSize: 26 }}>
-            {possessive(view.childName ?? "")} story · Export
+            {capitalize(possessive(view.childName ?? ""))} story · Export
           </p>
           <div className="center-col" style={{ marginTop: 24 }}>
             <div className="spin-ring spin-ring--lg" />
@@ -180,7 +180,7 @@ export function ExportStatus() {
         <Masthead title={<>Your memories,<br />ready to keep.</>} art="download" artMode="corner" style={{ paddingTop: 0 }} size="md" />
         <Sheet grow>
           <p className="h-title" style={{ fontSize: 26 }}>
-            {possessive(view.childName ?? "")} story · Export
+            {capitalize(possessive(view.childName ?? ""))} story · Export
           </p>
           <div className="steps" style={{ marginTop: 8 }}>
             {included.map((item) => (

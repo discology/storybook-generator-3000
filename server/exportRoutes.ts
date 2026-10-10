@@ -3,9 +3,10 @@ import express, { Router } from "express";
 import fs from "fs";
 import path from "path";
 import { prisma } from "./db";
-import { canSeeChapter, memberForMemory, requireMember } from "./access";
+import { canSeeChapter, isOwner, memberForMemory, requireMember } from "./access";
 import { appUrl, renderMessage } from "./messageTemplates";
 import { sendText } from "./texts";
+import { childLabel } from "./beforeBirth";
 
 const EXPORT_DIR = path.join(process.cwd(), "uploads", "exports");
 fs.mkdirSync(EXPORT_DIR, { recursive: true });
@@ -176,7 +177,7 @@ router.post("/storybooks/:id/export", async (req, res) => {
 router.get("/exports/:exportId", async (req, res) => {
   const found = await myExport(req, res);
   if (!found) return;
-  res.json({ ...exportView(found.request), storybookTitle: found.request.storybook.title, childName: found.request.storybook.child.displayName });
+  res.json({ ...exportView(found.request), storybookTitle: found.request.storybook.title, childName: childLabel(found.request.storybook.child.displayName, isOwner(found.member.me)) });
 });
 
 router.post("/exports/:exportId/retry", async (req, res) => {

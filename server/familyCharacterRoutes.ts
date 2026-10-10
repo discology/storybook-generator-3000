@@ -24,6 +24,7 @@ import {
 } from "./familyCharacters";
 import { redrawPages } from "./storyPages";
 import { getActiveRules } from "./pageRules";
+import { childLabel } from "./beforeBirth";
 
 // "Our Characters": a family's people (and pets), their approved looks and the
 // history of every version. Only members of that family can see or change them.
@@ -43,7 +44,7 @@ async function requireHousehold(req: Request, res: Response, householdId: string
     res.status(403).json({ error: "access_denied" });
     return false;
   }
-  return true;
+  return member;
 }
 
 async function characterForRequest(req: Request, res: Response) {
@@ -108,14 +109,15 @@ export async function present(characterId: string) {
 router.get("/storybooks/:id/characters", async (req, res) => {
   const storybook = await prisma.storybook.findUnique({ where: { id: req.params.id }, include: { child: true } });
   if (!storybook) return res.status(404).json({ error: "Storybook not found" });
-  if (!(await requireHousehold(req, res, storybook.child.householdId))) return;
+  const me = await requireHousehold(req, res, storybook.child.householdId);
+  if (!me) return;
   const characters = await prisma.familyCharacter.findMany({
     where: { householdId: storybook.child.householdId },
     include: { designs: true },
     orderBy: { createdAt: "asc" },
   });
   res.json({
-    childName: storybook.child.displayName,
+    childName: childLabel(storybook.child.displayName, me.role === "owner"),
     fixedIdentity: FIXED_IDENTITY,
     allowedVariations: ALLOWED_VARIATIONS,
     characters: characters.map((c) => {

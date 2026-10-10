@@ -2,6 +2,8 @@
 // the person recording ("…tell <child_name>…" → "…tell Mia…"). Plain functions
 // with no server imports: the web app uses this file too.
 
+import { childLabel } from "./childName";
+
 export interface PromptVariable {
   name: string;
   label: string;
@@ -11,7 +13,7 @@ export interface PromptVariable {
 }
 
 export const PROMPT_VARIABLES: PromptVariable[] = [
-  { name: "child_name", label: "Child's name", description: "The child's name or nickname, as the family entered it", sample: "Mia", neutral: "the child" },
+  { name: "child_name", label: "Child's name", description: "The child's name or nickname, as the family entered it; \"your baby\" to a parent or \"the baby\" to others while an expected baby has no name", sample: "Mia", neutral: "the child" },
   { name: "child_age", label: "Child's age", description: "\"8 months old\", \"2 years old\", or \"on the way\" while expecting", sample: "2 years old", neutral: "young" },
   { name: "your_name", label: "Your name", description: "First name of the person recording", sample: "Rose", neutral: "you" },
   { name: "your_relationship", label: "Your relationship", description: "How the person recording is related to the child (\"grandparent\", \"auntie\")", sample: "grandparent", neutral: "family member" },
@@ -70,12 +72,12 @@ export function childAgeWords(child: { stage: string; birthDate: string | Date |
 // The values for one person recording in one storybook.
 export function promptValues(input: {
   child: { displayName: string; stage: string; birthDate: string | Date | null };
-  me: { name: string; relationship: string | null };
+  me: { name: string; relationship: string | null; role?: string | null };
   parentName: string | null;
 }, now = new Date()): Record<string, string> {
   const relationship = input.me.relationship && input.me.relationship !== "Other" ? input.me.relationship.toLowerCase() : "family member";
   return {
-    child_name: input.child.displayName.trim() || "your little one",
+    child_name: childLabel(input.child.displayName, input.me.role === "owner"),
     child_age: childAgeWords(input.child, now),
     your_name: firstName(input.me.name) || "you",
     your_relationship: relationship,

@@ -28,6 +28,7 @@ async function textOwner(householdId: string, event: string, values: (storybook:
   if (body) await sendText({ event, to: { userId: owner.user.id, phone: owner.user.phone }, body, householdId });
 }
 import { isOwner, requireMember } from "./access";
+import { childLabel } from "./beforeBirth";
 
 const router: Router = express.Router();
 
@@ -42,7 +43,7 @@ const isExpired = (invitation: { status: string; createdAt: Date }) =>
 async function inviteMessage(inviterName: string, childName: string, storybookTitle: string, relationship: string | null, token: string) {
   return renderMessage("invite", {
     inviter_name: inviterName,
-    child_name: childName,
+    child_name: childLabel(childName),
     relationship: relationship || "family member",
     storybook_title: storybookTitle,
     invite_url: appUrl(`/invitations/${token}`),
@@ -56,7 +57,7 @@ router.get("/storybooks/:id/family", async (req, res) => {
   res.json({
     myContributorId: member.me.id,
     isOwner: isOwner(member.me),
-    childName: member.storybook.child.displayName,
+    childName: childLabel(member.storybook.child.displayName, isOwner(member.me)),
     contributors: member.storybook.child.household.contributors
       .filter((c) => c.inviteStatus !== "revoked")
       .map((c) => {
@@ -149,7 +150,7 @@ router.get("/invitations/:token", async (req, res) => {
     status: invitation.status,
     invitedByName: invitation.invitedByName,
     relationship: invitation.relationship,
-    childName: child?.displayName ?? "their child",
+    childName: childLabel(child?.displayName),
     storybookTitle: child?.storybooks[0]?.title ?? null,
     storybookId: child?.storybooks[0]?.id ?? null,
     joinedByMe: invitation.status === "accepted" && mine?.inviteStatus === "joined",
@@ -180,7 +181,7 @@ export async function acceptInvitation(invitation: Invitation, user: { id: strin
     void textOwner(invitation.householdId, "member_joined", (sb) => ({
       member_name: name,
       relationship: invitation.relationship ?? "",
-      child_name: sb.child.displayName,
+      child_name: childLabel(sb.child.displayName, true),
       storybook_title: sb.title,
       family_url: appUrl(`/storybooks/${sb.id}/family`),
     })).catch((e) => console.error("Joined text:", e?.message));
@@ -213,7 +214,7 @@ router.post("/invitations/:token/request-new", async (req, res) => {
     await prisma.invitation.update({ where: { id: invitation.id }, data: { renewRequestedAt: new Date() } });
     void textOwner(invitation.householdId, "new_link_requested", (sb) => ({
       member_name: invitation.contact,
-      child_name: sb.child.displayName,
+      child_name: childLabel(sb.child.displayName, true),
       storybook_title: sb.title,
       family_url: appUrl(`/storybooks/${sb.id}/family`),
     })).catch((e) => console.error("New link text:", e?.message));

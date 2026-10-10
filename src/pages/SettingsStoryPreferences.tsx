@@ -7,6 +7,7 @@ import { Chev, Field, Loading, Masthead, Note, RadioCard, Select, Sheet } from "
 import { useStorybookData } from "../hooks/useStorybookData";
 import { apiSend, ApiError } from "../lib/api";
 import { READING_STAGES, ageInYears, normalizeStage, stageForAge, stageInfo } from "../lib/stages";
+import { childLabel } from "../lib/format";
 
 const NAME_AGES = [
   ...Array.from({ length: 8 }, (_, i) => ({ value: String(i + 2), label: `At age ${i + 2}${i + 2 === 4 ? " (recommended)" : ""}` })),
@@ -47,8 +48,15 @@ export default function SettingsStoryPreferences() {
   const current = form.growWithChild ? stageForAge(age) : form.readerAgeBand;
   const nameNow = useMemo(() => (age !== null && age >= Number(form.vambieNameAge) ? "Vambie" : "Baby Vambie"), [age, form.vambieNameAge]);
 
+  // While expecting, the name can wait; it's asked for with the birthday (VSB-121).
+  const nameNeeded = expecting && Boolean(form.birthDate) && !form.childName.trim();
+
   const save = async () => {
     setError(null);
+    if (nameNeeded) {
+      setError("Add their name with their birthday.");
+      return;
+    }
     try {
       await apiSend(`/api/storybooks/${id}/settings`, "PUT", {
         title: form.title,
@@ -69,7 +77,7 @@ export default function SettingsStoryPreferences() {
 
   if (status === "denied") return <AccessDenied />;
   if (!storybook) return <Loading />;
-  const name = form.childName.trim() || storybook.child.displayName;
+  const name = childLabel(form.childName.trim() || storybook.child.displayName, true);
 
   return (
     <div className="page">
@@ -79,8 +87,12 @@ export default function SettingsStoryPreferences() {
         <Field label="Storybook title" htmlFor="title">
           <input id="title" className="input" value={form.title} onChange={(e) => set("title", e.target.value)} />
         </Field>
-        <Field label="Child's name or nickname" htmlFor="childName">
-          <input id="childName" className="input" value={form.childName} onChange={(e) => set("childName", e.target.value)} />
+        <Field
+          label={nameNeeded ? "Their name" : expecting && !form.childName.trim() ? "Name or nickname (optional until they're born)" : "Child's name or nickname"}
+          htmlFor="childName"
+          hint={nameNeeded ? "Needed with their birthday." : undefined}
+        >
+          <input id="childName" className="input" value={form.childName} onChange={(e) => set("childName", e.target.value)} maxLength={40} />
         </Field>
         {expecting && (
           <Field
