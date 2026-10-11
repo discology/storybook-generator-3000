@@ -1,7 +1,105 @@
-/* Vambie design system: black app chrome with big condensed headlines, cream
-   sheets, lime calls to action and purple accents. The reader uses a book serif. */
+/* Vambie design system: the picture-book look (VSB-124). Warm cream paper, ink
+   text and lines, Vambie aqua actions, Fraunces titles and Nunito for everything
+   else; Baby Vambie in ink and wash. The admin panel keeps the original black
+   chrome, lime and purple: .admin-shell below re-declares those values. */
 
 :root {
+  color-scheme: light;
+  --black: #f4ecd3;
+  --ink: #3b2e24;
+  --ink-2: #5a4a3d;
+  --ink-3: #6e5e50;
+  --line: #e2d6bd;
+  --cream: #fbf6e8;
+  --cream-2: #efe5cb;
+  --white: #fffbf2;
+  --lime: #86d6d0;
+  --lime-press: #74c8c1;
+  --purple: #86d6d0;
+  --purple-press: #74c8c1;
+  --purple-soft: #dcefeb;
+  --purple-line: #a9d9d4;
+  --purple-ink: #1f6f6b;
+  --magenta: #1f6f6b;
+  --pink: #f6dcc4;
+  --amber: #f6b503;
+  --amber-soft: #fdefcc;
+  --amber-ink: #6e4b00;
+  --green: #2cbf0f;
+  --green-soft: #e4f6dc;
+  --green-ink: #1d6b0b;
+  --red: #ef3a47;
+  --red-soft: #fef0ef;
+  --red-line: #f7b9b5;
+  --gray-btn: #e6dcc6;
+  --gray-btn-ink: #857563;
+  --dark-1: #fbf6e8;
+  --dark-2: #fbf6e8;
+  --dark-line: #d6c8ab;
+  --on-dark: #3b2e24;
+  --on-dark-2: #6e5e50;
+
+  /* Legacy names still used by older screens */
+  --bg: var(--black);
+  --bg-elevated: var(--dark-2);
+  --border-dark: var(--dark-line);
+  --cream-elevated: var(--cream);
+  --ink-soft: var(--ink-2);
+  --purple-light: #86d6d0;
+  --green-ink-legacy: #163806;
+  --orange: var(--amber);
+  --text-primary: var(--on-dark);
+  --text-secondary: var(--on-dark-2);
+
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-title: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-wordmark: "Barlow", system-ui, sans-serif;
+  --font-book: "Source Serif 4", Georgia, "Times New Roman", serif;
+
+  --r-sheet: 26px;
+  --r-card: 20px;
+  --r-btn: 16px;
+  --r-field: 12px;
+  --shadow-card: 0 1px 0 rgba(0, 0, 0, 0.04);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+
+  /* Picture-book look (VSB-124); the admin keeps today's values below */
+  --accent-text: #1f6f6b;
+  --accent-border: #3b2e24;
+  --focus: #1f6f6b;
+  --display-case: none;
+  --display-weight: 600;
+  --display-scale: 0.74;
+  --title-scale: 0.92;
+  --font-button: "Nunito", system-ui, sans-serif;
+  --button-weight: 800;
+  --button-case: none;
+  --button-scale: 0.9;
+  --font-badge: "Nunito", system-ui, sans-serif;
+  --badge-weight: 800;
+  --badge-scale: 0.9;
+  --on-dark-hover: rgba(59, 46, 36, 0.08);
+  --sheet-edge: rgba(59, 46, 36, 0.18);
+  --wash-lilac: #e4dcef;
+  --wash-butter: #f6e7b8;
+  --wash-peach: #f6dcc4;
+  --wash-sage: #dfe8cf;
+  --night-tall: none;
+  --night-wide: none;
+  --plate-shade: none;
+  --mic-halo: rgba(134, 214, 208, 0.35);
+  --mic-glow: rgba(134, 214, 208, 0.45);
+  --on-ink: #fffbf2;
+  --glow-rgb: 42, 133, 128;
+  --lime-rgb: 134, 214, 208;
+
+  font-family: var(--font-body);
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+}
+
+.admin-shell {
   color-scheme: dark;
   --black: #000000;
   --ink: #0c0c10;
@@ -36,8 +134,6 @@
   --dark-line: #2b2b33;
   --on-dark: #ffffff;
   --on-dark-2: #b8b8c2;
-
-  /* Legacy names still used by older screens */
   --bg: var(--black);
   --bg-elevated: var(--dark-2);
   --border-dark: var(--dark-line);
@@ -48,23 +144,136 @@
   --orange: var(--amber);
   --text-primary: var(--on-dark);
   --text-secondary: var(--on-dark-2);
-
   --font-display: "Anton", "Impact", sans-serif;
   --font-title: "Barlow Condensed", "Arial Narrow", sans-serif;
   --font-body: "Barlow Semi Condensed", "Barlow", system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-wordmark: "Barlow", system-ui, sans-serif;
   --font-book: "Source Serif 4", Georgia, "Times New Roman", serif;
-
   --r-sheet: 26px;
   --r-card: 20px;
   --r-btn: 16px;
   --r-field: 12px;
   --shadow-card: 0 1px 0 rgba(0, 0, 0, 0.04);
   --safe-bottom: env(safe-area-inset-bottom, 0px);
-
+  --accent-text: #7b24fd;
+  --accent-border: #7b24fd;
+  --focus: #7b24fd;
+  --display-case: uppercase;
+  --display-weight: 400;
+  --display-scale: 1;
+  --title-scale: 1;
+  --font-button: var(--font-display);
+  --button-weight: 400;
+  --button-case: uppercase;
+  --button-scale: 1;
+  --font-badge: var(--font-display);
+  --badge-weight: 400;
+  --badge-scale: 1;
+  --on-dark-hover: rgba(255, 255, 255, 0.08);
+  --sheet-edge: transparent;
+  --wash-lilac: #e4dcef;
+  --wash-butter: #f6e7b8;
+  --wash-peach: #f6dcc4;
+  --wash-sage: #dfe8cf;
+  --night-tall: url("/art/night-tall.webp");
+  --night-wide: url("/art/night-wide.webp");
+  --plate-shade: linear-gradient(180deg, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0) 45%);
+  --mic-halo: rgba(var(--glow-rgb), 0.22);
+  --mic-glow: rgba(var(--glow-rgb), 0.75);
+  --on-ink: #ffffff;
+  --glow-rgb: 123, 36, 253;
+  --lime-rgb: 140, 250, 44;
   font-family: var(--font-body);
-  font-size: 16px;
-  -webkit-font-smoothing: antialiased;
+  color: var(--on-dark);
+}
+
+/* The admin's phone preview shows the family app, so it takes the family look. */
+.admin-shell .phone-preview {
+  color-scheme: light;
+  --black: #f4ecd3;
+  --ink: #3b2e24;
+  --ink-2: #5a4a3d;
+  --ink-3: #6e5e50;
+  --line: #e2d6bd;
+  --cream: #fbf6e8;
+  --cream-2: #efe5cb;
+  --white: #fffbf2;
+  --lime: #86d6d0;
+  --lime-press: #74c8c1;
+  --purple: #86d6d0;
+  --purple-press: #74c8c1;
+  --purple-soft: #dcefeb;
+  --purple-line: #a9d9d4;
+  --purple-ink: #1f6f6b;
+  --magenta: #1f6f6b;
+  --pink: #f6dcc4;
+  --amber: #f6b503;
+  --amber-soft: #fdefcc;
+  --amber-ink: #6e4b00;
+  --green: #2cbf0f;
+  --green-soft: #e4f6dc;
+  --green-ink: #1d6b0b;
+  --red: #ef3a47;
+  --red-soft: #fef0ef;
+  --red-line: #f7b9b5;
+  --gray-btn: #e6dcc6;
+  --gray-btn-ink: #857563;
+  --dark-1: #fbf6e8;
+  --dark-2: #fbf6e8;
+  --dark-line: #d6c8ab;
+  --on-dark: #3b2e24;
+  --on-dark-2: #6e5e50;
+  --bg: var(--black);
+  --bg-elevated: var(--dark-2);
+  --border-dark: var(--dark-line);
+  --cream-elevated: var(--cream);
+  --ink-soft: var(--ink-2);
+  --purple-light: #86d6d0;
+  --green-ink-legacy: #163806;
+  --orange: var(--amber);
+  --text-primary: var(--on-dark);
+  --text-secondary: var(--on-dark-2);
+  --font-display: "Fraunces", Georgia, "Times New Roman", serif;
+  --font-title: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-body: "Nunito", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-wordmark: "Barlow", system-ui, sans-serif;
+  --font-book: "Source Serif 4", Georgia, "Times New Roman", serif;
+  --r-sheet: 26px;
+  --r-card: 20px;
+  --r-btn: 16px;
+  --r-field: 12px;
+  --shadow-card: 0 1px 0 rgba(0, 0, 0, 0.04);
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+  --accent-text: #1f6f6b;
+  --accent-border: #3b2e24;
+  --focus: #1f6f6b;
+  --display-case: none;
+  --display-weight: 600;
+  --display-scale: 0.74;
+  --title-scale: 0.92;
+  --font-button: "Nunito", system-ui, sans-serif;
+  --button-weight: 800;
+  --button-case: none;
+  --button-scale: 0.9;
+  --font-badge: "Nunito", system-ui, sans-serif;
+  --badge-weight: 800;
+  --badge-scale: 0.9;
+  --on-dark-hover: rgba(59, 46, 36, 0.08);
+  --sheet-edge: rgba(59, 46, 36, 0.18);
+  --wash-lilac: #e4dcef;
+  --wash-butter: #f6e7b8;
+  --wash-peach: #f6dcc4;
+  --wash-sage: #dfe8cf;
+  --night-tall: none;
+  --night-wide: none;
+  --plate-shade: none;
+  --mic-halo: rgba(134, 214, 208, 0.35);
+  --mic-glow: rgba(134, 214, 208, 0.45);
+  --on-ink: #fffbf2;
+  --glow-rgb: 42, 133, 128;
+  --lime-rgb: 134, 214, 208;
+  font-family: var(--font-body);
+  color: var(--on-dark);
 }
 
 * {
@@ -169,12 +378,12 @@ button {
 
 .h-display {
   font-family: var(--font-display);
-  font-weight: 400;
-  text-transform: uppercase;
+  font-weight: var(--display-weight);
+  text-transform: var(--display-case);
   line-height: 0.94;
   letter-spacing: 0.005em;
   margin: 0;
-  font-size: clamp(40px, 12vw, 54px);
+  font-size: calc(clamp(40px, 12vw, 54px) * var(--display-scale));
 }
 
 .h-display--md {
@@ -188,7 +397,7 @@ button {
 .h-title {
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 26px;
+  font-size: calc(26px * var(--title-scale));
   line-height: 1.05;
   margin: 0;
   letter-spacing: 0.002em;
@@ -205,7 +414,7 @@ button {
 .h-section {
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 20px;
+  font-size: calc(20px * var(--title-scale));
   margin: 0;
 }
 
@@ -246,7 +455,7 @@ button {
 .eyebrow {
   font-family: var(--font-title);
   font-weight: 600;
-  font-size: 13px;
+  font-size: calc(13px * var(--title-scale));
   letter-spacing: 0.16em;
   text-transform: uppercase;
 }
@@ -256,9 +465,9 @@ button {
   align-items: center;
   gap: 12px;
   font-family: var(--font-display);
-  font-size: 19px;
+  font-size: calc(19px * var(--display-scale));
   letter-spacing: 0.02em;
-  text-transform: uppercase;
+  text-transform: var(--display-case);
   margin: 26px 0 10px;
 }
 
@@ -362,7 +571,7 @@ button {
 
 .tbar__icon:hover,
 .tbar__back:hover {
-  background: rgba(255, 255, 255, 0.08);
+  background: var(--on-dark-hover);
 }
 
 .avatar-ring {
@@ -379,7 +588,7 @@ button {
   height: 100%;
   border-radius: 999px;
   object-fit: cover;
-  background: #1b1430;
+  background: var(--cream);
 }
 
 /* ---------- Masthead (dark header) ---------- */
@@ -415,20 +624,20 @@ button {
 }
 
 .masthead--plate {
-  background: var(--black) url("/art/night-tall.webp") center bottom / cover no-repeat;
+  background: var(--black) var(--night-tall) center bottom / cover no-repeat;
 }
 
 .masthead--plate::after {
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(180deg, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0) 45%);
+  background: var(--plate-shade, none);
   z-index: 1;
   pointer-events: none;
 }
 
 .masthead--wide-plate {
-  background: var(--black) url("/art/night-wide.webp") center 70% / cover no-repeat;
+  background: var(--black) var(--night-wide) center 70% / cover no-repeat;
 }
 
 .masthead__art {
@@ -463,6 +672,7 @@ button {
 
 .sheet {
   position: relative;
+  box-shadow: 0 0 0 1.5px var(--sheet-edge);
   background: var(--cream);
   color: var(--ink);
   border-radius: var(--r-sheet);
@@ -522,7 +732,7 @@ button {
 
 .card--purple {
   background: var(--purple);
-  color: var(--white);
+  color: var(--on-dark);
 }
 
 .card--lavender {
@@ -560,7 +770,7 @@ button {
   border: 2px solid transparent;
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 21px;
+  font-size: calc(21px * var(--title-scale));
   line-height: 1;
   letter-spacing: 0.005em;
   text-decoration: none;
@@ -575,10 +785,10 @@ button {
 }
 
 .btn--caps {
-  font-family: var(--font-display);
-  font-weight: 400;
-  text-transform: uppercase;
-  font-size: 21px;
+  font-family: var(--font-button);
+  font-weight: var(--button-weight);
+  text-transform: var(--button-case);
+  font-size: calc(21px * var(--button-scale));
   letter-spacing: 0.01em;
 }
 
@@ -615,7 +825,7 @@ button {
 
 .btn--purple {
   background: var(--purple);
-  color: var(--white);
+  color: var(--on-dark);
 }
 
 .btn--purple:hover:not(:disabled) {
@@ -624,7 +834,7 @@ button {
 
 .btn--dark {
   background: var(--ink);
-  color: var(--white);
+  color: var(--on-ink);
 }
 
 .btn--outline {
@@ -636,13 +846,13 @@ button {
 .btn--outline-purple {
   background: var(--white);
   color: var(--purple-ink);
-  border-color: var(--purple);
+  border-color: var(--accent-border);
 }
 
 .btn--ghost {
   background: transparent;
-  color: var(--white);
-  border-color: rgba(255, 255, 255, 0.85);
+  color: var(--on-dark);
+  border-color: var(--accent-border);
 }
 
 .btn--danger {
@@ -653,7 +863,7 @@ button {
 
 .btn--danger-solid {
   background: var(--red);
-  color: var(--white);
+  color: var(--on-dark);
 }
 
 .btn--soft {
@@ -687,7 +897,7 @@ button {
 }
 
 .tlink--light {
-  color: var(--white);
+  color: var(--on-dark);
 }
 
 .tlink--plain {
@@ -718,17 +928,17 @@ button {
   border-radius: 999px;
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 15px;
+  font-size: calc(15px * var(--title-scale));
   line-height: 1.1;
   white-space: nowrap;
 }
 
 .badge--caps {
-  font-family: var(--font-display);
-  font-weight: 400;
+  font-family: var(--font-badge);
+  font-weight: var(--badge-weight);
   text-transform: uppercase;
   letter-spacing: 0.02em;
-  font-size: 16px;
+  font-size: calc(16px * var(--badge-scale));
 }
 
 .badge--sm {
@@ -748,7 +958,7 @@ button {
 
 .badge--purple {
   background: var(--purple);
-  color: var(--white);
+  color: var(--on-dark);
 }
 
 .badge--lavender {
@@ -822,7 +1032,7 @@ button {
 
 .dot-status--purple {
   background: var(--purple-soft);
-  color: var(--purple);
+  color: var(--accent-text);
 }
 
 .dot-status > span {
@@ -849,7 +1059,7 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--white);
+  color: var(--on-dark);
 }
 
 .note__body {
@@ -861,7 +1071,7 @@ button {
   display: block;
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 19px;
+  font-size: calc(19px * var(--title-scale));
   color: var(--ink);
   margin-bottom: 4px;
 }
@@ -919,7 +1129,8 @@ button {
 }
 
 .note--dark .note__icon {
-  background: #34343e;
+  background: var(--ink-2);
+  color: var(--on-ink);
 }
 
 /* ---------- Progress rows ---------- */
@@ -960,7 +1171,7 @@ button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: var(--white);
+  color: var(--on-dark);
 }
 
 .step__icon--done {
@@ -982,7 +1193,7 @@ button {
 }
 
 .step__icon--active {
-  color: var(--purple);
+  color: var(--accent-text);
 }
 
 .step__icon--purple {
@@ -992,7 +1203,7 @@ button {
 .step__title {
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 21px;
+  font-size: calc(21px * var(--title-scale));
   line-height: 1.1;
   margin: 0;
 }
@@ -1012,8 +1223,8 @@ button {
   height: 40px;
   border-radius: 999px;
   border: 4px solid #e7dcfb;
-  border-top-color: var(--purple);
-  border-right-color: var(--purple);
+  border-top-color: var(--accent-border);
+  border-right-color: var(--accent-border);
   animation: spin 1s linear infinite;
 }
 
@@ -1114,7 +1325,7 @@ button {
 .field__label--strong {
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 21px;
+  font-size: calc(21px * var(--title-scale));
 }
 
 .field__hint {
@@ -1143,8 +1354,8 @@ button {
 .input:focus,
 .select select:focus,
 .textarea:focus {
-  border-color: var(--purple);
-  box-shadow: 0 0 0 3px rgba(123, 36, 253, 0.15);
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 3px rgba(var(--glow-rgb), 0.15);
 }
 
 .input::placeholder,
@@ -1319,12 +1530,12 @@ button {
 
 .check input:checked + .check__box {
   background: var(--purple);
-  border-color: var(--purple);
-  color: var(--white);
+  border-color: var(--accent-border);
+  color: var(--on-dark);
 }
 
 .check input:focus-visible + .check__box {
-  box-shadow: 0 0 0 3px rgba(123, 36, 253, 0.25);
+  box-shadow: 0 0 0 3px rgba(var(--glow-rgb), 0.25);
 }
 
 .check__sub {
@@ -1373,17 +1584,17 @@ button {
 
 .radio-card--on {
   background: var(--purple-soft);
-  border-color: var(--purple);
+  border-color: var(--accent-border);
 }
 
 .radio-card--on .radio-card__dot {
-  border: 8px solid var(--purple);
+  border: 8px solid var(--accent-border);
 }
 
 .radio-card__title {
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 22px;
+  font-size: calc(22px * var(--title-scale));
   line-height: 1.1;
   display: flex;
   align-items: center;
@@ -1425,7 +1636,7 @@ button {
 }
 
 .radio-row--on .radio-card__dot {
-  border: 7px solid var(--purple);
+  border: 7px solid var(--accent-border);
 }
 
 /* Toggle switch */
@@ -1489,13 +1700,13 @@ button {
   color: var(--ink);
   font-family: var(--font-title);
   font-weight: 600;
-  font-size: 20px;
+  font-size: calc(20px * var(--title-scale));
   cursor: pointer;
 }
 
 .seg__btn--on {
   background: var(--purple);
-  color: var(--white);
+  color: var(--on-dark);
 }
 
 .seg--dark {
@@ -1537,14 +1748,14 @@ button {
   background: var(--dark-1);
   color: var(--on-dark);
   font-family: var(--font-title);
-  font-size: 18px;
+  font-size: calc(18px * var(--title-scale));
   font-weight: 600;
   cursor: pointer;
 }
 
 .chip--on {
   background: var(--purple);
-  border-color: var(--purple);
+  border-color: var(--accent-border);
 }
 
 .chip__chev {
@@ -1562,7 +1773,7 @@ label.chip {
 
 .chip--light {
   background: transparent;
-  border-color: rgba(255, 255, 255, 0.5);
+  border-color: var(--dark-line);
 }
 
 .chip select {
@@ -1597,15 +1808,15 @@ label.chip {
   background: var(--white);
   text-align: center;
   font-family: var(--font-title);
-  font-size: 30px;
+  font-size: calc(30px * var(--title-scale));
   font-weight: 700;
   color: var(--ink);
   outline: none;
 }
 
 .otp input:focus {
-  border-color: var(--purple);
-  box-shadow: 0 0 0 3px rgba(123, 36, 253, 0.15);
+  border-color: var(--accent-border);
+  box-shadow: 0 0 0 3px rgba(var(--glow-rgb), 0.15);
 }
 
 .phone-field {
@@ -1635,20 +1846,20 @@ label.chip {
   width: 26px;
   height: 26px;
   border-radius: 999px;
-  border: 2px solid #5f5f68;
+  border: 2px solid var(--dark-line);
   background: transparent;
 }
 
 .progress-steps__dot--on {
-  background: radial-gradient(circle at 35% 35%, #a36bff, var(--purple));
-  border-color: var(--purple);
-  box-shadow: 0 0 12px rgba(123, 36, 253, 0.6);
+  background: var(--purple);
+  border-color: var(--accent-border);
+  box-shadow: 0 0 12px rgba(var(--glow-rgb), 0.6);
 }
 
 .progress-steps__line {
   flex: 1;
   height: 2px;
-  background: #3b3b44;
+  background: var(--dark-line);
   max-width: 90px;
 }
 
@@ -1675,7 +1886,7 @@ label.chip {
   justify-content: space-around;
   padding: 10px 8px calc(10px + var(--safe-bottom));
   background: var(--black);
-  border-top: 1px solid #1d1d23;
+  border-top: 1.5px solid var(--dark-line);
   z-index: 30;
 }
 
@@ -1685,7 +1896,7 @@ label.chip {
   flex-direction: column;
   align-items: center;
   gap: 4px;
-  color: var(--white);
+  color: var(--on-dark);
   text-decoration: none;
   font-size: 16px;
   font-weight: 500;
@@ -1707,7 +1918,7 @@ label.chip {
   justify-content: center;
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 22px;
+  font-size: calc(22px * var(--title-scale));
   color: var(--ink);
   overflow: hidden;
   background: #ffd9a8;
@@ -1732,7 +1943,7 @@ label.chip {
 }
 
 .avatar--vambie {
-  background: radial-gradient(circle at 50% 40%, #3a2a66, #160f2b);
+  background: var(--purple-soft);
   border: 3px solid var(--magenta);
 }
 
@@ -1751,8 +1962,8 @@ label.chip {
 
 .player--purple {
   background: var(--purple);
-  border-color: var(--purple);
-  color: var(--white);
+  border-color: var(--accent-border);
+  color: var(--on-dark);
 }
 
 .player__btn {
@@ -1762,7 +1973,7 @@ label.chip {
   border-radius: 999px;
   border: 0;
   background: var(--purple);
-  color: var(--white);
+  color: var(--on-dark);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1771,6 +1982,7 @@ label.chip {
 
 .player--purple .player__btn {
   background: var(--ink);
+  color: var(--on-ink);
 }
 
 .player__wave {
@@ -1824,13 +2036,13 @@ label.chip {
   width: 5px;
   border-radius: 3px;
   background: var(--lime);
-  box-shadow: 0 0 10px rgba(140, 250, 44, 0.55);
+  box-shadow: 0 0 10px rgba(var(--lime-rgb), 0.55);
   transition: height 0.08s linear;
 }
 
 .rec-timer {
   font-family: var(--font-title);
-  font-size: 30px;
+  font-size: calc(30px * var(--title-scale));
   font-weight: 600;
   font-variant-numeric: tabular-nums;
   text-align: center;
@@ -1842,12 +2054,13 @@ label.chip {
   height: 120px;
   border-radius: 999px;
   border: 0;
-  background: radial-gradient(circle at 40% 35%, #9a55ff, var(--purple));
-  color: var(--white);
+  background: var(--purple);
+  border: 2px solid var(--accent-border);
+  color: var(--on-dark);
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 0 0 12px rgba(123, 36, 253, 0.22), 0 0 50px rgba(123, 36, 253, 0.75);
+  box-shadow: 0 0 0 12px var(--mic-halo, rgba(var(--glow-rgb), 0.22)), 0 0 50px var(--mic-glow, rgba(var(--glow-rgb), 0.75));
   cursor: pointer;
 }
 
@@ -1858,10 +2071,10 @@ label.chip {
 @keyframes mic-pulse {
   0%,
   100% {
-    box-shadow: 0 0 0 10px rgba(123, 36, 253, 0.22), 0 0 40px rgba(123, 36, 253, 0.6);
+    box-shadow: 0 0 0 10px rgba(var(--glow-rgb), 0.22), 0 0 40px rgba(var(--glow-rgb), 0.6);
   }
   50% {
-    box-shadow: 0 0 0 20px rgba(123, 36, 253, 0.12), 0 0 70px rgba(123, 36, 253, 0.9);
+    box-shadow: 0 0 0 20px rgba(var(--glow-rgb), 0.12), 0 0 70px rgba(var(--glow-rgb), 0.9);
   }
 }
 
@@ -1877,7 +2090,7 @@ label.chip {
 }
 
 .mem-row + .mem-row {
-  border-top: 1px solid #1d1d23;
+  border-top: 1.5px solid var(--dark-line);
 }
 
 .mem-row__play {
@@ -1887,7 +2100,7 @@ label.chip {
   border-radius: 999px;
   border: 0;
   background: var(--purple);
-  color: var(--white);
+  color: var(--on-dark);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1907,7 +2120,7 @@ label.chip {
 .mem-row__title {
   font-family: var(--font-title);
   font-weight: 600;
-  font-size: 19px;
+  font-size: calc(19px * var(--title-scale));
   line-height: 1.15;
   white-space: nowrap;
   overflow: hidden;
@@ -1950,7 +2163,7 @@ label.chip {
   height: 104px;
   border-radius: 14px;
   object-fit: cover;
-  background: #1d1830 url("/art/night-wide.webp") center / cover;
+  background: var(--cream-2) var(--night-wide) center / cover;
 }
 
 .chapter-tile__text {
@@ -1962,14 +2175,14 @@ label.chip {
 .chapter-tile__label {
   font-family: var(--font-title);
   font-weight: 600;
-  font-size: 16px;
-  color: #b07cff;
+  font-size: calc(16px * var(--title-scale));
+  color: var(--accent-text);
 }
 
 .chapter-tile__title {
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 23px;
+  font-size: calc(23px * var(--title-scale));
   line-height: 1.05;
   margin: 3px 0 6px;
 }
@@ -2006,9 +2219,10 @@ label.chip {
 .feature {
   display: block;
   border-radius: 24px;
-  background: linear-gradient(170deg, #8a35ff 0%, var(--purple) 60%, #6a12ee 100%);
+  background: var(--cream);
+  border: 1.5px solid var(--dark-line);
   padding: 12px 12px 18px;
-  color: var(--white);
+  color: var(--on-dark);
   text-decoration: none;
   position: relative;
 }
@@ -2018,7 +2232,7 @@ label.chip {
   border-radius: 16px;
   overflow: hidden;
   aspect-ratio: 16 / 10;
-  background: #1d1830 url("/art/night-wide.webp") center / cover;
+  background: var(--cream-2) var(--night-wide) center / cover;
 }
 
 .feature__image img {
@@ -2044,7 +2258,7 @@ label.chip {
 .feature__title {
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 34px;
+  font-size: calc(34px * var(--title-scale));
   line-height: 0.98;
   margin: 0 0 14px;
 }
@@ -2061,15 +2275,15 @@ label.chip {
   gap: 14px;
   padding: 18px 18px 18px 16px;
   border-radius: 20px;
-  background: linear-gradient(160deg, #8b3cff, var(--purple) 70%);
-  color: var(--white);
+  background: var(--wash-peach);
+  color: var(--on-dark);
   text-decoration: none;
 }
 
 .sample-prompt__q {
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 27px;
+  font-size: calc(27px * var(--title-scale));
   line-height: 1.02;
   margin-top: 8px;
 }
@@ -2092,8 +2306,8 @@ label.chip {
   width: 46px;
   height: 46px;
   border-radius: 14px;
-  background: #24183d;
-  color: #b98aff;
+  background: var(--purple-soft);
+  color: var(--accent-text);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2102,7 +2316,7 @@ label.chip {
 .week-card__title {
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 20px;
+  font-size: calc(20px * var(--title-scale));
 }
 
 .week-card__sub {
@@ -2137,7 +2351,7 @@ label.chip {
 .attention__kicker {
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 15px;
+  font-size: calc(15px * var(--title-scale));
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--purple-ink);
@@ -2146,7 +2360,7 @@ label.chip {
 .attention__title {
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 21px;
+  font-size: calc(21px * var(--title-scale));
   line-height: 1.08;
   margin: 2px 0 3px;
 }
@@ -2164,7 +2378,7 @@ label.chip {
   gap: 14px;
   padding: 10px 14px 10px 10px;
   border-radius: 18px;
-  border: 2px solid var(--purple);
+  border: 2px solid var(--accent-border);
   background: var(--white);
   color: var(--ink);
   text-decoration: none;
@@ -2180,7 +2394,7 @@ label.chip {
   height: 78px;
   border-radius: 12px;
   object-fit: cover;
-  background: #1d1830 url("/art/night-wide.webp") center / cover;
+  background: var(--cream-2) var(--night-wide) center / cover;
 }
 
 .inspired__kicker {
@@ -2192,7 +2406,7 @@ label.chip {
 .inspired__title {
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 22px;
+  font-size: calc(22px * var(--title-scale));
   line-height: 1.05;
   margin-top: 2px;
 }
@@ -2239,7 +2453,7 @@ label.chip {
 .person__name {
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 21px;
+  font-size: calc(21px * var(--title-scale));
   line-height: 1.1;
 }
 
@@ -2294,12 +2508,12 @@ label.chip {
 
 .check-input:checked + .check__box {
   background: var(--purple);
-  border-color: var(--purple);
-  color: var(--white);
+  border-color: var(--accent-border);
+  color: var(--on-dark);
 }
 
 .check-input:focus-visible + .check__box {
-  box-shadow: 0 0 0 3px rgba(123, 36, 253, 0.25);
+  box-shadow: 0 0 0 3px rgba(var(--glow-rgb), 0.25);
 }
 
 .pick-row .check__box {
@@ -2333,27 +2547,27 @@ label.chip {
   flex-direction: column;
   overflow: hidden;
   position: relative;
-  color: var(--white);
+  color: var(--on-dark);
   background: var(--purple);
   text-align: center;
 }
 
 .prompt-card--purple {
-  background: linear-gradient(170deg, #8a3cff, #6a18f2);
+  background: var(--wash-lilac);
 }
 
 .prompt-card--gold {
-  background: linear-gradient(170deg, #ffd23f, #f5b400);
+  background: var(--wash-butter);
   color: var(--ink);
 }
 
 .prompt-card--pink {
-  background: linear-gradient(170deg, #ff7ad9, #ff42c4);
+  background: var(--wash-peach);
   color: var(--ink);
 }
 
 .prompt-card--green {
-  background: linear-gradient(170deg, #9cfb4a, #6fe11b);
+  background: var(--wash-sage);
   color: var(--ink);
 }
 
@@ -2364,7 +2578,7 @@ label.chip {
 .prompt-card__q {
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 34px;
+  font-size: calc(34px * var(--title-scale));
   line-height: 1.02;
   margin: 14px 4px 6px;
 }
@@ -2378,16 +2592,16 @@ label.chip {
 .prompt-card__badges { align-self: flex-start; display: flex; flex-wrap: wrap; gap: 6px; }
 .prompt-card__q--long { font-size: 28px; }
 .prompt-card__q--longer { font-size: 25px; }
-.prompt-card__answers { align-self: center; display: inline-flex; align-items: center; gap: 8px; margin: 2px 0 10px; padding: 5px 12px 5px 5px; border-radius: 999px; background: rgba(255, 255, 255, 0.18); font-family: var(--font-title); font-weight: 600; font-size: 15px; line-height: 1.1; }
+.prompt-card__answers { align-self: center; display: inline-flex; align-items: center; gap: 8px; margin: 2px 0 10px; padding: 5px 12px 5px 5px; border-radius: 999px; background: rgba(255, 251, 242, 0.7); font-family: var(--font-title); font-weight: 600; font-size: 15px; line-height: 1.1; }
 .prompt-card--gold .prompt-card__answers,
 .prompt-card--pink .prompt-card__answers,
 .prompt-card--green .prompt-card__answers { background: rgba(0, 0, 0, 0.1); }
 .prompt-card__faces { display: inline-flex; }
-.prompt-card__face { position: relative; width: 26px; height: 26px; box-sizing: border-box; border-radius: 999px; border: 2px solid rgba(255, 255, 255, 0.9); background: var(--purple-soft); color: var(--ink); display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; }
+.prompt-card__face { position: relative; width: 26px; height: 26px; box-sizing: border-box; border-radius: 999px; border: 2px solid var(--ink); background: var(--purple-soft); color: var(--ink); display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; }
 .prompt-card__face + .prompt-card__face { margin-left: -7px; }
 .prompt-card__face--you + .prompt-card__face { margin-left: 3px; }
 .prompt-card__face--you { background: #ffd9a8; }
-.prompt-card__face-check { position: absolute; right: -5px; bottom: -5px; width: 15px; height: 15px; border-radius: 999px; background: var(--green); color: var(--white); display: inline-flex; align-items: center; justify-content: center; }
+.prompt-card__face-check { position: absolute; right: -5px; bottom: -5px; width: 15px; height: 15px; border-radius: 999px; background: var(--green); color: var(--on-dark); display: inline-flex; align-items: center; justify-content: center; }
 .prompt-card--answered .prompt-card__art { width: 70%; }
 
 .deck-dots {
@@ -2401,7 +2615,7 @@ label.chip {
   width: 9px;
   height: 9px;
   border-radius: 999px;
-  background: #4a4a52;
+  background: var(--dark-line);
 }
 
 .deck-dots span.on {
@@ -2416,7 +2630,7 @@ label.chip {
   align-items: center;
   text-align: center;
   padding: 4px 20px calc(24px + var(--safe-bottom));
-  background: var(--black) url("/art/night-tall.webp") center 40% / cover no-repeat;
+  background: var(--black) var(--night-tall) center 40% / cover no-repeat;
 }
 
 .rec-screen .h-display {
@@ -2449,7 +2663,7 @@ label.chip {
   align-items: center;
   text-align: center;
   padding: 18px 20px calc(24px + var(--safe-bottom));
-  background: var(--black) url("/art/night-tall.webp") center 30% / cover no-repeat;
+  background: var(--black) var(--night-tall) center 30% / cover no-repeat;
 }
 
 .saved-screen__art {
@@ -2467,14 +2681,14 @@ label.chip {
   padding: 16px 18px;
   border-radius: 20px;
   background: var(--purple);
-  color: var(--white);
+  color: var(--on-dark);
   margin-top: 16px;
 }
 
 .preparing-card__title {
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 22px;
+  font-size: calc(22px * var(--title-scale));
   margin: 0 0 2px;
 }
 
@@ -2498,10 +2712,10 @@ label.chip {
   height: 30px;
   border-radius: 999px;
   background: var(--purple);
-  color: var(--white);
+  color: var(--on-dark);
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 17px;
+  font-size: calc(17px * var(--title-scale));
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2573,7 +2787,7 @@ label.chip {
   color: var(--ink);
   font-family: var(--font-title);
   font-weight: 600;
-  font-size: 19px;
+  font-size: calc(19px * var(--title-scale));
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -2583,8 +2797,8 @@ label.chip {
 
 .choice--on {
   background: var(--purple);
-  border-color: var(--purple);
-  color: var(--white);
+  border-color: var(--accent-border);
+  color: var(--on-dark);
 }
 
 .choice--radio {
@@ -2615,7 +2829,7 @@ label.chip {
 .photo-pick__text strong { font-family: var(--font-title); font-weight: 700; font-size: 19px; color: var(--ink); }
 
 .choice--radio.choice--on .radio-card__dot {
-  border: 6px solid var(--purple);
+  border: 6px solid var(--accent-border);
 }
 
 .stack-lg > .check + .check {
@@ -2630,11 +2844,13 @@ label.chip {
   min-height: 590px;
   padding: 8px 20px 0;
   overflow: hidden;
-  background: var(--black) url("/art/night-tall.webp") center bottom / cover no-repeat;
+  background: var(--black) url("/art/book/landing.jpg") center bottom / 100% auto no-repeat;
+  background-blend-mode: multiply;
 }
 
 .landing-hero .h-display {
-  font-size: clamp(56px, 17vw, 76px);
+  font-size: clamp(40px, 11.5vw, 48px);
+  line-height: 1.04;
   position: relative;
   z-index: 2;
 }
@@ -2653,10 +2869,8 @@ label.chip {
 }
 
 .landing-cta {
-  position: absolute;
-  left: 20px;
-  right: 20px;
-  bottom: 18px;
+  position: relative;
+  margin-top: 24px;
   z-index: 3;
 }
 
@@ -2666,11 +2880,11 @@ label.chip {
   gap: 14px;
   padding: 10px 20px 10px 12px;
   background: var(--purple);
-  color: var(--white);
+  color: var(--on-dark);
   text-decoration: none;
   font-family: var(--font-display);
-  text-transform: uppercase;
-  font-size: 22px;
+  text-transform: var(--display-case);
+  font-size: calc(22px * var(--display-scale));
   line-height: 1.02;
 }
 
@@ -2714,8 +2928,8 @@ label.chip {
 
 .icon-circle--purple {
   background: var(--purple);
-  color: var(--white);
-  box-shadow: 0 0 40px rgba(123, 36, 253, 0.6);
+  color: var(--on-dark);
+  box-shadow: 0 0 40px rgba(var(--glow-rgb), 0.6);
 }
 
 .icon-circle--sm {
@@ -2741,7 +2955,7 @@ label.chip {
   height: 72px;
   border-radius: 12px;
   object-fit: cover;
-  background: #1d1830 url("/art/night-wide.webp") center / cover;
+  background: var(--cream-2) var(--night-wide) center / cover;
 }
 
 .kv-row {
@@ -2797,11 +3011,11 @@ details.disclosure .disclosure__body {
 
 .display {
   font-family: var(--font-display);
-  text-transform: uppercase;
+  text-transform: var(--display-case);
   line-height: 0.95;
   letter-spacing: 0.01em;
   margin: 0 0 0.5rem;
-  font-weight: 400;
+  font-weight: var(--display-weight);
 }
 
 h1.display {
@@ -2875,7 +3089,7 @@ h3 {
 }
 
 .hero-mascot-stage {
-  background: var(--black) url("/art/night-wide.webp") center / cover;
+  background: var(--black) var(--night-wide) center / cover;
   border-radius: 20px;
   padding: 2rem 1.5rem;
   display: flex;
@@ -2960,7 +3174,7 @@ a.btn-outline {
   border: none;
   border-radius: 14px;
   padding: 0.85rem 1.4rem;
-  font-size: 1.1rem;
+  font-size: calc(1.1rem * var(--title-scale));
   font-weight: 700;
   font-family: var(--font-title);
   display: inline-flex;
@@ -2987,7 +3201,7 @@ button:disabled {
 
 .btn-secondary {
   background: var(--ink);
-  color: var(--text-primary);
+  color: var(--on-ink);
   border: 1px solid #3a3833 !important;
 }
 
@@ -3005,7 +3219,7 @@ button:disabled {
 
 .btn-danger {
   background: var(--red);
-  color: var(--white);
+  color: var(--on-dark);
 }
 
 button.btn-link,
@@ -3302,7 +3516,7 @@ button.btn-small,
 
 .admin-sidebar-link.active {
   background: var(--purple);
-  color: var(--white);
+  color: var(--on-dark);
 }
 
 .admin-sidebar-group {
@@ -3353,8 +3567,8 @@ button.btn-small,
 
 .adm-title {
   font-family: var(--font-display);
-  font-weight: 400;
-  font-size: 54px;
+  font-weight: var(--display-weight);
+  font-size: calc(54px * var(--display-scale));
   line-height: 1;
   letter-spacing: 0.005em;
   margin: 0;
@@ -3397,7 +3611,7 @@ button.btn-small,
 
 .adm-tab--on {
   background: var(--purple);
-  color: var(--white);
+  color: var(--on-dark);
 }
 
 .adm-search {
@@ -3479,14 +3693,14 @@ button.btn-small,
   height: 58px;
   border-radius: 12px;
   object-fit: cover;
-  background: #1d1830 url("/art/night-wide.webp") center / cover;
+  background: var(--cream-2) var(--night-wide) center / cover;
   flex: none;
 }
 
 .adm-cell-title {
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 19px;
+  font-size: calc(19px * var(--title-scale));
   line-height: 1.1;
 }
 
@@ -3618,21 +3832,21 @@ button.btn-small,
   height: 52px;
   border-radius: 999px;
   background: var(--purple);
-  color: var(--white);
+  color: var(--on-dark);
   display: inline-flex;
   align-items: center;
   justify-content: center;
   font-family: var(--font-display);
-  font-size: 26px;
+  font-size: calc(26px * var(--display-scale));
   letter-spacing: 0.02em;
 }
 
 .how-title {
   font-family: var(--font-display);
-  font-weight: 400;
-  font-size: 28px;
+  font-weight: var(--display-weight);
+  font-size: calc(28px * var(--display-scale));
   line-height: 1;
-  text-transform: uppercase;
+  text-transform: var(--display-case);
   margin: 0;
   color: var(--ink);
 }
@@ -3689,7 +3903,7 @@ button.btn-small,
   height: 30px;
   border-radius: 8px;
   background: var(--purple);
-  color: var(--white);
+  color: var(--on-dark);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3740,7 +3954,7 @@ button.btn-small,
   height: 30px;
   border-radius: 999px;
   background: var(--purple);
-  color: var(--white);
+  color: var(--on-dark);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3786,7 +4000,7 @@ button.btn-small,
   height: 54px;
   border-radius: 999px;
   background: var(--purple);
-  color: var(--white);
+  color: var(--on-dark);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -3817,8 +4031,9 @@ button.btn-small,
 }
 
 .how-btn--back {
-  background: #26262e;
-  color: var(--white);
+  background: var(--white);
+  border: 1.5px solid var(--dark-line);
+  color: var(--on-dark);
 }
 
 .how-btn--back:disabled {
@@ -3828,7 +4043,7 @@ button.btn-small,
 
 .how-btn--next {
   background: var(--purple);
-  color: var(--white);
+  color: var(--on-dark);
 }
 
 .how-btn--spacer {
@@ -3844,7 +4059,7 @@ button.btn-small,
   width: 10px;
   height: 10px;
   border-radius: 999px;
-  background: #4a4a52;
+  background: var(--dark-line);
 }
 
 .how-dots span.on {
@@ -3898,7 +4113,7 @@ button.btn-small,
 .typed-words {
   margin: 0;
   padding: 14px 16px;
-  border-left: 4px solid var(--purple);
+  border-left: 4px solid var(--accent-border);
   background: var(--white);
   border-radius: 0 14px 14px 0;
   font-family: var(--font-book);
@@ -4028,7 +4243,7 @@ button.btn-small,
 
 .try-clock {
   font-family: var(--font-display);
-  font-size: 44px;
+  font-size: calc(44px * var(--display-scale));
   margin: 4px 0;
   text-align: center;
 }
@@ -4045,9 +4260,9 @@ button.btn-small,
 .try-title__name {
   display: block;
   font-family: var(--font-display);
-  font-size: 30px;
+  font-size: calc(30px * var(--display-scale));
   line-height: 1.05;
-  text-transform: uppercase;
+  text-transform: var(--display-case);
   color: var(--on-dark);
   margin-top: 4px;
 }
@@ -4141,7 +4356,7 @@ button.btn-small,
   align-items: center;
   gap: 8px;
   background: var(--black);
-  color: var(--white);
+  color: var(--on-dark);
   transition: opacity 0.2s;
 }
 
@@ -4152,7 +4367,7 @@ button.btn-small,
 
 .reader__top a,
 .reader__top button {
-  color: var(--white);
+  color: var(--on-dark);
 }
 
 .reader__bottom {
@@ -4193,7 +4408,7 @@ button.btn-small,
   display: inline-flex;
   align-items: center;
   gap: 14px;
-  color: var(--purple);
+  color: var(--accent-text);
   font-family: var(--font-body);
   font-weight: 600;
   font-size: 14px;
@@ -4264,7 +4479,7 @@ button.btn-small,
   align-items: center;
   justify-content: center;
   gap: 12px;
-  color: var(--purple);
+  color: var(--accent-text);
   margin: 18px 0 4px;
 }
 
@@ -4280,7 +4495,7 @@ button.btn-small,
 .reader__nav-btn {
   background: none;
   border: 0;
-  color: var(--white);
+  color: var(--on-dark);
   font-family: var(--font-body);
   font-size: 18px;
   display: inline-flex;
@@ -4311,7 +4526,7 @@ button.btn-small,
   width: 9px;
   height: 9px;
   border-radius: 999px;
-  background: #5b5b66;
+  background: var(--dark-line);
 }
 
 .reader__dots span.on {
@@ -4324,10 +4539,10 @@ button.btn-small,
   border-radius: 999px;
   border: 0;
   background: var(--purple);
-  color: var(--white);
+  color: var(--on-dark);
   font-family: var(--font-title);
   font-weight: 600;
-  font-size: 20px;
+  font-size: calc(20px * var(--title-scale));
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -4389,7 +4604,7 @@ button.btn-small,
 }
 
 .paper-choice--on span:first-child {
-  border: 3px solid var(--purple);
+  border: 3px solid var(--accent-border);
 }
 
 /* Chapter ending */
@@ -4580,7 +4795,7 @@ button.btn-small,
   height: 46px;
   border-radius: 999px;
   background: var(--purple);
-  color: var(--white);
+  color: var(--on-dark);
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -4589,7 +4804,7 @@ button.btn-small,
 .adm-banner strong {
   display: block;
   font-family: var(--font-title);
-  font-size: 21px;
+  font-size: calc(21px * var(--title-scale));
   font-weight: 700;
 }
 
@@ -4605,14 +4820,14 @@ button.btn-small,
 .adm-section-title {
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 22px;
+  font-size: calc(22px * var(--title-scale));
   margin: 24px 0 10px;
 }
 
 .adm-flow__title {
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 18px;
+  font-size: calc(18px * var(--title-scale));
 }
 
 .adm-flow__sub {
@@ -4715,7 +4930,7 @@ button.btn-small,
 .finding__title {
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 18px;
+  font-size: calc(18px * var(--title-scale));
 }
 
 .finding--open .finding__title {
@@ -4829,7 +5044,7 @@ button.btn-small,
   padding: 14px;
   min-height: 150px;
   overflow: hidden;
-  color: var(--white);
+  color: var(--on-dark);
 }
 
 .deck-preview__card .badge {
@@ -4842,7 +5057,7 @@ button.btn-small,
   z-index: 2;
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 22px;
+  font-size: calc(22px * var(--title-scale));
   line-height: 1.02;
   margin-top: 10px;
   max-width: 62%;
@@ -4879,7 +5094,7 @@ button.btn-small,
   aspect-ratio: 1;
   border-radius: 14px;
   object-fit: cover;
-  background: #1d1830 url("/art/night-wide.webp") center / cover;
+  background: var(--cream-2) var(--night-wide) center / cover;
 }
 
 /* Prompt card variables */
@@ -4930,7 +5145,7 @@ button.btn-small,
 }
 
 .var-chip:hover {
-  border-color: var(--purple);
+  border-color: var(--accent-border);
 }
 
 .var-chip code {
@@ -5027,7 +5242,7 @@ button.btn-small,
 }
 
 .art-tile.prompt-card--purple {
-  color: var(--white);
+  color: var(--on-dark);
 }
 
 .art-tile__label {
@@ -5043,7 +5258,7 @@ button.btn-small,
 .art-heading {
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 19px;
+  font-size: calc(19px * var(--title-scale));
   margin: 22px 0 10px;
 }
 
@@ -5061,7 +5276,7 @@ button.btn-small,
   border-radius: 28px;
   background: var(--black);
   padding: 14px 14px 18px;
-  color: var(--white);
+  color: var(--on-dark);
   box-shadow: 0 16px 40px rgba(0, 0, 0, 0.25);
 }
 
@@ -5091,7 +5306,7 @@ button.btn-small,
 
 .stat__n {
   font-family: var(--font-display);
-  font-size: 44px;
+  font-size: calc(44px * var(--display-scale));
   line-height: 1;
 }
 
@@ -5208,7 +5423,7 @@ button.btn-small,
 .cost-chart__count {
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 14px;
+  font-size: calc(14px * var(--title-scale));
   fill: var(--ink);
 }
 
@@ -5391,8 +5606,8 @@ input[type="radio"] {
 }
 .flag-chip--on {
   background: var(--purple);
-  border-color: var(--purple);
-  color: var(--white);
+  border-color: var(--accent-border);
+  color: var(--on-dark);
 }
 .fb-card {
   display: grid;
@@ -5454,14 +5669,14 @@ input[type="radio"] {
   color: var(--purple-ink);
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: 16px;
+  font-size: calc(16px * var(--title-scale));
   letter-spacing: 0.02em;
   cursor: pointer;
 }
 .reader__voice--on {
   background: var(--purple);
-  border-color: var(--purple);
-  color: #ffffff;
+  border-color: var(--accent-border);
+  color: var(--on-dark);
 }
 .reader__voice-icon {
   width: 32px;
@@ -5471,12 +5686,12 @@ input[type="radio"] {
   align-items: center;
   justify-content: center;
   background: var(--purple);
-  color: #ffffff;
+  color: var(--on-dark);
   flex: none;
 }
 .reader__voice--on .reader__voice-icon {
-  background: #ffffff;
-  color: var(--purple);
+  background: var(--white);
+  color: var(--accent-text);
 }
 .reader__voice-time {
   font-weight: 500;
@@ -5485,4 +5700,21 @@ input[type="radio"] {
 }
 .chapter-part {
   margin-top: 22px;
+}
+
+
+.landing-hero .h-display em {
+  font-style: italic;
+  color: #2a8580;
+}
+
+/* Nunito runs wider than the old condensed type: keep these short labels on one line. */
+.rec-choice .btn {
+  padding: 0 12px;
+  white-space: nowrap;
+}
+
+.reader__next,
+.choice {
+  white-space: nowrap;
 }

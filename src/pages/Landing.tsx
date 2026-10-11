@@ -18,19 +18,15 @@ export default function Landing() {
 
       <header className="landing-hero">
         <h1 className="h-display">
-          Little
+          Little moments.
           <br />
-          moments.
-          <br />A story
-          <br />
-          for life.
+          <em>A story for life.</em>
         </h1>
         <p className="masthead__sub">
           Your voice. Their childhood.
           <br />
           One growing Vambie storybook.
         </p>
-        <Mascot name="book" className="landing-art" />
         <div className="landing-cta">
           <Link className="btn btn--lime btn--caps" to="/try">
             Start their story <Chev />

@@ -8,7 +8,7 @@ import {
   IconSpinner,
 } from "./icons";
 
-// Baby Vambie artwork generated from his official 3D render (public/art).
+// Baby Vambie artwork in the books' ink and wash, painted from the book-style reference (public/art/book).
 export type MascotName =
   | "peek"
   | "peek-worried"
@@ -26,7 +26,8 @@ export type MascotName =
   | "download";
 
 export function Mascot({ name, className, style }: { name: MascotName; className?: string; style?: CSSProperties }) {
-  return <img src={`/art/vambie-${name}.webp`} alt="" className={className} style={style} draggable={false} />;
+  // Ink-and-wash poses with transparent paper (VSB-124).
+  return <img src={`/art/book/vambie-${name}.webp`} alt="" className={className} style={style} draggable={false} />;
 }
 
 export const Chev = ({ size = 20 }: { size?: number }) => <IconChevronRight size={size} strokeWidth={3} className="btn__chev" />;
