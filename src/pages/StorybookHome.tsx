@@ -8,7 +8,7 @@ import { Chev, Loading, Mascot } from "../components/ui";
 import { useStorybookData } from "../hooks/useStorybookData";
 import { apiGet } from "../lib/api";
 import { waitingChapters } from "../lib/chapterStatus";
-import { audienceFor, cardFitsChild } from "../lib/promptStages";
+import { audienceFor, cardFitsChild, cardPose } from "../lib/promptStages";
 import { fillPrompt, promptValues } from "../lib/promptVariables";
 import { capitalize, childLabel, possessive } from "../lib/format";
 import type { Prompt, StorybookView } from "../types";
@@ -26,7 +26,7 @@ const weekday = (iso: string) => new Date(iso).toLocaleDateString("en-US", { wee
 export default function StorybookHome() {
   const { id } = useParams();
   const { storybook, status, reload } = useStorybookData(id);
-  const [prompt, setPrompt] = useState<{ id: string; question: string; thisWeek: boolean } | null>(null);
+  const [prompt, setPrompt] = useState<{ id: string; question: string; art: string | null; thisWeek: boolean } | null>(null);
 
   const busy =
     !!storybook &&
@@ -54,7 +54,7 @@ export default function StorybookHome() {
         const next = week ?? fits.find((p) => p.answerOnce && !answered(p)) ?? fits.find((p) => !p.answerOnce) ?? null;
         if (!next) return setPrompt(null);
         const values = promptValues({ child: storybook.child, me: storybook.me, parentName: storybook.family.find((f) => f.role === "owner")?.name ?? null });
-        setPrompt({ id: next.id, question: fillPrompt(next.question, values), thisWeek: next === week });
+        setPrompt({ id: next.id, question: fillPrompt(next.question, values), art: next.artworkPath, thisWeek: next === week });
       })
       .catch(() => setPrompt(null));
   }, [storybook?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -98,7 +98,7 @@ export default function StorybookHome() {
         <div className="home-tiles">
           {prompt ? (
             <Link to={`${base}/record?card=${prompt.id}`} className="home-prompt">
-              <Mascot name="mic" className="home-prompt__art" />
+              {prompt.art ? <img src={`/${prompt.art}`} alt="" className="home-prompt__art home-prompt__art--picture" /> : <Mascot name={cardPose(prompt.id)} className="home-prompt__art" />}
               <span className="home-prompt__kicker">{prompt.thisWeek ? "This week's question" : "A question for you"}</span>
               <span className="home-prompt__q">{prompt.question}</span>
               <span className="home-prompt__go">

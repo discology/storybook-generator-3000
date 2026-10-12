@@ -5848,6 +5848,12 @@ input[type="radio"] {
   object-fit: contain;
 }
 
+.home-prompt__art--picture {
+  object-fit: cover;
+  border: 1.5px solid var(--accent-border);
+  border-radius: 14px;
+}
+
 .home-prompt__kicker {
   padding-right: 76px;
   font-weight: 800;

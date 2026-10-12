@@ -9,7 +9,7 @@ import { Chev, Field, Loading, Mascot, Masthead, Note, Select, Sheet, Switch, ty
 import { useStorybookData } from "../hooks/useStorybookData";
 import { apiGet, apiSend } from "../lib/api";
 import { childLabel, formatDuration, possessive } from "../lib/format";
-import { audienceFor, cardFitsChild } from "../lib/promptStages";
+import { audienceFor, cardFitsChild, cardPose } from "../lib/promptStages";
 import { fillPrompt, promptValues } from "../lib/promptVariables";
 import type { Prompt, StorybookView } from "../types";
 
@@ -47,7 +47,6 @@ const questionSize = (q: string) => (q.length > 85 ? " prompt-card__q--longer" :
 
 const MAX_SECONDS = 15 * 60;
 const BARS = 26;
-const CARD_ART: MascotName[] = ["star", "book", "open-book", "hug-book", "envelope-happy", "closedbook"];
 const FREEFORM: DeckCard = { id: null, question: "What would you like to remember?", supportingText: "Tell it in your own words.", category: "Just talk", color: "purple", art: null };
 
 const pickMimeType = () => {
@@ -703,7 +702,7 @@ export default function Recorder() {
                 {c.art ? (
                   <img src={`/${c.art}`} alt="" className="prompt-card__art" style={{ borderRadius: 16, aspectRatio: "1", objectFit: "cover" }} />
                 ) : (
-                  <Mascot name={CARD_ART[i % CARD_ART.length]} className="prompt-card__art" />
+                  <Mascot name={cardPose(c.id)} className="prompt-card__art" />
                 )}
               </button>
             ))}
