@@ -6,7 +6,7 @@ import { runAiStep, isAiConfigured, guardianReview } from "./aiService";
 import { getAiInstruction } from "./aiInstructions";
 import { CastMember, buildCast, characterCardValues, currentCast, describeCast, moodArt, renderReferences } from "./characters";
 import { appUrl, fillTemplate, renderMessage } from "./messageTemplates";
-import { BEFORE_BIRTH_KEY, BEFORE_BIRTH_PROFILE, CHECK_NOTE, DEFAULT_BEFORE_BIRTH, NO_NAME_NOTE, arrivalNote, childLabel, hasName, isBeforeBirth, withBeforeBirth } from "./beforeBirth";
+import { BEFORE_BIRTH_CLOSING_KEY, BEFORE_BIRTH_KEY, BEFORE_BIRTH_PROFILE, CHECK_NOTE, DEFAULT_BEFORE_BIRTH, DEFAULT_CLOSING_LINE, NO_NAME_NOTE, arrivalNote, childLabel, hasName, isBeforeBirth, withBeforeBirth, withClosingPage } from "./beforeBirth";
 import { sendText, storybookOwner } from "./texts";
 import {
   AppearanceWithDesign,
@@ -84,9 +84,16 @@ interface GenerationSnapshot {
 // What <before_birth> holds for a chapter: the Before you arrive text, the
 // arrival note, or nothing.
 // Before a name is chosen, the pages say "you" (VSB-121).
+// The fixed last page of a pre-birth chapter (VSB-125).
+const closingLine = (snapshot: GenerationSnapshot, childName: string) =>
+  fillTemplate(snapshot.instructions[BEFORE_BIRTH_CLOSING_KEY] ?? DEFAULT_CLOSING_LINE, { child_name: childLabel(childName) }).trim();
+
 const beforeBirthValue = (snapshot: GenerationSnapshot, childName: string) =>
   snapshot.beforeBirth
-    ? [fillTemplate(snapshot.instructions[BEFORE_BIRTH_KEY] || DEFAULT_BEFORE_BIRTH, { child_name: childLabel(childName) }), hasName(childName) ? "" : NO_NAME_NOTE]
+    ? [
+        fillTemplate(snapshot.instructions[BEFORE_BIRTH_KEY] || DEFAULT_BEFORE_BIRTH, { child_name: childLabel(childName), closing_line: closingLine(snapshot, childName) }),
+        hasName(childName) ? "" : NO_NAME_NOTE,
+      ]
         .filter(Boolean)
         .join("\n\n")
     : snapshot.arrival
@@ -435,7 +442,7 @@ export async function createPagedChapter(input: CreateChapterInput) {
   } else {
     const active = await getActiveRules();
     const instructions: Record<string, string> = {};
-    for (const key of ["page_plan", "page_check", "page_revise", "illustration_check", "world", BEFORE_BIRTH_KEY]) {
+    for (const key of ["page_plan", "page_check", "page_revise", "illustration_check", "world", BEFORE_BIRTH_KEY, BEFORE_BIRTH_CLOSING_KEY]) {
       instructions[key] = (await getAiInstruction(key)).body;
     }
     const stage = effectiveStage(storybook);
@@ -513,6 +520,8 @@ export async function createPagedChapter(input: CreateChapterInput) {
     const isBabyVambie = (t: string) => /^baby[\s_-]*vambie$/i.test(t.trim());
     plan.pages = plan.pages.map((p) => ({ ...p, characters: p.characters.filter((t) => !isBabyVambie(t)), pictureSize: p.pictureSize === "none" ? "framed" : p.pictureSize }));
     plan.characters = plan.characters.filter((c) => !isBabyVambie(c.name));
+    // The family's closing line ends the chapter, whatever the planner wrote (VSB-125).
+    plan.pages = withClosingPage(plan.pages, closingLine(snapshot, storybook.child.displayName));
   }
   let { unresolved, appearances } = placePeople(plan.pages, family, plan.unresolved);
   if (input.noQuestions && unresolved.length) {

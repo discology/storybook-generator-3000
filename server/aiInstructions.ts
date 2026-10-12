@@ -1,6 +1,6 @@
 import { prisma } from "./db";
 import type { MessageVariable } from "./messageTemplates";
-import { BEFORE_BIRTH_KEY, DEFAULT_BEFORE_BIRTH } from "./beforeBirth";
+import { BEFORE_BIRTH_CLOSING_KEY, BEFORE_BIRTH_KEY, DEFAULT_BEFORE_BIRTH, DEFAULT_CLOSING_LINE } from "./beforeBirth";
 
 // The AI steps are fixed in code because the code decides when each runs and reads
 // its reply. Admins edit the instructions (stored in AiInstruction); the reply
@@ -55,8 +55,20 @@ Not in this storybook: profanity, the bite, Dan and his company, the Vambie Offi
     name: "Before you arrive",
     kind: "block",
     trigger: "Chapters made while the family is expecting (VSB-118): Plan pages, Check pages and Revise page read it as <before_birth>; chapters keep the version they were made with. <child_name> is filled in.",
-    variables: [{ name: "child_name", description: "Child's name or nickname", sample: "Peanut" }],
+    variables: [
+      { name: "child_name", description: "Child's name or nickname", sample: "Peanut" },
+      { name: "closing_line", description: "The closing line, set in Before you arrive: closing line", sample: DEFAULT_CLOSING_LINE },
+    ],
     defaultBody: DEFAULT_BEFORE_BIRTH,
+    outputFormat: "",
+  },
+  {
+    key: BEFORE_BIRTH_CLOSING_KEY,
+    name: "Before you arrive: closing line",
+    kind: "block",
+    trigger: "The last page of every chapter made while the family is expecting (VSB-125): the same words every time, never written by the AI. <child_name> is filled in; chapters keep the line they were made with.",
+    variables: [{ name: "child_name", description: "Child's name or nickname", sample: "Peanut" }],
+    defaultBody: DEFAULT_CLOSING_LINE,
     outputFormat: "",
   },
   {

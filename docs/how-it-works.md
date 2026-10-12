@@ -93,7 +93,7 @@ It follows these rules:
 
 While a family is expecting, a chapter is a collection of the family's words for the baby rather than a story about events (VSB-116).
 
-- **One page per message.** Each page is one person's message, named as the child will call them and cut to one or two sentences in their own words: "Grandma Rose says: Call me whenever the house is too quiet." The specific thing they said stays; nothing is added, and there's no storybook voice, refrain or moral. A short opening page and a short closing page frame them.
+- **One page per message.** Each page is one person's message, named as the child will call them and cut to one or two sentences in their own words: "Grandma Rose says: Call me whenever the house is too quiet." The specific thing they said stays; nothing is added, and there's no storybook voice, refrain or moral. A short opening page about the waiting comes first. The last page is always the family's closing line ("We can't wait to meet you." unless the team changes it), never words the AI writes, so a chapter can't end on a recap of everyone's messages (VSB-125).
 - **At most two pages per person** in a chapter; their other messages wait for the next one. Chapters are still made every week.
 - **Their own limits.** Pages may run to about 45 words in two sentences, whatever the reading stage. The page check expects a faithful trim of what was said, and the Guardian checks continuity and private details but not reader fit.
 - **No Baby Vambie yet.** Pre-birth pictures show the family saying their words; a page with nobody on it shows the place or the objects. The picture check flags a Baby Vambie on a pre-birth page.
@@ -101,7 +101,7 @@ While a family is expecting, a chapter is a collection of the family's words for
 - **No name needed yet.** Setup and the try-it form ask for a name only when the child is born. Until a name is given, pages speak to the child as "you" and never invent a name, the parents' screens and texts say "your baby", and everyone else's say "the baby". The book is called "The baby's growing story" until a name arrives (VSB-121).
 - **One book, two parts.** The chapter list shows "Before you arrive" and, once there are chapters after the birth, "You're here". Entering the birthday under Story preferences marks the child born, and asks for their name if the family hadn't given one; earlier chapters stay as they are, and the next chapter opens with Baby Vambie's arrival ("Baby Vambie chose you").
 
-The wording the planner follows is **Before you arrive** under AI instructions.
+The wording the planner follows is **Before you arrive** under AI instructions, and the last page's words are **Before you arrive: closing line**.
 
 ## Reading stages
 

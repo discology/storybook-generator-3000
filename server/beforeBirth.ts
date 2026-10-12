@@ -15,9 +15,26 @@ This chapter is made before the child is born. The memories below are not events
 - Each message gets one page. The page's text is the message cut to one or two sentences in the speaker's own words and register, keeping the feeling and the specific answer (the blanket, the pancakes, the song). Drop nothing that makes it theirs and add nothing. Start with what the child will call them and "says:", for example "Mama says: I'll learn every song you like. Even the terrible ones." When an answer only makes sense with its question (an answer like "How to lose at cards gracefully" to "What will you teach them?"), carry the question into their sentence in their voice: "Aunt Mei says: I'll teach you how to lose at cards gracefully." An answer to "Call me…" keeps the name they chose: "Papa says: Call me Papa. My dad was Papa to me." Write it plainly: no storybook voice, no refrains, sound words or rhythm games, and no morals.
 - The picture shows that person, drawn as a Vambie like everyone in this book, in a place that fits what they said, mid-action, speaking to the child who isn't here yet. Every page has a picture: framed or full for each message; the opening and closing pages may be vignettes.
 - Baby Vambie has not arrived yet and never appears in this chapter: not in the pictures, not in the words, not as a glimpse. Ignore any other instruction to show Baby Vambie standing in for <child_name>.
-- Open with one short page of the waiting (one plain sentence about the room, the house or the road) and close with one short page for the child (one plain sentence, never a moral). Either may be wordless.
+- Open with one short page of the waiting (one plain sentence about the room, the house or the road); it may be wordless. End with one vignette page whose words are exactly: <closing_line> Nothing else goes on it: never sum up, list or repeat the messages.
 - The title is a phrase from one of the messages.
 - Ignore the reading level's voice and picture pattern; keep only its word limits.`;
+
+// The last page of every pre-birth chapter: words the team writes, not the AI
+// (VSB-125). Editable in Admin, AI instructions; <child_name> is filled in.
+export const BEFORE_BIRTH_CLOSING_KEY = "before_you_arrive_closing";
+export const DEFAULT_CLOSING_LINE = "We can't wait to meet you.";
+
+// Ends a plan on the closing line. A last page that isn't a family member's
+// message becomes it; after a message, a closing page is added, drawn like the
+// opening page of the waiting.
+export function withClosingPage<P extends { text: string; pictureSize: string; characters: string[]; visibleAction: string; sourceQuote?: string }>(pages: P[], line: string): P[] {
+  const closing = line.trim();
+  if (!closing || pages.length === 0) return pages;
+  const last = pages[pages.length - 1];
+  if (!speakerOf(last.text)) return [...pages.slice(0, -1), { ...last, text: closing, pictureSize: "vignette", sourceQuote: "" }];
+  const opening = pages.find((p) => !speakerOf(p.text)) ?? { ...last, characters: [], visibleAction: "The place is quiet and ready, waiting. No one is in the picture." };
+  return [...pages, { ...opening, text: closing, pictureSize: "vignette", sourceQuote: "" }];
+}
 
 // The first chapter after the birth, when the chapters before it were made from
 // the family's words.
@@ -26,7 +43,7 @@ export const arrivalNote = (childName: string) =>
 
 // What Check pages is told about a pre-birth chapter.
 export const CHECK_NOTE =
-  "This chapter was made before the child is born: each page is a family member's message cut to one or two sentences in their own words. A faithful trim of what they said is expected, not an added fact, and so is carrying the question they answered into their sentence. The short opening page (the waiting) and closing page (for the child) are part of the design: they are not messages and need no source. Flag a page where Baby Vambie appears, or where the words change what the person said.";
+  "This chapter was made before the child is born: each page is a family member's message cut to one or two sentences in their own words. A faithful trim of what they said is expected, not an added fact, and so is carrying the question they answered into their sentence. The short opening page (the waiting) and the closing page (the family's fixed closing line) are part of the design: they are not messages and need no source. Flag a page where Baby Vambie appears, or where the words change what the person said.";
 
 // What the Guardian is told instead of a reading stage.
 export const GUARDIAN_READER_LEVEL =
