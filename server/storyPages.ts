@@ -6,7 +6,7 @@ import { runAiStep, isAiConfigured, guardianReview } from "./aiService";
 import { getAiInstruction } from "./aiInstructions";
 import { CastMember, buildCast, characterCardValues, currentCast, describeCast, moodArt, renderReferences } from "./characters";
 import { appUrl, fillTemplate, renderMessage } from "./messageTemplates";
-import { BEFORE_BIRTH_CLOSING_KEY, BEFORE_BIRTH_KEY, BEFORE_BIRTH_PROFILE, CHECK_NOTE, DEFAULT_BEFORE_BIRTH, DEFAULT_CLOSING_LINE, NO_NAME_NOTE, arrivalNote, childLabel, hasName, isBeforeBirth, withBeforeBirth, withClosingPage } from "./beforeBirth";
+import { BEFORE_BIRTH_CLOSING_KEY, BEFORE_BIRTH_KEY, BEFORE_BIRTH_PROFILE, DEFAULT_BEFORE_BIRTH, DEFAULT_CLOSING_LINE, NO_NAME_NOTE, OWN_WORDS_MIN, arrivalNote, checkNote, childLabel, echoesEarlierOpening, hasName, isBeforeBirth, ownWords, speakerOf, withBeforeBirth, withClosingPage } from "./beforeBirth";
 import { sendText, storybookOwner } from "./texts";
 import {
   AppearanceWithDesign,
@@ -747,6 +747,37 @@ export async function checkPages(chapterId: string, pageNumbers?: number[]) {
     }
   }
 
+  // Pre-birth chapters (VSB-127): a message keeps the person's own words, and an
+  // opening the planner wrote doesn't echo an earlier chapter's. The family's
+  // closing line is never checked.
+  if (snapshot.beforeBirth) {
+    const closing = closingLine(snapshot, chapter.storybook.child.displayName);
+    const earlierOpenings = (
+      await prisma.storyPage.findMany({
+        where: { pageNumber: 1, chapter: { storybookId: chapter.storybookId, id: { not: chapter.id }, createdAt: { lt: chapter.createdAt } } },
+        select: { text: true },
+      })
+    ).map((p) => p.text);
+    for (const page of targets) {
+      const text = page.pictureSize === "wordless" ? "" : page.text.trim();
+      if (!text || text === closing) continue;
+      const speaker = speakerOf(text);
+      if (speaker) {
+        const own = memories.find((m) => m.id === page.sourceMemoryId);
+        const scores = [own, ...memories.filter((m) => m !== own)]
+          .filter((m): m is SourceMemory => Boolean(m))
+          .map((m) => ownWords(text, [m.transcript, m.prompt ?? ""]));
+        const best = scores.reduce((a, b) => (b.share > a.share ? b : a), scores[0]);
+        if (best && best.share < OWN_WORDS_MIN) {
+          notes.get(page.pageNumber)?.push(`Not ${speaker}'s own words: "${best.notTheirs.slice(0, 8).join(" ")}" isn't how they said it. Keep their words and only trim; compare with their recording.`);
+        }
+      } else if (page.pageNumber === 1) {
+        const echo = echoesEarlierOpening(text, earlierOpenings);
+        if (echo) notes.get(page.pageNumber)?.push(`Opens the same way as an earlier chapter ("${echo}"). Try a different opening, or leave this page wordless.`);
+      }
+    }
+  }
+
   const count = chapter.pages.length;
   if (count < profile.pagesMin || count > profile.pagesMax) {
     notes.get(1)?.push(`The chapter has ${count} pages; this reading level calls for ${profile.pagesMin}-${profile.pagesMax}.`);
@@ -764,7 +795,7 @@ export async function checkPages(chapterId: string, pageNumbers?: number[]) {
           characters: formatCharacters(characterSheet),
           pages: chapter.pages.map((p) => formatPage(p, snapshot, unresolved)).join("\n\n"),
           pages_to_check: targets.map((p) => p.pageNumber).join(", "),
-          before_birth: snapshot.beforeBirth ? CHECK_NOTE : "",
+          before_birth: snapshot.beforeBirth ? checkNote(closingLine(snapshot, chapter.storybook.child.displayName)) : "",
           ...snapshotCharacterValues(snapshot),
         }),
         { body: withBeforeBirth(named(snapshot, snapshot.instructions.page_check)) },
