@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
 import BottomNav from "../components/BottomNav";
 import AccessDenied from "../components/AccessDenied";
-import { IconMic, IconPeople, IconSparkle } from "../components/icons";
+import { IconBook, IconMic, IconPeople, IconSparkle } from "../components/icons";
 import { Chev, Loading, Mascot } from "../components/ui";
 import { useStorybookData } from "../hooks/useStorybookData";
 import { apiGet } from "../lib/api";
@@ -116,14 +116,21 @@ export default function StorybookHome() {
             </Link>
           )}
 
-          <Link to={featured ? `${base}/read/${featured.id}` : `${base}/this-week`} className="home-tile">
-            {featured?.cover ? <img src={`/${featured.cover}`} alt="" className="home-tile__cover" /> : <Mascot name="closedbook" className="home-tile__art" />}
-            <span className="home-tile__text">
-              <span className="home-tile__title">Read together</span>
-              <span className="home-tile__sub">{featured ? featured.title : "Your first chapter is on its way."}</span>
-              {featured && !featured.readAt && <span className="home-tile__new">New</span>}
-            </span>
-            <Chev size={22} />
+          <Link to={featured ? `${base}/read/${featured.id}` : `${base}/this-week`} className="home-read">
+            {featured?.cover ? (
+              <img src={`/${featured.cover}`} alt="" className="home-read__cover" />
+            ) : (
+              <span className="home-read__cover home-read__cover--art">
+                <Mascot name="closedbook" />
+              </span>
+            )}
+            <span className="home-read__kicker">{!featured ? "Read together" : featured.readAt ? "Your newest chapter" : "New chapter"}</span>
+            <span className="home-read__title">{featured ? featured.title : "Your first chapter is on its way."}</span>
+            {featured && (
+              <span className="home-prompt__go">
+                <IconBook size={20} /> Read together
+              </span>
+            )}
           </Link>
         </div>
 
