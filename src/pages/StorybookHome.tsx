@@ -124,7 +124,7 @@ export default function StorybookHome() {
                 <Mascot name="closedbook" />
               </span>
             )}
-            <span className="home-read__kicker">{!featured ? "Read together" : featured.readAt ? "Your newest chapter" : "New chapter"}</span>
+            <span className="home-read__kicker">{featured ? `${possessive(child)} newest chapter` : "Read together"}</span>
             <span className="home-read__title">{featured ? featured.title : "Your first chapter is on its way."}</span>
             {featured && (
               <span className="home-prompt__go">
