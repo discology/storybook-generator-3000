@@ -5917,29 +5917,100 @@ input[type="radio"] {
   color: var(--ink-2);
 }
 
-.home-chapters {
+.home-chapters-head {
   display: flex;
-  align-items: center;
+  align-items: baseline;
   justify-content: space-between;
+  margin-top: 22px;
+}
+
+.home-chapters-head__title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  font-size: 22px;
+}
+
+.home-chapters-head__all {
+  padding: 8px 0 8px 12px;
+  font-weight: 800;
+  font-size: 15px;
+  color: var(--accent-text);
+}
+
+/* Chapter covers, each tagged with what it is (To review, Finished...) */
+.home-strip {
+  display: flex;
   gap: 12px;
-  min-height: 64px;
-  margin-top: 16px;
-  padding: 0 6px;
-  border-top: 1.5px solid var(--dark-line);
-  border-bottom: 1.5px solid var(--dark-line);
+  margin: 8px -20px 0;
+  padding: 0 20px 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.home-strip::-webkit-scrollbar {
+  display: none;
+}
+
+.home-strip__item {
+  flex: none;
+  width: 118px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
   color: var(--ink);
   text-decoration: none;
 }
 
-.home-chapters__title {
-  display: block;
-  font-family: var(--font-display);
-  font-weight: var(--display-weight);
-  font-size: 20px;
+.home-strip__cover {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 118px;
+  height: 88px;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--cream-2);
 }
 
-.home-chapters__sub {
-  display: block;
+.home-strip__cover img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.home-strip__tag {
+  align-self: flex-start;
+  padding: 2px 8px;
+  border: 1.5px solid var(--accent-border);
+  border-radius: 999px;
+  background: var(--wash-butter);
+  font-weight: 800;
+  font-size: 11.5px;
+}
+
+.home-strip__tag--done {
+  border-color: var(--dark-line);
+  background: var(--cream);
+}
+
+.home-strip__tag--new {
+  border-color: var(--dark-line);
+  background: var(--wash-peach);
+}
+
+.home-strip__title {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-weight: 700;
+  font-size: 13.5px;
+  line-height: 1.25;
+}
+
+.home-next {
+  margin: 12px 0 0;
   font-size: 14px;
   color: var(--ink-2);
 }

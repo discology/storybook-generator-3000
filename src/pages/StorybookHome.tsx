@@ -21,7 +21,8 @@ const weekday = (iso: string) => new Date(iso).toLocaleDateString("en-US", { wee
 // Home is just the actions (VSB-129): record a memory (always prompted by a
 // question), read the newest chapter together, and open the chapter list. What a
 // chapter in progress needs from the parent lives in that list, under "Waiting
-// for you"; when the next chapter is made shows on the Chapters row.
+// for you" and as tagged covers on home; when the next chapter is made shows
+// under them.
 export default function StorybookHome() {
   const { id } = useParams();
   const { storybook, status, reload } = useStorybookData(id);
@@ -76,16 +77,15 @@ export default function StorybookHome() {
   const owner = storybook.me.role === "owner";
   const published = storybook.chapters.filter((c) => c.status === "published").sort((a, b) => b.sequence - a.sequence);
   const featured = published[0];
-  const waitingForYou = owner ? waitingChapters(storybook.chapters, child).length : 0;
+  const waitingForYou = owner ? waitingChapters(storybook.chapters, child) : [];
   const waiting = storybook.memories.filter((m) => m.chapterIds.length === 0 && m.storyUseConsent && m.status !== "failed");
-  const nextLine = storybook.generating ? "writing the next one now" : waiting.length ? `next one ${weekday(storybook.nextChapterAt)}` : "";
-  const chaptersLine = [
-    published.length ? `${published.length} in the book` : "None in the book yet",
-    waitingForYou ? `${waitingForYou} waiting for you` : "",
-    nextLine,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  const nextLine = storybook.generating ? "Writing the next chapter now." : waiting.length ? `Next chapter: ${weekday(storybook.nextChapterAt)} morning.` : "";
+  // The chapter covers: chapters that need the owner first, then the ones in the book.
+  const strip = [
+    ...waitingForYou.map(({ chapter, step }) => ({ chapter, tag: step.tag, done: false, to: step.cta ? `${base}/chapters/${chapter.id}/pages` : null })),
+    ...published.map((c) => ({ chapter: c, tag: c.readAt ? "Finished" : "New", done: true, to: `${base}/read/${c.id}` })),
+  ].slice(0, 8);
+  const total = published.length + waitingForYou.length;
 
   return (
     <div className="page page--nav">
@@ -134,13 +134,37 @@ export default function StorybookHome() {
           </Link>
         </div>
 
-        <Link to={`${base}/memories`} className="home-chapters">
-          <span>
-            <span className="home-chapters__title">Chapters</span>
-            <span className="home-chapters__sub">{chaptersLine}</span>
-          </span>
-          <Chev size={22} />
-        </Link>
+        {strip.length > 0 && (
+          <>
+            <div className="home-chapters-head">
+              <h2 className="home-chapters-head__title">Chapters</h2>
+              <Link to={`${base}/memories`} className="home-chapters-head__all">
+                See all {total}
+              </Link>
+            </div>
+            <div className="home-strip">
+              {strip.map(({ chapter, tag, done, to }) => {
+                const body = (
+                  <>
+                    <span className="home-strip__cover">{chapter.cover ? <img src={`/${chapter.cover}`} alt="" /> : <Mascot name="closedbook" />}</span>
+                    <span className={`home-strip__tag ${done ? (tag === "New" ? "home-strip__tag--new" : "home-strip__tag--done") : ""}`}>{tag}</span>
+                    <span className="home-strip__title">{chapter.title}</span>
+                  </>
+                );
+                return to ? (
+                  <Link key={chapter.id} to={to} className="home-strip__item">
+                    {body}
+                  </Link>
+                ) : (
+                  <div key={chapter.id} className="home-strip__item">
+                    {body}
+                  </div>
+                );
+              })}
+            </div>
+          </>
+        )}
+        {nextLine && <p className="home-next">{nextLine}</p>}
       </div>
       <BottomNav storybookId={storybook.id} />
     </div>
