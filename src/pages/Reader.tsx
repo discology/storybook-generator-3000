@@ -120,17 +120,20 @@ export default function Reader() {
       : [{ id: "text", pageNumber: 1, text: chapter.content, pictureSize: "none", visibleAction: "", image: null }]
     : [];
   const ended = index >= pages.length;
+  // A chapter with a question for the grown-ups gets its own page after the end (VSB-128).
+  const grownUpsIndex = chapter?.reflection ? pages.length + 1 : null;
+  const onGrownUps = grownUpsIndex !== null && index === grownUpsIndex;
 
   const go = useCallback(
     (next: number) => {
       if (!chapter) return;
-      const clamped = Math.max(0, Math.min(pages.length, next));
+      const clamped = Math.max(0, Math.min(grownUpsIndex ?? pages.length, next));
       setIndex(clamped);
       pageRef.current?.scrollTo({ top: 0 });
       if (clamped < pages.length) void apiSend(`/api/chapters/${chapter.id}/mark`, "PUT", { lastPage: clamped }).catch(() => undefined);
       else void apiSend(`/api/chapters/${chapter.id}/mark`, "PUT", { finished: true }).catch(() => undefined);
     },
-    [chapter, pages.length]
+    [chapter, pages.length, grownUpsIndex]
   );
 
   useEffect(() => {
@@ -217,6 +220,31 @@ export default function Reader() {
 
   // The chapter's wordless moment if it has one, else its last picture.
   const endingPicture = (pages.find((p) => p.pictureSize === "wordless" && p.image) ?? [...pages].reverse().find((p) => p.image))?.image;
+  const nextOrClose = chapter.nextChapterId ? (
+    <Link className="btn btn--outline" to={`${base}/read/${chapter.nextChapterId}`}>
+      Next chapter <IconChevronRight size={20} />
+    </Link>
+  ) : (
+    <Link className="btn btn--outline" to={base}>
+      Close the book
+    </Link>
+  );
+  const grownUpLinks = (feedbackLabel: string) => (
+    <>
+      {chapter.canShare && (
+        <p style={{ marginTop: 16 }}>
+          <Link to={`${base}/chapters/${chapter.id}/share`} className="tlink" style={{ fontSize: 17 }}>
+            Send this chapter to family
+          </Link>
+        </p>
+      )}
+      <p style={{ marginTop: 14 }}>
+        <Link to={`${base}/chapters/${chapter.id}/feedback`} className="tlink" style={{ display: "inline-flex", gap: 8, alignItems: "center", fontWeight: 500, fontSize: 16 }}>
+          <IconPeople size={20} /> {feedbackLabel}
+        </Link>
+      </p>
+    </>
+  );
   const ending = (
     <div className="ending">
       <span className="reader__chapter">{chapterLabel(chapter.sequence)}</span>
@@ -230,38 +258,40 @@ export default function Reader() {
         <IconSparkle size={20} />
       </div>
       <p className="ending__end">End of chapter {chapter.sequence}</p>
-      {chapter.reflection && (
-        <aside className="reflection" aria-label="For the grown-ups">
-          <span className="reflection__label">For the grown-ups</span>
-          <p className="reflection__question">{chapter.reflection}</p>
-        </aside>
-      )}
       <div className="stack" style={{ marginTop: 22, maxWidth: 380, marginLeft: "auto", marginRight: "auto" }}>
         <button className="btn btn--purple" onClick={() => go(0)}>
           Read again
         </button>
-        {chapter.nextChapterId ? (
-          <Link className="btn btn--outline" to={`${base}/read/${chapter.nextChapterId}`}>
-            Next chapter <IconChevronRight size={20} />
-          </Link>
-        ) : (
-          <Link className="btn btn--outline" to={base}>
-            Close the book
-          </Link>
-        )}
+        {nextOrClose}
       </div>
-      {chapter.canShare && (
-        <p style={{ marginTop: 16 }}>
-          <Link to={`${base}/chapters/${chapter.id}/share`} className="tlink" style={{ fontSize: 17 }}>
-            Send this chapter to family
-          </Link>
+      {grownUpsIndex !== null ? (
+        <p style={{ marginTop: 18 }}>
+          <button type="button" className="tlink" style={{ display: "inline-flex", gap: 6, alignItems: "center", fontSize: 17 }} onClick={() => go(grownUpsIndex)}>
+            For the grown-ups <IconChevronRight size={18} />
+          </button>
         </p>
+      ) : (
+        grownUpLinks("For grown-ups: story feedback")
       )}
-      <p style={{ marginTop: 14 }}>
-        <Link to={`${base}/chapters/${chapter.id}/feedback`} className="tlink" style={{ display: "inline-flex", gap: 8, alignItems: "center", fontWeight: 500, fontSize: 16 }}>
-          <IconPeople size={20} /> For grown-ups: story feedback
-        </Link>
+    </div>
+  );
+
+  // For the grown-ups: the chapter's question on a page of its own, after the
+  // child's ending, with sharing and story feedback (VSB-128). Nothing to answer.
+  const grownUps = (
+    <div className="ending grown-ups">
+      <span className="reader__chapter">{chapterLabel(chapter.sequence)}</span>
+      <p className="grown-ups__label">For the grown-ups</p>
+      <p className="grown-ups__question" style={{ fontSize: `${(wide ? 32 : 26) * textSize}px` }}>
+        {chapter.reflection}
       </p>
+      <div className="reader__ornament" aria-hidden="true">
+        <IconSparkle size={20} />
+      </div>
+      <div className="stack" style={{ marginTop: 18, maxWidth: 380, width: "100%", marginLeft: "auto", marginRight: "auto" }}>
+        {nextOrClose}
+      </div>
+      {grownUpLinks("Story feedback")}
     </div>
   );
 
@@ -302,7 +332,7 @@ export default function Reader() {
       <div className="reader__frame" onClick={onTap}>
         {ended ? (
           <div className="reader__page" ref={pageRef} style={{ maxWidth: wide ? 760 : 480 }}>
-            {ending}
+            {onGrownUps ? grownUps : ending}
           </div>
         ) : wide ? (
           <div className="reader__page reader__spread" ref={pageRef}>

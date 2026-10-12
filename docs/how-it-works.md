@@ -143,7 +143,7 @@ Pages made before picture sizes existed keep their original wide format.
 
 - **The reader** shows one page per screen on a phone and a two-page spread on a tablet held sideways. Readers can change the text size, choose cream, white or dark paper, and hide the controls. The screen stays on while a chapter is open. Bookmarks and reading progress are saved for each person.
 - **Sharing.** Each chapter can be readable by everyone in the family, by selected family members, or only by the storybook's owner. Sending a chapter link to someone also gives them access.
-- **For the grown-ups.** After the last page, a chapter made after the birth shows one reflective question for the adult who read it: a place to pause, with nothing to fill in.
+- **For the grown-ups.** A chapter made after the birth has one more page after its end screen, reached with one more swipe or the "For the grown-ups" link: one reflective question for the adult who read it, a place to pause with nothing to fill in. Sending the chapter to family and story feedback live there too, so the end screen stays the child's (VSB-128). Chapters without a question keep those links on the end screen.
 - **Story feedback.** At the end of a chapter, grown-ups can say what felt off. The feedback appears in Story Review, and the chapter stays available meanwhile.
 
 ## Running costs
