@@ -3,7 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
 import BottomNav from "../components/BottomNav";
 import AccessDenied from "../components/AccessDenied";
-import { IconBook, IconMic, IconPeople, IconSparkle } from "../components/icons";
+import { IconMic, IconPeople, IconSparkle } from "../components/icons";
 import { Chev, Loading, Mascot } from "../components/ui";
 import { useStorybookData } from "../hooks/useStorybookData";
 import { apiGet } from "../lib/api";
@@ -18,15 +18,15 @@ const SAMPLE_PROMPT = "What is one thing you never want to forget?";
 
 const weekday = (iso: string) => new Date(iso).toLocaleDateString("en-US", { weekday: "long" });
 
-// Home is just the actions (VSB-129): record a memory (always prompted by a
-// question), read the newest chapter together, and open the chapter list. What a
-// chapter in progress needs from the parent lives in that list, under "Waiting
-// for you" and as tagged covers on home; when the next chapter is made shows
-// under them.
+// Home is just the actions (VSB-129): Baby Vambie asks one question and a big
+// button records the answer; under it, one chapter slot shows what a chapter needs
+// from the owner (review, who's who, publish) or else the newest chapter to read;
+// then the chapter covers, tagged, and when the next chapter is made.
 export default function StorybookHome() {
   const { id } = useParams();
   const { storybook, status, reload } = useStorybookData(id);
-  const [prompt, setPrompt] = useState<{ id: string; question: string; art: string | null; thisWeek: boolean } | null>(null);
+  // undefined while the deck loads; null when no card fits.
+  const [prompt, setPrompt] = useState<{ id: string; question: string; thisWeek: boolean } | null>();
 
   const busy =
     !!storybook &&
@@ -41,8 +41,8 @@ export default function StorybookHome() {
     return () => clearInterval(t);
   }, [busy, reload]);
 
-  // A question always prompts the Record tile: this week's question until you've
-  // answered it, then the next card in your deck you haven't answered.
+  // Baby Vambie always asks something: this week's question until you've answered
+  // it, then the next card in your deck you haven't answered.
   useEffect(() => {
     if (!storybook) return;
     Promise.all([apiGet(`/api/storybooks/${storybook.id}/prompt-answers`), apiGet("/api/prompts?status=published")])
@@ -54,7 +54,7 @@ export default function StorybookHome() {
         const next = week ?? fits.find((p) => p.answerOnce && !answered(p)) ?? fits.find((p) => !p.answerOnce) ?? null;
         if (!next) return setPrompt(null);
         const values = promptValues({ child: storybook.child, me: storybook.me, parentName: storybook.family.find((f) => f.role === "owner")?.name ?? null });
-        setPrompt({ id: next.id, question: fillPrompt(next.question, values), art: next.artworkPath, thisWeek: next === week });
+        setPrompt({ id: next.id, question: fillPrompt(next.question, values), thisWeek: next === week });
       })
       .catch(() => setPrompt(null));
   }, [storybook?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -86,53 +86,47 @@ export default function StorybookHome() {
     ...published.map((c) => ({ chapter: c, tag: c.readAt ? "Finished" : "New", done: true, to: `${base}/read/${c.id}` })),
   ].slice(0, 8);
   const total = published.length + waitingForYou.length;
+  // The one chapter slot: what a chapter needs from the owner, else the newest chapter to read.
+  const todo = waitingForYou.find(({ step }) => step.go);
+  const slot = todo
+    ? { to: `${base}/chapters/${todo.chapter.id}/pages`, cover: todo.chapter.cover, kicker: todo.step.kicker, title: todo.chapter.title, go: todo.step.go }
+    : featured
+      ? { to: `${base}/read/${featured.id}`, cover: featured.cover, kicker: `${possessive(child)} newest chapter`, title: featured.title, go: "Read" }
+      : { to: `${base}/this-week`, cover: null, kicker: "Read together", title: "Your first chapter is on its way.", go: null };
+  const question = prompt ? prompt.question : prompt === null ? SAMPLE_PROMPT : "";
 
   return (
     <div className="page page--nav">
       <TopBar wordmark avatar={`${base}/settings`} />
       <div className="pad">
-        <h1 className="h-title home-title" style={{ fontSize: 36, margin: "2px 0 16px" }}>
-          {capitalize(possessive(child))} story
-        </h1>
-
-        <div className="home-tiles">
-          {prompt ? (
-            <Link to={`${base}/record?card=${prompt.id}`} className="home-prompt">
-              {prompt.art ? <img src={`/${prompt.art}`} alt="" className="home-prompt__art home-prompt__art--picture" /> : <Mascot name={cardPose(prompt.id)} className="home-prompt__art" />}
-              <span className="home-prompt__kicker">{prompt.thisWeek ? "This week's question" : "A question for you"}</span>
-              <span className="home-prompt__q">{prompt.question}</span>
-              <span className="home-prompt__go">
-                <IconMic size={20} filled /> Record a memory
-              </span>
-            </Link>
-          ) : (
-            <Link to={`${base}/record`} className="home-tile home-tile--record">
-              <Mascot name="mic" className="home-tile__art" />
-              <span className="home-tile__text">
-                <span className="home-tile__title">Record a memory</span>
-                <span className="home-tile__sub">A minute or two, in your own words.</span>
-              </span>
-              <Chev size={22} />
-            </Link>
-          )}
-
-          <Link to={featured ? `${base}/read/${featured.id}` : `${base}/this-week`} className="home-read">
-            {featured?.cover ? (
-              <img src={`/${featured.cover}`} alt="" className="home-read__cover" />
-            ) : (
-              <span className="home-read__cover home-read__cover--art">
-                <Mascot name="closedbook" />
-              </span>
-            )}
-            <span className="home-read__kicker">{featured ? `${possessive(child)} newest chapter` : "Read together"}</span>
-            <span className="home-read__title">{featured ? featured.title : "Your first chapter is on its way."}</span>
-            {featured && (
-              <span className="home-prompt__go">
-                <IconBook size={20} /> Read together
-              </span>
-            )}
-          </Link>
+        {/* Baby Vambie asks one question, one button answers it: like "Every story starts somewhere". */}
+        <span className="home-hero__kicker">
+          {capitalize(possessive(child))} story · {prompt?.thisWeek ? "this week's question" : "a question for you"}
+        </span>
+        <div className="home-ask" aria-busy={prompt === undefined}>
+          <h1 className="home-ask__q">
+            <QuestionText text={question} />
+          </h1>
+          <svg className="home-ask__tail" width="34" height="26" viewBox="0 0 34 26" aria-hidden="true">
+            <path d="M3 0 L13 24 L31 0" />
+          </svg>
         </div>
+        <div className="home-hero__art">
+          <Mascot name={prompt ? cardPose(prompt.id) : "hug-book"} />
+        </div>
+        <Link className="btn btn--lime btn--caps" to={prompt ? `${base}/record?card=${prompt.id}` : prompt === null ? `${base}/record?q=${encodeURIComponent(SAMPLE_PROMPT)}` : `${base}/record`}>
+          <IconMic size={24} filled /> Record a memory
+        </Link>
+
+        <Link to={slot.to} className={`home-read-row ${todo ? "home-read-row--todo" : ""}`}>
+          {slot.cover ? <img src={`/${slot.cover}`} alt="" className="home-read-row__cover" /> : <Mascot name="closedbook" className="home-read-row__cover home-read-row__cover--art" />}
+          <span className="home-read-row__text">
+            <span className="home-read-row__kicker">{slot.kicker}</span>
+            <span className="home-read-row__title">{slot.title}</span>
+          </span>
+          {slot.go && <span className="home-read-row__go">{slot.go}</span>}
+          <Chev size={20} />
+        </Link>
 
         {strip.length > 0 && (
           <>
@@ -168,6 +162,19 @@ export default function StorybookHome() {
       </div>
       <BottomNav storybookId={storybook.id} />
     </div>
+  );
+}
+
+// "What did you grow up believing you had to earn? What would you like Peanut to
+// receive freely?": the second sentence in italic.
+function QuestionText({ text }: { text: string }) {
+  const [first, ...rest] = text.split(/(?<=[?.!])\s+/);
+  return rest.length ? (
+    <>
+      {first} <em>{rest.join(" ")}</em>
+    </>
+  ) : (
+    <>{text}</>
   );
 }
 

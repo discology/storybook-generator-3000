@@ -5749,174 +5749,129 @@ input[type="radio"] {
 }
 
 /* Home: just the actions (VSB-129) */
-.home-tiles {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+/* Baby Vambie asks one question in a speech bubble; one button answers it */
+.home-hero__kicker {
+  display: block;
+  padding-top: 6px;
+  font-weight: 800;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
 }
 
-.home-tile {
+.home-ask {
+  position: relative;
+  margin-top: 10px;
+  padding: 18px 20px 20px;
+  border: 2px solid var(--accent-border);
+  border-radius: 28px 24px 30px 22px / 24px 30px 22px 28px;
+  background: var(--cream);
+}
+
+.home-ask__q {
+  margin: 0;
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  font-size: 25px;
+  line-height: 1.2;
+  color: var(--ink);
+}
+
+.home-ask[aria-busy="true"] .home-ask__q {
+  min-height: 2.4em;
+}
+
+.home-ask__q em {
+  font-style: italic;
+  color: var(--accent-text);
+}
+
+/* The bubble's tail, pointing down at Baby Vambie; its fill covers the bubble's border */
+.home-ask__tail {
+  position: absolute;
+  left: calc(50% - 17px);
+  bottom: -24px;
+  overflow: visible;
+}
+
+.home-ask__tail path {
+  fill: var(--cream);
+  stroke: var(--accent-border);
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
+.home-hero__art {
+  display: flex;
+  justify-content: center;
+  margin: 18px 0 6px;
+}
+
+.home-hero__art > img {
+  width: 176px;
+  height: 176px;
+  object-fit: contain;
+}
+
+/* The chapter slot under the button: the newest chapter to read (peach), or a
+   chapter that needs the owner (butter, like its "To review" tag) */
+.home-read-row {
   display: flex;
   align-items: center;
   gap: 12px;
-  min-height: 116px;
-  padding: 12px 14px 12px 12px;
-  border: 1.5px solid var(--dark-line);
-  border-radius: 22px 18px 24px 20px / 20px 24px 18px 22px;
-  background: var(--cream);
-  color: var(--ink);
-  text-decoration: none;
-}
-
-.home-tile--record {
-  background: var(--lime);
+  margin-top: 14px;
+  padding: 10px 14px 10px 10px;
   border: 2px solid var(--accent-border);
-}
-
-/* Read together: the newest chapter, a card like the question card in a peach wash */
-.home-read {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 16px;
-  border: 2px solid var(--accent-border);
-  border-radius: 26px 22px 28px 20px / 22px 28px 20px 26px;
+  border-radius: 20px 24px 18px 22px / 22px 18px 24px 20px;
   background: var(--wash-peach);
   color: var(--ink);
   text-decoration: none;
 }
 
-.home-read__cover {
-  display: block;
-  width: 100%;
-  height: 100px;
-  object-fit: cover;
-  object-position: 50% 40%;
-  border: 1.5px solid var(--accent-border);
-  border-radius: 14px;
-}
-
-.home-read__cover--art {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: var(--cream-2);
-}
-
-.home-read__cover--art img {
-  width: 96px;
-  height: 96px;
-  object-fit: contain;
-}
-
-.home-read__kicker {
-  padding-top: 4px;
-  font-weight: 800;
-  font-size: 12.5px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-2);
-}
-
-.home-read__title {
-  font-family: var(--font-display);
-  font-weight: var(--display-weight);
-  font-size: 22px;
-  line-height: 1.2;
-}
-
-/* Record a memory, prompted by this week's question */
-.home-prompt {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 16px 16px 16px;
-  border: 2px solid var(--accent-border);
-  border-radius: 26px 22px 28px 20px / 22px 28px 20px 26px;
-  background: var(--lime);
-  color: var(--ink);
-  text-decoration: none;
-}
-
-.home-prompt__art {
-  position: absolute;
-  right: 6px;
-  top: 6px;
-  width: 76px;
-  height: 76px;
-  object-fit: contain;
-}
-
-.home-prompt__art--picture {
-  object-fit: cover;
-  border: 1.5px solid var(--accent-border);
-  border-radius: 14px;
-}
-
-.home-prompt__kicker {
-  padding-right: 76px;
-  font-weight: 800;
-  font-size: 12.5px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-2);
-}
-
-.home-prompt__q {
-  padding-right: 64px;
-  font-family: var(--font-display);
-  font-weight: var(--display-weight);
-  font-size: 22px;
-  line-height: 1.2;
-}
-
-.home-prompt__go {
-  align-self: flex-start;
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  min-height: 46px;
-  margin-top: 4px;
-  padding: 0 18px;
-  border-radius: 999px;
-  background: var(--ink);
-  color: var(--on-ink);
-  font-weight: 800;
-  font-size: 16px;
-}
-
-.home-tile__art {
+.home-read-row__cover {
   flex: none;
-  width: 86px;
-  height: 86px;
-  object-fit: contain;
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  border: 1.5px solid var(--accent-border);
+  border-radius: 12px;
 }
 
-.home-tile__text {
+.home-read-row__cover--art {
+  object-fit: contain;
+  border: 0;
+}
+
+.home-read-row__text {
   display: flex;
   flex-direction: column;
-  gap: 3px;
   flex: 1;
   min-width: 0;
 }
 
-.home-title {
-  font-family: var(--font-display);
-  font-weight: var(--display-weight);
-}
-
-.home-tile__title {
-  font-family: var(--font-display);
-  font-weight: var(--display-weight);
-  font-size: 21px;
-  line-height: 1.1;
-}
-
-.home-tile__sub {
-  font-size: 15px;
-  line-height: 1.35;
+.home-read-row__kicker {
+  font-weight: 800;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
   color: var(--ink-2);
+}
+
+.home-read-row__title {
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  font-size: 18px;
+  line-height: 1.2;
+}
+
+.home-read-row__go {
+  font-weight: 800;
+  font-size: 15px;
+}
+
+.home-read-row--todo {
+  background: var(--wash-butter);
 }
 
 .home-chapters-head {
