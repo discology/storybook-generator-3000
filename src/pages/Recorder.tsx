@@ -9,7 +9,7 @@ import { Chev, Field, Loading, Mascot, Masthead, Note, Select, Sheet, Switch, ty
 import { useStorybookData } from "../hooks/useStorybookData";
 import { apiGet, apiSend } from "../lib/api";
 import { childLabel, formatDuration, possessive } from "../lib/format";
-import { cardFitsChild } from "../lib/promptStages";
+import { audienceFor, cardFitsChild } from "../lib/promptStages";
 import { fillPrompt, promptValues } from "../lib/promptVariables";
 import type { Prompt, StorybookView } from "../types";
 
@@ -55,8 +55,6 @@ const pickMimeType = () => {
   return candidates.find((c) => typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(c)) ?? "";
 };
 
-const audienceFor = (relationship: string | null) =>
-  relationship === "Parent" || relationship === "Guardian" ? "Parents" : relationship === "Grandparent" ? "Grandparents" : null;
 
 // Cards can use variables like <child_name>; they're filled in for the person
 // recording, and the memory keeps the question as they saw it.
@@ -158,7 +156,9 @@ export default function Recorder() {
     });
     // The week's card comes first; a card answered once that you've already
     // recorded moves to the back. The sort is stable, so the deck order holds otherwise.
-    const rank = (c: DeckCard) => (c.thisWeek ? 0 : c.answerOnce && c.you ? 2 : 1);
+    // A card chosen on home (?card=) comes first, then the week's card (VSB-129).
+    const chosen = params.get("card");
+    const rank = (c: DeckCard) => (chosen && c.id === chosen ? -1 : c.thisWeek ? 0 : c.answerOnce && c.you ? 2 : 1);
     const list = fitting
       .filter((p) => category === "All" || p.category === category)
       .map((p) => ({

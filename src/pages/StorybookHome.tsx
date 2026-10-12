@@ -8,6 +8,7 @@ import { Chev, Loading, Mascot } from "../components/ui";
 import { useStorybookData } from "../hooks/useStorybookData";
 import { apiGet } from "../lib/api";
 import { waitingChapters } from "../lib/chapterStatus";
+import { audienceFor, cardFitsChild } from "../lib/promptStages";
 import { fillPrompt, promptValues } from "../lib/promptVariables";
 import { capitalize, childLabel, possessive } from "../lib/format";
 import type { Prompt, StorybookView } from "../types";
@@ -17,14 +18,14 @@ const SAMPLE_PROMPT = "What is one thing you never want to forget?";
 
 const weekday = (iso: string) => new Date(iso).toLocaleDateString("en-US", { weekday: "long" });
 
-// Home is just the actions (VSB-129): record a memory (prompted by this week's
+// Home is just the actions (VSB-129): record a memory (always prompted by a
 // question), read the newest chapter together, and open the chapter list. What a
 // chapter in progress needs from the parent lives in that list, under "Waiting
 // for you"; when the next chapter is made shows on the Chapters row.
 export default function StorybookHome() {
   const { id } = useParams();
   const { storybook, status, reload } = useStorybookData(id);
-  const [weekQuestion, setWeekQuestion] = useState<string | null>(null);
+  const [prompt, setPrompt] = useState<{ id: string; question: string; thisWeek: boolean } | null>(null);
 
   const busy =
     !!storybook &&
@@ -39,17 +40,22 @@ export default function StorybookHome() {
     return () => clearInterval(t);
   }, [busy, reload]);
 
-  // This week's question prompts the Record tile, until you've answered it.
+  // A question always prompts the Record tile: this week's question until you've
+  // answered it, then the next card in your deck you haven't answered.
   useEffect(() => {
     if (!storybook) return;
     Promise.all([apiGet(`/api/storybooks/${storybook.id}/prompt-answers`), apiGet("/api/prompts?status=published")])
       .then(([answers, prompts]: [{ weekPromptId: string | null; answers: Record<string, { you: boolean }> }, Prompt[]]) => {
-        const week = prompts.find((p) => p.id === answers.weekPromptId);
-        if (!week || answers.answers[week.id]?.you) return setWeekQuestion(null);
+        const audience = audienceFor(storybook.me.relationship);
+        const fits = prompts.filter((p) => (p.audience === "Everyone" || p.audience === audience) && cardFitsChild(p.childStage, storybook.child));
+        const answered = (p: Prompt) => Boolean(answers.answers[p.id]?.you);
+        const week = fits.find((p) => p.id === answers.weekPromptId && !answered(p));
+        const next = week ?? fits.find((p) => p.answerOnce && !answered(p)) ?? fits.find((p) => !p.answerOnce) ?? null;
+        if (!next) return setPrompt(null);
         const values = promptValues({ child: storybook.child, me: storybook.me, parentName: storybook.family.find((f) => f.role === "owner")?.name ?? null });
-        setWeekQuestion(fillPrompt(week.question, values));
+        setPrompt({ id: next.id, question: fillPrompt(next.question, values), thisWeek: next === week });
       })
-      .catch(() => setWeekQuestion(null));
+      .catch(() => setPrompt(null));
   }, [storybook?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (status === "denied") return <AccessDenied />;
@@ -90,11 +96,11 @@ export default function StorybookHome() {
         </h1>
 
         <div className="home-tiles">
-          {weekQuestion ? (
-            <Link to={`${base}/record`} className="home-prompt">
+          {prompt ? (
+            <Link to={`${base}/record?card=${prompt.id}`} className="home-prompt">
               <Mascot name="mic" className="home-prompt__art" />
-              <span className="home-prompt__kicker">This week's question</span>
-              <span className="home-prompt__q">{weekQuestion}</span>
+              <span className="home-prompt__kicker">{prompt.thisWeek ? "This week's question" : "A question for you"}</span>
+              <span className="home-prompt__q">{prompt.question}</span>
               <span className="home-prompt__go">
                 <IconMic size={20} filled /> Record a memory
               </span>
