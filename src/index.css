@@ -5747,3 +5747,181 @@ input[type="radio"] {
 .choice {
   white-space: nowrap;
 }
+
+/* Home: just the actions (VSB-129) */
+.home-tiles {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.home-tile {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 116px;
+  padding: 12px 14px 12px 12px;
+  border: 1.5px solid var(--dark-line);
+  border-radius: 22px 18px 24px 20px / 20px 24px 18px 22px;
+  background: var(--cream);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.home-tile--record {
+  background: var(--lime);
+  border: 2px solid var(--accent-border);
+}
+
+/* Record a memory, prompted by this week's question */
+.home-prompt {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px 16px 16px;
+  border: 2px solid var(--accent-border);
+  border-radius: 26px 22px 28px 20px / 22px 28px 20px 26px;
+  background: var(--lime);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.home-prompt__art {
+  position: absolute;
+  right: 6px;
+  top: 6px;
+  width: 76px;
+  height: 76px;
+  object-fit: contain;
+}
+
+.home-prompt__kicker {
+  padding-right: 76px;
+  font-weight: 800;
+  font-size: 12.5px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+
+.home-prompt__q {
+  padding-right: 64px;
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  font-size: 22px;
+  line-height: 1.2;
+}
+
+.home-prompt__go {
+  align-self: flex-start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 46px;
+  margin-top: 4px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--on-ink);
+  font-weight: 800;
+  font-size: 16px;
+}
+
+.home-tile__cover,
+.home-tile__art {
+  flex: none;
+  width: 86px;
+  height: 86px;
+}
+
+.home-tile__cover {
+  object-fit: cover;
+  border-radius: 14px;
+}
+
+.home-tile__art {
+  object-fit: contain;
+}
+
+.home-tile__text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  flex: 1;
+  min-width: 0;
+}
+
+.home-title {
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+}
+
+.home-tile__title {
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  font-size: 21px;
+  line-height: 1.1;
+}
+
+.home-tile__sub {
+  font-size: 15px;
+  line-height: 1.35;
+  color: var(--ink-2);
+}
+
+.home-tile__new {
+  align-self: flex-start;
+  margin-top: 4px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--wash-peach);
+  font-weight: 800;
+  font-size: 12.5px;
+}
+
+.home-chapters {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 64px;
+  margin-top: 16px;
+  padding: 0 6px;
+  border-top: 1.5px solid var(--dark-line);
+  border-bottom: 1.5px solid var(--dark-line);
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.home-chapters__title {
+  display: block;
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  font-size: 20px;
+}
+
+.home-chapters__sub {
+  display: block;
+  font-size: 14px;
+  color: var(--ink-2);
+}
+
+/* The chapter list: a chapter waiting for the owner (VSB-129) */
+.chapter-tile--waiting {
+  background: var(--wash-butter);
+  border: 2px solid var(--accent-border);
+}
+
+.chapter-tile__cover--art {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-text);
+}
+
+.chapter-tile__cover--art img {
+  width: 84px;
+  height: 84px;
+  object-fit: contain;
+}

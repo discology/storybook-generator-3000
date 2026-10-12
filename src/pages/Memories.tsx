@@ -4,11 +4,12 @@ import TopBar from "../components/TopBar";
 import BottomNav from "../components/BottomNav";
 import AccessDenied from "../components/AccessDenied";
 import MemoryListRow from "../components/MemoryListRow";
-import { IconBookmark, IconChevronRight, IconClose, IconMic, IconSearch, IconStar } from "../components/icons";
+import { IconBookmark, IconChevronRight, IconClose, IconMic, IconSearch, IconSpinner, IconStar } from "../components/icons";
 import { Chev, Loading, Mascot, Segmented } from "../components/ui";
 import { useStorybookData } from "../hooks/useStorybookData";
 import { useInlineAudio } from "../hooks/useInlineAudio";
 import { apiSend } from "../lib/api";
+import { waitingChapters } from "../lib/chapterStatus";
 import { capitalize, chapterLabel, childLabel, formatDate, formatMonth, possessive } from "../lib/format";
 import type { StorybookChapter } from "../types";
 
@@ -21,7 +22,8 @@ const DATE_RANGES = [
 
 const monthKey = (iso: string) => iso.slice(0, 7);
 
-// The Memories tab: published chapters and the family's memories, with filters.
+// The Memories tab: every chapter (the owner's waiting ones first, VSB-129) and the
+// family's memories, with filters.
 export default function Memories() {
   const { id } = useParams();
   const [params, setParams] = useSearchParams();
@@ -71,6 +73,7 @@ export default function Memories() {
   const base = `/storybooks/${storybook.id}`;
   const child = childLabel(storybook.child.displayName, storybook.me?.role === "owner");
   const filtered = query || who || month || favorites;
+  const waitingForYou = storybook.me?.role === "owner" ? waitingChapters(storybook.chapters, child) : [];
 
   const toggleMark = async (c: StorybookChapter) => {
     const next = !(marks[c.id] ?? c.favorite);
@@ -103,6 +106,42 @@ export default function Memories() {
 
         {tab === "chapters" ? (
           <>
+            {waitingForYou.length > 0 && (
+              <>
+                <h2 className="section-label">Waiting for you</h2>
+                {waitingForYou.map(({ chapter, step }) => {
+                  const body = (
+                    <>
+                      {chapter.cover ? (
+                        <img src={`/${chapter.cover}`} alt="" className="chapter-tile__cover" />
+                      ) : (
+                        <span className="chapter-tile__cover chapter-tile__cover--art">{"spinner" in step && step.spinner ? <IconSpinner size={30} /> : <Mascot name={step.art ?? "open-book"} />}</span>
+                      )}
+                      <span className="chapter-tile__text">
+                        <span className="chapter-tile__label">{step.kicker}</span>
+                        <span className="chapter-tile__title" style={{ display: "block" }}>{chapter.title}</span>
+                        <span className="chapter-tile__date">{step.text}</span>
+                      </span>
+                      {step.cta && (
+                        <span className="chapter-tile__chev">
+                          <IconChevronRight size={22} />
+                        </span>
+                      )}
+                    </>
+                  );
+                  return step.cta ? (
+                    <Link key={chapter.id} to={`${base}/chapters/${chapter.id}/pages`} className="chapter-tile chapter-tile--waiting">
+                      {body}
+                    </Link>
+                  ) : (
+                    <div key={chapter.id} className="chapter-tile chapter-tile--waiting">
+                      {body}
+                    </div>
+                  );
+                })}
+                <h2 className="section-label">In the book</h2>
+              </>
+            )}
             <div className="chips" style={{ margin: "16px 0" }}>
               <label className="chip">
                 <span className="sr-only">Date range</span>
@@ -122,8 +161,14 @@ export default function Memories() {
             {chapters.length === 0 ? (
               <EmptyCard
                 art={favorites ? "magnifier" : "open-book"}
-                title={favorites ? "No favorites yet." : "No chapters yet."}
-                text={favorites ? "Tap the bookmark on a chapter to keep it here." : "The week's memories become a new chapter each week."}
+                title={favorites ? "No favorites yet." : waitingForYou.length ? "Nothing in the book yet." : "No chapters yet."}
+                text={
+                  favorites
+                    ? "Tap the bookmark on a chapter to keep it here."
+                    : waitingForYou.length
+                      ? "Chapters show up here once they're added to the book."
+                      : "The week's memories become a new chapter each week."
+                }
               />
             ) : (
               chapters.map((c, i) => {

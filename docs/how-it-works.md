@@ -8,6 +8,10 @@ Families record short voice memories about their child. Each week, those memorie
 
 The child never appears as themselves. **Baby Vambie stands in for the child on every page**, doing what the child did and feeling what they felt. That keeps the child's likeness out of AI-generated pictures and gives them a little distance to explore big feelings. Baby Vambie is called just "Vambie" from age 4 by default, and families can change that age. Family members appear as themselves, drawn from designs the parent approved.
 
+## Home
+
+Home is just the actions (VSB-129). **Record a memory** comes first, prompted by this week's question until you've answered it, and opens the recorder on that card. **Read together** opens the newest chapter in the book (or says the first one is on its way). The **Chapters** row says how many chapters are in the book, how many are waiting for you, and when the next one is made, and it opens the chapter list. There the owner sees chapters that aren't in the book yet first, under "Waiting for you" (ready to review, Who's who?, drawing the pictures, ready to publish), and the finished ones below. Recent memories live in the Memories tab.
+
 ## 0. Trying it first
 
 New visitors see the value before they sign up. "Start their story" on the splash screen asks only for the child's name or nickname, their age (a birthday, or "on the way" with an optional due date) and the visitor's relationship. Then the visitor records or types one memory.
