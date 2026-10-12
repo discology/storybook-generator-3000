@@ -230,6 +230,12 @@ export default function Reader() {
         <IconSparkle size={20} />
       </div>
       <p className="ending__end">End of chapter {chapter.sequence}</p>
+      {chapter.reflection && (
+        <aside className="reflection" aria-label="For the grown-ups">
+          <span className="reflection__label">For the grown-ups</span>
+          <p className="reflection__question">{chapter.reflection}</p>
+        </aside>
+      )}
       <div className="stack" style={{ marginTop: 22, maxWidth: 380, marginLeft: "auto", marginRight: "auto" }}>
         <button className="btn btn--purple" onClick={() => go(0)}>
           Read again

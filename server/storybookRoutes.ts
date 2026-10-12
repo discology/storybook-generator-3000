@@ -465,6 +465,8 @@ router.get("/chapters/:id/read", async (req, res) => {
     content: chapter.content,
     publishedAt: chapter.publishedAt,
     beforeBirth,
+    // The question for the grown-ups, shown after the last page (VSB-126).
+    reflection: beforeBirth ? null : chapter.reflection,
     pages: chapter.pages.map((p) => {
       // Before the birth, a page made from a recorded message plays it, for anyone who may hear it (VSB-118).
       // Only a page that quotes its speaker ("Grandma Rose says: …"); the opening and

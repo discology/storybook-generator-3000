@@ -4629,6 +4629,35 @@ button.btn-small,
   margin-top: 4px;
 }
 
+/* The question for the grown-ups after the last page (VSB-126): a quiet card
+   set apart from the story, nothing to fill in. */
+.reflection {
+  max-width: 380px;
+  margin: 22px auto 0;
+  padding: 16px 20px 18px;
+  border-top: 1px solid color-mix(in srgb, var(--paper-soft) 35%, transparent);
+  border-bottom: 1px solid color-mix(in srgb, var(--paper-soft) 35%, transparent);
+  text-align: center;
+}
+
+.reflection__label {
+  display: block;
+  font-family: var(--font-body);
+  font-size: 13px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--paper-soft);
+}
+
+.reflection__question {
+  font-family: var(--font-book);
+  font-style: italic;
+  font-size: 20px;
+  line-height: 1.4;
+  color: var(--paper-ink);
+  margin: 8px 0 0;
+}
+
 /* Two-page spread on tablets and wide screens */
 @media (min-width: 900px) and (min-aspect-ratio: 5/4) {
   .reader__frame {

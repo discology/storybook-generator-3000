@@ -75,7 +75,7 @@ The schema is in `prisma/schema.prisma`. Here are the models, grouped by what th
 
 - **People and access:** `User`, `Session`, `OtpCode`, `Household` (a family), `Contributor` (a person's place in a family: owner or contributor; one per person per family, so someone in several families' storybooks has one place in each), `Invitation`.
 - **Storybooks and memories:** `Child`, `Storybook` (settings, reminder schedule, reading stage), `Memory`, `TranscriptVersion` (machine and corrected transcripts), `MemoryInterpretation`.
-- **Chapters:** `Chapter` (with its rules snapshot), `ChapterSource` (which memories it came from), `StoryPage`, `PageAsset` (every picture attempt for a page), `GuardianFinding`, `ChapterAccess` and `ChapterShare` (sharing), `ChapterMark` (bookmarks and reading progress), `StoryFeedback`.
+- **Chapters:** `Chapter` (with its rules snapshot and the question for the grown-ups), `ChapterSource` (which memories it came from), `StoryPage`, `PageAsset` (every picture attempt for a page), `GuardianFinding`, `ChapterAccess` and `ChapterShare` (sharing), `ChapterMark` (bookmarks and reading progress), `StoryFeedback`.
 - **Characters:** `Character` and `CharacterArt` (the Vambies), `FamilyCharacter`, `CharacterDesign` (versioned looks per age), `DesignProposal`, `PageAppearance` (which design of a family member is on a page, and what they're wearing).
 - **Visitors:** a visitor's draft is an ordinary `Household` with a guest token (and, for a relative recording before joining, the invitation it came from), holding a storybook with status `guest`. `GuestPreview` logs each free preview for the daily limits, and `AppSetting` holds the daily cap.
 - **Configuration:** `Prompt`, `PromptArtwork` (pictures generated or uploaded for prompt cards), `MessageTemplate`, `AiInstruction`, `GenerationRuleSet` (one row per page rules version), `ShotReview` (a flagged shot pattern the team accepted or blocked).
@@ -109,6 +109,7 @@ The story steps (`page_plan`, `page_check`, `page_revise`, `guardian`) also read
 | `page_revise` | A parent asks to change one page, or a planned shot breaks the Shot list (one replan before drawing) | The rewritten page, or a new shot |
 | `illustration_check` | Each new picture (the image is attached) | Whether it matches the page, and which family members don't match their design |
 | `describe_person` | A photo is uploaded for a family member | A draft of their fixed features and usual clothing |
+| `reflection` | After Check pages on a chapter made after the birth, or when the parent asks for another | The question for the grown-ups after the last page (`Chapter.reflection`) |
 | `guardian` | After planning, or when an admin re-runs it | Findings for continuity, reader fit and private details |
 
 Transcription uses `OPENAI_TRANSCRIBE_MODEL` (`gpt-4o-transcribe`). Pictures use the image model and quality from Page Rules (`gpt-image-2`, medium).

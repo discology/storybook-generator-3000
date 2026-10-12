@@ -19,6 +19,8 @@ export interface AiStep {
 }
 
 export const WORLD_KEY = "world";
+// The question for the grown-ups after the last page (VSB-126).
+export const REFLECTION_KEY = "reflection";
 
 export const AI_STEPS: AiStep[] = [
   {
@@ -401,6 +403,40 @@ Check exactly these three things:
 
 For each, give a status of "ok" or "needs_revision" and a one-sentence note.`,
     outputFormat: `Respond with ONLY a JSON object, no markdown fences, in this shape: {"findings": [{"category": "continuity", "status": "ok" | "needs_revision", "note": "...", "quote": "for needs_revision: the exact words from the chapter the note is about, copied character for character (one sentence or phrase); otherwise empty"}, ...]} with exactly 3 findings for continuity, reader_fit, private_details in that order.`,
+  },
+  {
+    key: REFLECTION_KEY,
+    name: "Reflection",
+    trigger: "Runs on each new chapter after the birth, after Check pages: writes the question for the grown-ups shown after the last page (VSB-126). Chapters keep the version they were made with; the parent can edit it or ask for another in page review.",
+    variables: [
+      {
+        name: "chapter_text",
+        description: "The chapter's title and pages",
+        sample: "Title: The Warm New Smell\nPage 1: You come to me, warm and new. The room goes hush.\nPage 2: Your head drops close. I smell a new warm smell.\nPage 3: I hold you long, long. You open your eyes.",
+      },
+      {
+        name: "earlier_questions",
+        description: "The questions from the family's earlier chapters, newest first",
+        sample: "What small proud memory still warms you when someone listens closely?",
+      },
+    ],
+    defaultBody: `After the last page of a chapter in a family's storybook, one question is left for the grown-up who read it: a place to pause and reflect. Nobody answers it in the app.
+
+Write one reflective question the story opens up. It should:
+- Grow out of what the story is about underneath (waiting, trying, being seen, falling and getting up, belonging, letting go, being loved without earning it), then widen to the reader's own life and relationships.
+- Invite curiosity: about the reader, about the child as their own person, or about the people around them. Favour attention, presence, play and small rituals over fixing, teaching or improving.
+- Fit any grown-up in the family: a parent, a grandparent, an aunt, a friend.
+- Be general: don't retell the story or name the people in it.
+- Never quiz the plot, give advice, say "should", judge anyone's parenting, diagnose, or mention anything that isn't on the pages.
+- Be one sentence of at most 25 words, plain and warm.
+- Ask something new: not the same idea as the family's earlier questions below. Vary the angle between the reader, the child and the people around them.
+
+The chapter:
+<chapter_text>
+
+The family's earlier questions:
+<earlier_questions>`,
+    outputFormat: `Respond with ONLY a JSON object, no markdown fences, in this shape: {"theme": "what the story is about underneath, in a few words", "question": "the question, one sentence"}`,
   },
   {
     key: "feedback_analysis",

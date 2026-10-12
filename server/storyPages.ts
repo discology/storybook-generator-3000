@@ -3,7 +3,7 @@ import path from "path";
 import { toFile } from "openai";
 import { prisma } from "./db";
 import { runAiStep, isAiConfigured, guardianReview } from "./aiService";
-import { getAiInstruction } from "./aiInstructions";
+import { REFLECTION_KEY, getAiInstruction } from "./aiInstructions";
 import { CastMember, buildCast, characterCardValues, currentCast, describeCast, moodArt, renderReferences } from "./characters";
 import { appUrl, fillTemplate, renderMessage } from "./messageTemplates";
 import { BEFORE_BIRTH_CLOSING_KEY, BEFORE_BIRTH_KEY, BEFORE_BIRTH_PROFILE, DEFAULT_BEFORE_BIRTH, DEFAULT_CLOSING_LINE, NO_NAME_NOTE, OWN_WORDS_MIN, arrivalNote, checkNote, childLabel, echoesEarlierOpening, hasName, isBeforeBirth, ownWords, speakerOf, withBeforeBirth, withClosingPage } from "./beforeBirth";
@@ -442,7 +442,7 @@ export async function createPagedChapter(input: CreateChapterInput) {
   } else {
     const active = await getActiveRules();
     const instructions: Record<string, string> = {};
-    for (const key of ["page_plan", "page_check", "page_revise", "illustration_check", "world", BEFORE_BIRTH_KEY, BEFORE_BIRTH_CLOSING_KEY]) {
+    for (const key of ["page_plan", "page_check", "page_revise", "illustration_check", "world", BEFORE_BIRTH_KEY, BEFORE_BIRTH_CLOSING_KEY, REFLECTION_KEY]) {
       instructions[key] = (await getAiInstruction(key)).body;
     }
     const stage = effectiveStage(storybook);
@@ -560,6 +560,7 @@ export async function createPagedChapter(input: CreateChapterInput) {
     characterSheetImage: null,
     unresolvedPeople: JSON.stringify(unresolved),
     pagesStatus: unresolved.length ? "needs_characters" : "illustrating",
+    reflection: null, // written below, from the new pages (VSB-126)
   };
 
   let chapterId: string;
@@ -597,17 +598,62 @@ export async function createPagedChapter(input: CreateChapterInput) {
 
   await enforceShots(chapterId);
   await checkPages(chapterId);
+  await writeReflection(chapterId);
   await runGuardian(chapterId);
   if (!unresolved.length && input.illustrate !== false) void illustrateChapter(chapterId);
   return prisma.chapter.findUniqueOrThrow({ where: { id: chapterId }, include: { sources: true, findings: true } });
 }
+
+// The question for the grown-ups after the last page (VSB-126): one general
+// question that grows out of the story, for chapters after the birth made with
+// the Reflection step in their snapshot. Older chapters, pre-birth chapters and
+// a visitor's preview don't get one. Nothing is answered or recorded.
+export async function writeReflection(chapterId: string): Promise<string | null> {
+  const chapter = await prisma.chapter.findUniqueOrThrow({
+    where: { id: chapterId },
+    include: { pages: { orderBy: { pageNumber: "asc" } }, storybook: { include: { child: true } } },
+  });
+  const snapshot = chapter.generationSnapshot ? (JSON.parse(chapter.generationSnapshot) as GenerationSnapshot) : null;
+  const body = snapshot?.instructions[REFLECTION_KEY];
+  if (!snapshot || !body || snapshot.beforeBirth || chapter.isMock || chapter.storybook.status === "guest" || !isAiConfigured()) return null;
+  const earlier = await prisma.chapter.findMany({
+    // Includes this chapter's current question, so "Ask for another" gets a new one.
+    where: { storybookId: chapter.storybookId, reflection: { not: null } },
+    orderBy: { sequence: "desc" },
+    take: 12,
+    select: { reflection: true },
+  });
+  try {
+    const { output } = await runAiStep(
+      REFLECTION_KEY,
+      {
+        chapter_text: [`Title: ${chapter.title}`, ...chapter.pages.filter((p) => p.text.trim()).map((p) => `Page ${p.pageNumber}: ${p.text}`)].join("\n"),
+        earlier_questions: earlier.map((c) => c.reflection).join("\n") || "(none yet)",
+      },
+      { body },
+      [],
+      { chapterId, householdId: chapter.storybook.child.householdId }
+    );
+    const question = str(output?.question).trim().slice(0, 300);
+    if (!question) return null;
+    await prisma.chapter.update({ where: { id: chapterId }, data: { reflection: question } });
+    return question;
+  } catch (error: any) {
+    console.error("Reflection:", error?.message);
+    return null;
+  }
+}
+
+// How the Guardian sees the question: after the story, for the adult reader only.
+const reflectionForGuardian = (question: string) =>
+  `(After the story, a question printed for the grown-up who read it, not for the child: "${question}". Judge it only for private details.)`;
 
 async function runGuardian(chapterId: string) {
   const chapter = await prisma.chapter.findUniqueOrThrow({ where: { id: chapterId }, include: { storybook: { include: { chapters: true } } } });
   const review = await guardianReview({
     chapterId,
     beforeBirth: isBeforeBirth(chapter.generationSnapshot),
-    chapterContent: chapter.content,
+    chapterContent: chapter.reflection ? `${chapter.content}\n\n${reflectionForGuardian(chapter.reflection)}` : chapter.content,
     readerAgeBand: chapter.storybook.readerAgeBand,
     priorChapterTitles: chapter.storybook.chapters.filter((c) => c.status === "published" && c.id !== chapterId).map((c) => c.title),
   });

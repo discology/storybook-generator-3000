@@ -154,6 +154,7 @@ export default function ChapterPages() {
             castNames={castNames}
           />
         ))}
+        {chapter.reflection && <ReflectionCard key={chapter.reflection} chapter={chapter} busy={busy} act={act} />}
       </div>
 
       <div className="pad" style={{ padding: "8px 20px calc(28px + var(--safe-bottom))" }}>
@@ -186,6 +187,61 @@ export default function ChapterPages() {
         )}
       </div>
     </div>
+  );
+}
+
+// The question for the grown-ups after the last page (VSB-126): the parent can
+// reword it or ask for another before publishing. Nobody answers it.
+function ReflectionCard({ chapter, busy, act }: { chapter: ChapterWithPages; busy: string | null; act: Act }) {
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(chapter.reflection ?? "");
+  const disabled = busy !== null;
+  return (
+    <section className="sheet" style={{ marginBottom: 14 }}>
+      <div className="kv-row" style={{ marginBottom: 10 }}>
+        <span className="eyebrow t-muted">After the last page · For the grown-ups</span>
+      </div>
+      {editing ? (
+        <>
+          <textarea className="textarea" value={text} onChange={(e) => setText(e.target.value)} rows={3} maxLength={300} aria-label="The question for the grown-ups" />
+          <div className="hstack" style={{ marginTop: 10 }}>
+            <button
+              className="btn btn--purple btn--xs btn--auto"
+              disabled={disabled || !text.trim()}
+              onClick={() => void act("reflection-save", () => apiSend(`/api/chapters/${chapter.id}/reflection`, "PUT", { question: text })).then(() => setEditing(false))}
+            >
+              {busy === "reflection-save" ? "Saving…" : "Save question"}
+            </button>
+            <button
+              className="btn btn--outline btn--xs btn--auto"
+              onClick={() => {
+                setText(chapter.reflection ?? "");
+                setEditing(false);
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </>
+      ) : (
+        <>
+          <p style={{ fontFamily: "var(--font-book)", fontStyle: "italic", fontSize: 19, lineHeight: 1.4, margin: 0 }}>{chapter.reflection}</p>
+          <p className="field__hint">A question to pause on after reading. Nobody answers it in the app.</p>
+          <div className="hstack" style={{ marginTop: 10 }}>
+            <button className="btn btn--outline btn--xs btn--auto" disabled={disabled} onClick={() => setEditing(true)}>
+              Edit words
+            </button>
+            <button
+              className="btn btn--outline btn--xs btn--auto"
+              disabled={disabled}
+              onClick={() => void act("reflection-new", () => apiSend(`/api/chapters/${chapter.id}/reflection/rewrite`, "POST"))}
+            >
+              {busy === "reflection-new" ? "Writing another…" : "Ask for another"}
+            </button>
+          </div>
+        </>
+      )}
+    </section>
   );
 }
 

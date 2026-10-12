@@ -65,7 +65,8 @@ It follows these rules:
 
 - **Code** checks word and sentence limits and repeated shots on every page, and notes a shot that still breaks the Shot list after one replan.
 - The **`page_check`** AI step checks that each page is faithful to the memories, consistent with its neighbors, and that the words fit the picture.
-- The **Guardian** AI step reviews the whole chapter for continuity with earlier chapters, fit for the reader's stage, and private adult details. A chapter with an issue is held for the Vambie team in Story Review.
+- The **`reflection`** AI step writes the question for the grown-ups that follows the last page (VSB-126). It's one general question that grows out of what the story is about underneath, widened to the reader's own life and relationships, in one sentence of at most 25 words. It never quizzes the plot, gives advice or judges anyone's parenting, and it's shown the family's earlier questions so it doesn't repeat them. Only chapters after the birth get one; nobody answers it.
+- The **Guardian** AI step reviews the whole chapter for continuity with earlier chapters, fit for the reader's stage, and private adult details. It also reads the question for the grown-ups, for private details only. A chapter with an issue is held for the Vambie team in Story Review.
 
 ### Drawing the pictures
 
@@ -85,7 +86,7 @@ It follows these rules:
 
 ### Review and publishing
 
-1. **The parent reviews every page.** Answer Who's who, edit the words (the picture stays), redraw a picture, revise a page with an instruction (it rewrites the moment and redraws it), or mark "doesn't look right" for a family member. Then approve the pages.
+1. **The parent reviews every page.** Answer Who's who, edit the words (the picture stays), redraw a picture, revise a page with an instruction (it rewrites the moment and redraws it), or mark "doesn't look right" for a family member. Then approve the pages. Below the pages, the parent can edit the question for the grown-ups or ask for another.
 2. **The Vambie team reviews held chapters** in Story Review. They see the draft with flagged passages highlighted and can mark findings resolved, request a full revision, approve or keep the chapter on hold.
 3. **The parent publishes** once every page is approved and the chapter has passed review. It then appears for everyone it's shared with.
 
@@ -142,6 +143,7 @@ Pages made before picture sizes existed keep their original wide format.
 
 - **The reader** shows one page per screen on a phone and a two-page spread on a tablet held sideways. Readers can change the text size, choose cream, white or dark paper, and hide the controls. The screen stays on while a chapter is open. Bookmarks and reading progress are saved for each person.
 - **Sharing.** Each chapter can be readable by everyone in the family, by selected family members, or only by the storybook's owner. Sending a chapter link to someone also gives them access.
+- **For the grown-ups.** After the last page, a chapter made after the birth shows one reflective question for the adult who read it: a place to pause, with nothing to fill in.
 - **Story feedback.** At the end of a chapter, grown-ups can say what felt off. The feedback appears in Story Review, and the chapter stays available meanwhile.
 
 ## Running costs

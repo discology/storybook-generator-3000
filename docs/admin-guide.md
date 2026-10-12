@@ -133,7 +133,7 @@ The page also shows the texting mode (off, test or live), a "Text me a test" but
 
 ### AI instructions
 
-The instructions given to the AI at each step: interpret memory, plan pages, check pages, revise a page, check a picture, describe a person, and the Guardian. See [AI steps](architecture.md#ai-steps) for when each one runs.
+The instructions given to the AI at each step: interpret memory, plan pages, check pages, revise a page, check a picture, describe a person, the Guardian, and Reflection (the question for the grown-ups after the last page of a chapter made after the birth, VSB-126; chapters keep the version they were made with). See [AI steps](architecture.md#ai-steps) for when each one runs.
 
 **The Vambie world** is the first entry and isn't a step: it's the shared text that describes Baby Vambie, Parts, the band as background and the storybook's voice at each reading stage. Plan pages, Check pages, Revise page and the Guardian read it wherever their instructions say `<world>`. It has no model and no test run; to see its effect, test run Plan pages. Chapters keep the version of it they were made with.
 

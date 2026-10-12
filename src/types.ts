@@ -78,6 +78,8 @@ export interface Chapter {
   pagesStatus?: "none" | "needs_characters" | "illustrating" | "ready" | "needs_attention";
   ruleSetVersion?: number | null;
   characterSheet?: string | null;
+  // The question for the grown-ups after the last page (VSB-126).
+  reflection?: string | null;
   createdAt: string;
 }
 
@@ -477,6 +479,8 @@ export interface ReaderChapter {
     voice?: { src: string | null; name: string; durationSec: number | null } | null;
   }[];
   beforeBirth?: boolean;
+  // The question for the grown-ups after the last page (VSB-126).
+  reflection?: string | null;
   mark: { favorite: boolean; lastPage: number; readAt: string | null; finishedAt: string | null } | null;
   storybook: { id: string; title: string; childName: string };
   nextChapterId: string | null;

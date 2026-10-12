@@ -82,6 +82,7 @@ app.post(
     "/api/pages/:pageId/revise",
     "/api/chapters/:id/people",
     "/api/chapters/:id/pages/recheck",
+    "/api/chapters/:id/reflection/rewrite",
     "/api/storybooks/:id/chapters",
   ],
   asJob

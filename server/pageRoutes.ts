@@ -2,16 +2,17 @@ import express, { Request, Response, Router } from "express";
 import { prisma } from "./db";
 import { getCurrentUser } from "./session";
 import {
-  PersonAnswer,
   approvePages,
   checkPages,
   editPageText,
   generateIllustration,
   illustrateChapter,
   parseUnresolved,
+  PersonAnswer,
   resolvePeople,
   revisePage,
   updatePagesStatus,
+  writeReflection,
 } from "./storyPages";
 import { approvedVariants } from "./familyCharacters";
 import { familyPageFlag } from "./feedbackRoutes";
@@ -205,6 +206,23 @@ router.put("/chapters/:id/pages/approve", async (req, res) => {
   } catch (error: any) {
     res.status(400).json({ error: error.message });
   }
+});
+
+// The question for the grown-ups after the last page (VSB-126): the parent can
+// reword it, or ask for another, before publishing.
+router.put("/chapters/:id/reflection", async (req, res) => {
+  if (!(await requireChapterAccess(req, res, req.params.id))) return;
+  const question = String(req.body?.question ?? "").trim().slice(0, 300);
+  if (!question) return res.status(400).json({ error: "The question can't be empty." });
+  await prisma.chapter.update({ where: { id: req.params.id }, data: { reflection: question } });
+  res.json(await chapterWithPages(req.params.id));
+});
+
+router.post("/chapters/:id/reflection/rewrite", async (req, res) => {
+  if (!(await requireChapterAccess(req, res, req.params.id))) return;
+  const question = await writeReflection(req.params.id);
+  if (!question) return res.status(502).json({ error: "Couldn't write another question. Try again." });
+  res.json(await chapterWithPages(req.params.id));
 });
 
 router.post("/chapters/:id/pages/recheck", async (req, res) => {
