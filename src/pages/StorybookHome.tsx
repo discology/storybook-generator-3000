@@ -50,6 +50,9 @@ export default function StorybookHome() {
   // next card in your deck you haven't answered.
   useEffect(() => {
     if (!storybook) return;
+    // The bubble is never left empty: if the deck hasn't come back in a few
+    // seconds, ask the "Just talk" question until it does.
+    const slow = setTimeout(() => setPrompt((p) => (p === undefined ? null : p)), 5000);
     Promise.all([apiGet(`/api/storybooks/${storybook.id}/prompt-answers`), apiGet("/api/prompts?status=published")])
       .then(([answers, prompts]: [{ weekPromptId: string | null; answers: Record<string, { you: boolean }>; asked?: AskedCard[] }, Prompt[]]) => {
         const audience = audienceFor(storybook.me.relationship);
@@ -65,6 +68,7 @@ export default function StorybookHome() {
         setPrompt({ id: next.id, question: fillPrompt(next.question, values), thisWeek: next === week, askedBy: next === asked ? ask?.from : undefined });
       })
       .catch(() => setPrompt(null));
+    return () => clearTimeout(slow);
   }, [storybook?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (status === "denied") return <AccessDenied />;

@@ -101,7 +101,11 @@ router.get("/storybooks/:id/prompt-answers", async (req, res) => {
   res.json({
     weekPromptId: storybook ? await weekPromptId(storybook) : null,
     answers: await promptAnswers(req.params.id, access.me),
-    asked: await openAsks(req.params.id, access.me),
+    // The week's question still loads if the asks can't be read.
+    asked: await openAsks(req.params.id, access.me).catch((error) => {
+      console.error("Couldn't read the questions passed on:", error);
+      return [];
+    }),
   });
 });
 
