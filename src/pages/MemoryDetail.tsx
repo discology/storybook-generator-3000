@@ -8,6 +8,7 @@ import { IconBook, IconBookmark, IconChevronRight, IconDots, IconDownload, IconE
 import { BottomSheet, Chev, Loading, MenuRow, Note, RadioRow, Sheet } from "../components/ui";
 import { apiGet, apiSend, ApiError } from "../lib/api";
 import { capitalize, formatDate, possessive } from "../lib/format";
+import { JUST_TALK } from "../lib/promptStages";
 import type { MemoryDetail as Detail } from "../types";
 
 const PROCESSING = ["recorded", "transcribing", "transcribed"];
@@ -95,6 +96,8 @@ export default function MemoryDetail() {
   const base = `/storybooks/${memory.storybook.id}`;
   const recordedBy = memory.mine ? "you" : memory.contributor.name;
   const words = memory.transcript?.text;
+  // The question it answered, as it was asked (VSB-133); the "Just talk" card isn't one.
+  const question = memory.promptText && memory.promptText !== JUST_TALK ? memory.promptText : null;
   const nextDay = new Date(memory.nextChapterAt).toLocaleDateString("en-US", { weekday: "long" });
 
   return (
@@ -127,6 +130,12 @@ export default function MemoryDetail() {
       )}
 
       <Sheet grow style={{ marginTop: 16 }}>
+        {question && (
+          <div className="ask-question" style={{ marginBottom: 18 }}>
+            <span className="ask-question__kicker">The question</span>
+            <p className="ask-question__q">{question}</p>
+          </div>
+        )}
         <div className="kv-row">
           <h2 className="h-title">{memory.mine ? "Your words" : `${memory.contributor.name}'s words`}</h2>
           {memory.mine && words && !editing && (
