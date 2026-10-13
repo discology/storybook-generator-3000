@@ -9,7 +9,7 @@ import { Chev, Field, Loading, Mascot, Masthead, Note, Select, Sheet, Switch, ty
 import { useStorybookData } from "../hooks/useStorybookData";
 import { apiGet, apiSend } from "../lib/api";
 import { childLabel, formatDuration, possessive } from "../lib/format";
-import { audienceFor, cardFitsChild, cardPose } from "../lib/promptStages";
+import { audienceFor, cardFitsChild, cardPose, JUST_TALK } from "../lib/promptStages";
 import { fillPrompt, promptValues } from "../lib/promptVariables";
 import type { Prompt, StorybookView } from "../types";
 
@@ -47,7 +47,7 @@ const questionSize = (q: string) => (q.length > 85 ? " prompt-card__q--longer" :
 
 const MAX_SECONDS = 15 * 60;
 const BARS = 26;
-const FREEFORM: DeckCard = { id: null, question: "What would you like to remember?", supportingText: "Tell it in your own words.", category: "Just talk", color: "purple", art: null };
+const FREEFORM: DeckCard = { id: null, question: JUST_TALK, supportingText: "Tell it in your own words.", category: "Just talk", color: "purple", art: null };
 
 const pickMimeType = () => {
   const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
@@ -158,7 +158,7 @@ export default function Recorder() {
     // A card chosen on home (?card=) comes first, then the week's card (VSB-129).
     const chosen = params.get("card");
     const rank = (c: DeckCard) => (chosen && c.id === chosen ? -1 : c.thisWeek ? 0 : c.answerOnce && c.you ? 2 : 1);
-    const list = fitting
+    return fitting
       .filter((p) => category === "All" || p.category === category)
       .map((p) => ({
         ...toCard(p, values),
@@ -168,8 +168,6 @@ export default function Recorder() {
         others: answers?.answers[p.id]?.others ?? [],
       }))
       .sort((a, b) => rank(a) - rank(b));
-    const asked = params.get("q");
-    return asked && category === "All" ? [{ ...FREEFORM, question: asked, category: "Sample prompt" }, ...list] : list;
   }, [fitting, storybook, category, params, answers]);
 
   const categories = useMemo(() => ["All", ...new Set(fitting.map((p) => p.category))], [fitting]);

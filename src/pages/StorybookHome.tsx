@@ -8,13 +8,15 @@ import { Chev, Loading, Mascot } from "../components/ui";
 import { useStorybookData } from "../hooks/useStorybookData";
 import { apiGet } from "../lib/api";
 import { waitingChapters } from "../lib/chapterStatus";
-import { audienceFor, cardFitsChild, cardPose } from "../lib/promptStages";
+import { audienceFor, cardFitsChild, cardPose, JUST_TALK } from "../lib/promptStages";
 import { fillPrompt, promptValues } from "../lib/promptVariables";
 import { capitalize, childLabel, possessive } from "../lib/format";
 import type { Prompt, StorybookView } from "../types";
 
 const PROCESSING = ["recorded", "transcribing", "transcribed"];
-const SAMPLE_PROMPT = "What is one thing you never want to forget?";
+
+// The card home asks: one from the family's deck, never a made-up sample (VSB-130).
+type HomeQuestion = { id: string; question: string; thisWeek: boolean };
 
 const weekday = (iso: string) => new Date(iso).toLocaleDateString("en-US", { weekday: "long" });
 
@@ -26,7 +28,7 @@ export default function StorybookHome() {
   const { id } = useParams();
   const { storybook, status, reload } = useStorybookData(id);
   // undefined while the deck loads; null when no card fits.
-  const [prompt, setPrompt] = useState<{ id: string; question: string; thisWeek: boolean } | null>();
+  const [prompt, setPrompt] = useState<HomeQuestion | null>();
 
   const busy =
     !!storybook &&
@@ -72,7 +74,7 @@ export default function StorybookHome() {
   const base = `/storybooks/${storybook.id}`;
   const child = childLabel(storybook.child.displayName, storybook.me?.role === "owner");
 
-  if (storybook.memories.length === 0 && storybook.chapters.length === 0) return <EmptyStorybook storybook={storybook} />;
+  if (storybook.memories.length === 0 && storybook.chapters.length === 0) return <EmptyStorybook storybook={storybook} prompt={prompt} />;
 
   const owner = storybook.me.role === "owner";
   const published = storybook.chapters.filter((c) => c.status === "published").sort((a, b) => b.sequence - a.sequence);
@@ -93,7 +95,7 @@ export default function StorybookHome() {
     : featured
       ? { to: `${base}/read/${featured.id}`, cover: featured.cover, kicker: `${possessive(child)} newest chapter`, title: featured.title, go: "Read" }
       : { to: `${base}/this-week`, cover: null, kicker: "Read together", title: "Your first chapter is on its way.", go: null };
-  const question = prompt ? prompt.question : prompt === null ? SAMPLE_PROMPT : "";
+  const question = prompt ? prompt.question : prompt === null ? JUST_TALK : "";
 
   return (
     <div className="page page--nav">
@@ -114,7 +116,7 @@ export default function StorybookHome() {
         <div className="home-hero__art">
           <Mascot name={prompt ? cardPose(prompt.id) : "hug-book"} />
         </div>
-        <Link className="btn btn--lime btn--caps" to={prompt ? `${base}/record?card=${prompt.id}` : prompt === null ? `${base}/record?q=${encodeURIComponent(SAMPLE_PROMPT)}` : `${base}/record`}>
+        <Link className="btn btn--lime btn--caps" to={prompt ? `${base}/record?card=${prompt.id}` : `${base}/record`}>
           <IconMic size={24} filled /> Record a memory
         </Link>
 
@@ -178,8 +180,11 @@ function QuestionText({ text }: { text: string }) {
   );
 }
 
-function EmptyStorybook({ storybook }: { storybook: StorybookView }) {
+// A brand-new storybook asks the same real card home would (VSB-130), so the first
+// memory is saved against it; "What would you like to remember?" if no card fits.
+function EmptyStorybook({ storybook, prompt }: { storybook: StorybookView; prompt: HomeQuestion | null | undefined }) {
   const base = `/storybooks/${storybook.id}`;
+  const record = prompt ? `${base}/record?card=${prompt.id}` : `${base}/record`;
   return (
     <div className="page page--nav">
       <TopBar wordmark menu={`${base}/settings`} />
@@ -198,17 +203,17 @@ function EmptyStorybook({ storybook }: { storybook: StorybookView }) {
         </p>
       </header>
       <div className="pad stack" style={{ marginTop: 14 }}>
-        <Link to={`${base}/record?q=${encodeURIComponent(SAMPLE_PROMPT)}`} className="sample-prompt">
+        <Link to={record} className="first-question" aria-busy={prompt === undefined}>
           <IconSparkle size={34} />
           <span className="grow">
-            <span className="badge badge--lavender badge--caps badge--sm">Sample prompt</span>
-            <span className="sample-prompt__q" style={{ display: "block" }}>
-              {SAMPLE_PROMPT}
+            <span className="badge badge--lavender badge--caps badge--sm">{prompt?.thisWeek ? "This week's question" : "A question for you"}</span>
+            <span className="first-question__q">
+              {prompt ? prompt.question : prompt === null ? JUST_TALK : ""}
             </span>
           </span>
           <Chev size={26} />
         </Link>
-        <Link className="btn btn--lime btn--caps" to={`${base}/record?q=${encodeURIComponent(SAMPLE_PROMPT)}`}>
+        <Link className="btn btn--lime btn--caps" to={record}>
           <IconMic size={24} filled /> Record your first memory <Chev />
         </Link>
         <Link className="btn btn--ghost btn--caps" to={`${base}/family`}>

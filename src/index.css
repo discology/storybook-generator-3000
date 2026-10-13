@@ -2270,8 +2270,8 @@ label.chip {
   align-self: center;
 }
 
-/* Sample prompt (empty storybook) */
-.sample-prompt {
+/* The first question (empty storybook): a real card from the family's deck */
+.first-question {
   display: flex;
   align-items: center;
   gap: 14px;
@@ -2282,12 +2282,17 @@ label.chip {
   text-decoration: none;
 }
 
-.sample-prompt__q {
+.first-question__q {
+  display: block;
   font-family: var(--font-title);
   font-weight: 700;
-  font-size: calc(27px * var(--title-scale));
-  line-height: 1.02;
+  font-size: calc(22px * var(--title-scale));
+  line-height: 1.18;
   margin-top: 8px;
+}
+
+.first-question[aria-busy="true"] .first-question__q {
+  min-height: 2.4em;
 }
 
 /* This week's chapter */
