@@ -697,19 +697,21 @@ button {
   margin-top: 12px;
 }
 
-/* Mascot peeking over the top edge of a sheet */
+/* Mascot peeking over the top edge of a sheet: the ledge Baby Vambie holds sits
+   84% of the way down vambie-peek.webp, so that line lands on the sheet's edge
+   and only the fingers hang over it */
 .sheet__peek {
   position: absolute;
   right: 14px;
   top: 0;
   width: 132px;
-  transform: translateY(-74%);
+  transform: translateY(-84%);
   pointer-events: none;
   z-index: 3;
 }
 
 .has-peek {
-  margin-top: 6px;
+  margin-top: 16px;
 }
 
 .card {
