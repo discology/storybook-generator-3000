@@ -446,6 +446,7 @@ export interface MemoryDetail {
   processingError: string | null;
   visibility: string;
   storyUseConsent: boolean;
+  promptId: string | null; // the prompt card it answered
   promptText: string | null;
   audioSrc: string | null;
   recordingKept: boolean; // false when the family keeps only the words

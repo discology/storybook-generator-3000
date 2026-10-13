@@ -85,6 +85,8 @@ model Contributor {
   role        String    @default("owner") // owner | contributor
   inviteStatus String   @default("joined") // joined | pending | revoked
   memories    Memory[]
+  asksSent    PromptAsk[] @relation("asksSent")
+  asksReceived PromptAsk[] @relation("asksReceived")
   chapterAccess ChapterAccess[]
   chapterMarks ChapterMark[]
   feedback    StoryFeedback[]
@@ -208,6 +210,7 @@ model Storybook {
   pendingCastKeys   String  @default("[]") // JSON: Vambies picked for the next weekly chapter
   memories      Memory[]
   chapters      Chapter[]
+  promptAsks    PromptAsk[]
   exportRequests ExportRequest[]
   createdAt     DateTime  @default(now())
 }
@@ -513,6 +516,25 @@ model ChapterShare {
   recipientIds   String // JSON: contributor ids
   message        String   @default("")
   createdAt      DateTime @default(now())
+}
+
+// One family member asking another to answer a card they've answered (VSB-131).
+// It stays open until the person asked records an answer to that card; asking
+// again refreshes the same row.
+model PromptAsk {
+  id          String      @id @default(cuid())
+  storybookId String
+  storybook   Storybook   @relation(fields: [storybookId], references: [id], onDelete: Cascade)
+  promptId    String // the prompt card
+  fromId      String
+  from        Contributor @relation("asksSent", fields: [fromId], references: [id], onDelete: Cascade)
+  toId        String
+  to          Contributor @relation("asksReceived", fields: [toId], references: [id], onDelete: Cascade)
+  note        String      @default("")
+  createdAt   DateTime    @default(now())
+
+  @@unique([storybookId, promptId, fromId, toId])
+  @@index([storybookId, toId])
 }
 
 // What one AI call cost and what it was for (server/aiUsage.ts). Rows hold only

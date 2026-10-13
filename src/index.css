@@ -2404,6 +2404,16 @@ label.chip {
   background: var(--cream-2) var(--night-wide) center / cover;
 }
 
+.inspired__cover--icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 56px;
+  height: 56px;
+  background: var(--wash-lilac);
+  color: var(--ink);
+}
+
 .inspired__kicker {
   color: var(--purple-ink);
   font-weight: 600;
@@ -2489,6 +2499,7 @@ label.chip {
   padding: 12px 14px;
   font-size: 16px;
   white-space: pre-wrap;
+  overflow-wrap: anywhere; /* long links wrap instead of widening the page */
   color: var(--ink);
 }
 
@@ -2505,6 +2516,28 @@ label.chip {
 
 .pick-row:first-child {
   border-top: 0;
+}
+
+.pick-row--done {
+  cursor: default;
+  opacity: 0.6;
+}
+
+/* The question being passed on ("Ask someone else", VSB-131) */
+.ask-question {
+  padding: 14px 16px 16px;
+  border: 1.5px solid var(--dark-line);
+  border-radius: 20px 18px 22px 18px / 18px 22px 18px 20px;
+  background: var(--wash-lilac);
+  color: var(--ink);
+}
+
+.ask-question__q {
+  margin: 8px 0 0;
+  font-family: var(--font-display);
+  font-weight: var(--display-weight);
+  font-size: 20px;
+  line-height: 1.22;
 }
 
 .check-input {
@@ -2677,6 +2710,14 @@ label.chip {
   width: 62%;
   max-width: 250px;
   margin: 4px 0 0;
+}
+
+.saved-screen__links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 22px;
+  margin: 14px 0 0;
 }
 
 .preparing-card {

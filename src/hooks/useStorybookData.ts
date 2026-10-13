@@ -29,7 +29,8 @@ export function useStorybookData(id: string | undefined) {
           }
         })
         .catch((err: ApiError) => {
-          if (err.status === 401) navigate(`/sign-in?next=${encodeURIComponent(location.pathname)}`);
+          // Keep the query too, so a texted link like /record?card=… survives signing in (VSB-131).
+          if (err.status === 401) navigate(`/sign-in?next=${encodeURIComponent(location.pathname + location.search)}`);
           else if (err.status === 403) setStatus("denied");
           else setStatus("notfound");
         });

@@ -8,7 +8,7 @@ import { Chev, Loading, Mascot } from "../components/ui";
 import { useStorybookData } from "../hooks/useStorybookData";
 import { apiGet } from "../lib/api";
 import { waitingChapters } from "../lib/chapterStatus";
-import { audienceFor, cardFitsChild, cardPose, JUST_TALK } from "../lib/promptStages";
+import { askedLine, audienceFor, cardFitsChild, cardPose, JUST_TALK, type AskedCard } from "../lib/promptStages";
 import { fillPrompt, promptValues } from "../lib/promptVariables";
 import { capitalize, childLabel, possessive } from "../lib/format";
 import type { Prompt, StorybookView } from "../types";
@@ -16,7 +16,9 @@ import type { Prompt, StorybookView } from "../types";
 const PROCESSING = ["recorded", "transcribing", "transcribed"];
 
 // The card home asks: one from the family's deck, never a made-up sample (VSB-130).
-type HomeQuestion = { id: string; question: string; thisWeek: boolean };
+type HomeQuestion = { id: string; question: string; thisWeek: boolean; askedBy?: string[] };
+// Above the question: who asked it (VSB-131), or that it's this week's.
+const questionLabel = (q: HomeQuestion | null | undefined) => (q?.askedBy ? askedLine(q.askedBy) : q?.thisWeek ? "this week's question" : "a question for you");
 
 const weekday = (iso: string) => new Date(iso).toLocaleDateString("en-US", { weekday: "long" });
 
@@ -43,20 +45,24 @@ export default function StorybookHome() {
     return () => clearInterval(t);
   }, [busy, reload]);
 
-  // Baby Vambie always asks something: this week's question until you've answered
-  // it, then the next card in your deck you haven't answered.
+  // Baby Vambie always asks something: a question someone in the family passed on
+  // to you (VSB-131), then this week's question until you've answered it, then the
+  // next card in your deck you haven't answered.
   useEffect(() => {
     if (!storybook) return;
     Promise.all([apiGet(`/api/storybooks/${storybook.id}/prompt-answers`), apiGet("/api/prompts?status=published")])
-      .then(([answers, prompts]: [{ weekPromptId: string | null; answers: Record<string, { you: boolean }> }, Prompt[]]) => {
+      .then(([answers, prompts]: [{ weekPromptId: string | null; answers: Record<string, { you: boolean }>; asked?: AskedCard[] }, Prompt[]]) => {
         const audience = audienceFor(storybook.me.relationship);
         const fits = prompts.filter((p) => (p.audience === "Everyone" || p.audience === audience) && cardFitsChild(p.childStage, storybook.child));
         const answered = (p: Prompt) => Boolean(answers.answers[p.id]?.you);
+        // A card someone asked you to answer shows whoever it's usually for.
+        const ask = answers.asked?.find((a) => prompts.some((p) => p.id === a.promptId));
+        const asked = ask && prompts.find((p) => p.id === ask.promptId);
         const week = fits.find((p) => p.id === answers.weekPromptId && !answered(p));
-        const next = week ?? fits.find((p) => p.answerOnce && !answered(p)) ?? fits.find((p) => !p.answerOnce) ?? null;
+        const next = asked ?? week ?? fits.find((p) => p.answerOnce && !answered(p)) ?? fits.find((p) => !p.answerOnce) ?? null;
         if (!next) return setPrompt(null);
         const values = promptValues({ child: storybook.child, me: storybook.me, parentName: storybook.family.find((f) => f.role === "owner")?.name ?? null });
-        setPrompt({ id: next.id, question: fillPrompt(next.question, values), thisWeek: next === week });
+        setPrompt({ id: next.id, question: fillPrompt(next.question, values), thisWeek: next === week, askedBy: next === asked ? ask?.from : undefined });
       })
       .catch(() => setPrompt(null));
   }, [storybook?.id]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -103,7 +109,7 @@ export default function StorybookHome() {
       <div className="pad">
         {/* Baby Vambie asks one question, one button answers it: like "Every story starts somewhere". */}
         <span className="home-hero__kicker">
-          {capitalize(possessive(child))} story · {prompt?.thisWeek ? "this week's question" : "a question for you"}
+          {capitalize(possessive(child))} story · {questionLabel(prompt)}
         </span>
         <div className="home-ask" aria-busy={prompt === undefined}>
           <h1 className="home-ask__q">
@@ -206,7 +212,7 @@ function EmptyStorybook({ storybook, prompt }: { storybook: StorybookView; promp
         <Link to={record} className="first-question" aria-busy={prompt === undefined}>
           <IconSparkle size={34} />
           <span className="grow">
-            <span className="badge badge--lavender badge--caps badge--sm">{prompt?.thisWeek ? "This week's question" : "A question for you"}</span>
+            <span className="badge badge--lavender badge--caps badge--sm">{capitalize(questionLabel(prompt))}</span>
             <span className="first-question__q">
               {prompt ? prompt.question : prompt === null ? JUST_TALK : ""}
             </span>

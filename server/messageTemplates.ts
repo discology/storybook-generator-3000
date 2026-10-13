@@ -37,6 +37,8 @@ const v = {
   reviewUrl: { name: "review_url", description: "Link to review the chapter's pages", sample: "https://vambie.app/p/ck31q" },
   exportUrl: { name: "export_url", description: "Link to the download", sample: "https://vambie.app/e/ck44z" },
   memoryUrl: { name: "memory_url", description: "Link to the memory", sample: "https://vambie.app/m/ck52a" },
+  question: { name: "question", description: "The question being passed on, worded for the person receiving it", sample: "What made you smile today?" },
+  answerUrl: { name: "answer_url", description: "Link straight to recording an answer to that question", sample: "https://vambie.app/q/ck61d" },
 } satisfies Record<string, MessageVariable>;
 
 export const MESSAGE_TYPES: MessageType[] = [
@@ -76,6 +78,13 @@ export const MESSAGE_TYPES: MessageType[] = [
     trigger: "Sent to each family member a parent chooses in \"Send a little story\"",
     variables: [v.senderName, v.childName, v.storybookTitle, v.chapterTitle, v.chapterUrl, v.note],
     defaultBody: "<sender_name> sent you a chapter of <storybook_title>: \"<chapter_title>\". <note> Read it here: <chapter_url>",
+  },
+  {
+    key: "question_asked",
+    name: "Question sent to you",
+    trigger: "Sent to each family member someone chooses in \"Ask someone else this question\", after answering it themselves",
+    variables: [v.senderName, v.childName, v.storybookTitle, v.question, v.note, v.answerUrl],
+    defaultBody: "<sender_name> answered a question for <storybook_title> and would love to hear yours: \"<question>\" <note> Answer here: <answer_url>",
   },
   {
     key: "member_joined",

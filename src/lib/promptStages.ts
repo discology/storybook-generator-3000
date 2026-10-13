@@ -11,6 +11,16 @@ export const audienceFor = (relationship: string | null) =>
 // question when the deck is empty (VSB-130).
 export const JUST_TALK = "What would you like to remember?";
 
+// A question someone in the family passed on to you (VSB-131): "Mama asked you",
+// "Mama and Papa asked you".
+export interface AskedCard {
+  promptId: string;
+  from: string[];
+  note: string;
+}
+export const askedLine = (names: string[]) =>
+  `${names.length <= 1 ? names.join("") : `${names.slice(0, -1).join(", ")} and ${names[names.length - 1]}`} asked you`;
+
 // The Baby Vambie pose a card shows when it has no artwork of its own. Fixed per
 // card, so the deck and home's question show the same picture (VSB-129).
 const CARD_ART: MascotName[] = ["star", "book", "open-book", "hug-book", "envelope-happy", "closedbook"];

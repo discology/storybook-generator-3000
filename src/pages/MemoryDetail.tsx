@@ -4,7 +4,7 @@ import TopBar from "../components/TopBar";
 import AudioPlayer from "../components/AudioPlayer";
 import AccessDenied from "../components/AccessDenied";
 import { memoryTitle } from "../components/MemoryListRow";
-import { IconBook, IconBookmark, IconChevronRight, IconDots, IconDownload, IconEdit, IconLock, IconSpinner, IconTrash } from "../components/icons";
+import { IconBook, IconBookmark, IconChevronRight, IconDots, IconDownload, IconEdit, IconLock, IconPeople, IconSpinner, IconTrash } from "../components/icons";
 import { BottomSheet, Chev, Loading, MenuRow, Note, RadioRow, Sheet } from "../components/ui";
 import { apiGet, apiSend, ApiError } from "../lib/api";
 import { capitalize, formatDate, possessive } from "../lib/format";
@@ -222,6 +222,19 @@ export default function MemoryDetail() {
         </div>
 
         <div style={{ marginTop: 16 }}>
+          {/* Your answer to a card: pass the question on (VSB-131). */}
+          {memory.mine && memory.promptId && (
+            <Link to={`${base}/ask/${memory.promptId}`} className="inspired">
+              <span className="inspired__cover inspired__cover--icon">
+                <IconPeople size={26} />
+              </span>
+              <span className="grow">
+                <span className="inspired__kicker">Pass the question on</span>
+                <span className="inspired__title" style={{ display: "block" }}>Ask someone else</span>
+              </span>
+              <IconChevronRight size={22} />
+            </Link>
+          )}
           {memory.chapters.map((c) => (
             <Link key={c.id} to={c.status === "published" ? `${base}/read/${c.id}` : `${base}/chapters/${c.id}/pages`} className="inspired">
               {c.cover ? <img src={`/${c.cover}`} alt="" className="inspired__cover" /> : <span className="inspired__cover" />}

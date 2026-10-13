@@ -12,6 +12,7 @@ import Recorder from "./pages/Recorder";
 import Reader, { ReadLatest } from "./pages/Reader";
 import StoryFeedback from "./pages/StoryFeedback";
 import Family from "./pages/Family";
+import AskQuestion from "./pages/AskQuestion";
 import ShareChapter, { ChapterAccess } from "./pages/ShareChapter";
 import ChapterPages from "./pages/ChapterPages";
 import OurCharacters from "./pages/OurCharacters";
@@ -80,6 +81,7 @@ export default function App() {
                 <Route path="/invitations/:token" element={<InvitationAccept />} />
                 <Route path="/storybooks/:id" element={<StorybookHome />} />
                 <Route path="/storybooks/:id/record" element={<Recorder />} />
+                <Route path="/storybooks/:id/ask/:promptId" element={<AskQuestion />} />
                 <Route path="/storybooks/:id/this-week" element={<ThisWeek />} />
                 <Route path="/storybooks/:id/memories" element={<Memories />} />
                 <Route path="/storybooks/:id/memories/:memoryId" element={<MemoryDetail />} />

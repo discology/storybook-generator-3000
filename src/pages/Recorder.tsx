@@ -4,12 +4,12 @@ import TopBar from "../components/TopBar";
 import BottomNav from "../components/BottomNav";
 import AudioPlayer from "../components/AudioPlayer";
 import AccessDenied from "../components/AccessDenied";
-import { IconCheck, IconChevronLeft, IconDownload, IconEdit, IconLock, IconMic, IconRefresh, IconSparkle, IconUpload, IconWarning } from "../components/icons";
+import { IconCheck, IconChevronLeft, IconDownload, IconEdit, IconLock, IconMic, IconPeople, IconRefresh, IconSparkle, IconUpload, IconWarning } from "../components/icons";
 import { Chev, Field, Loading, Mascot, Masthead, Note, Select, Sheet, Switch, type MascotName } from "../components/ui";
 import { useStorybookData } from "../hooks/useStorybookData";
 import { apiGet, apiSend } from "../lib/api";
 import { childLabel, formatDuration, possessive } from "../lib/format";
-import { audienceFor, cardFitsChild, cardPose, JUST_TALK } from "../lib/promptStages";
+import { askedLine, audienceFor, cardFitsChild, cardPose, JUST_TALK, type AskedCard } from "../lib/promptStages";
 import { fillPrompt, promptValues } from "../lib/promptVariables";
 import type { Prompt, StorybookView } from "../types";
 
@@ -26,6 +26,7 @@ interface DeckCard {
   // Question of the week and who has answered (VSB-113).
   answerOnce?: boolean;
   thisWeek?: boolean;
+  askedBy?: string[]; // family members who asked you to answer it
   you?: boolean;
   others?: string[];
 }
@@ -33,6 +34,7 @@ interface DeckCard {
 interface PromptAnswers {
   weekPromptId: string | null;
   answers: Record<string, { you: boolean; others: string[] }>;
+  asked?: AskedCard[];
 }
 
 // "You", "You and Emma", "You, Emma and Sue", "Emma, Sue and 2 others".
@@ -139,12 +141,14 @@ export default function Recorder() {
     return () => window.removeEventListener("beforeunload", warn);
   }, [unsaved]);
 
-  // The cards meant for this person and this child's stage (VSB-117).
+  // The cards meant for this person and this child's stage (VSB-117), plus any card
+  // someone in the family asked them to answer, whoever it's usually for (VSB-131).
   const fitting = useMemo(() => {
     if (!storybook) return [];
     const audience = audienceFor(storybook.me.relationship);
-    return prompts.filter((p) => (p.audience === "Everyone" || p.audience === audience) && cardFitsChild(p.childStage, storybook.child));
-  }, [prompts, storybook]);
+    const asked = new Set(answers?.asked?.map((a) => a.promptId));
+    return prompts.filter((p) => asked.has(p.id) || ((p.audience === "Everyone" || p.audience === audience) && cardFitsChild(p.childStage, storybook.child)));
+  }, [prompts, storybook, answers]);
 
   const cards = useMemo(() => {
     if (!storybook) return [];
@@ -155,15 +159,17 @@ export default function Recorder() {
     });
     // The week's card comes first; a card answered once that you've already
     // recorded moves to the back. The sort is stable, so the deck order holds otherwise.
-    // A card chosen on home (?card=) comes first, then the week's card (VSB-129).
+    // A card chosen on home or sent in a text (?card=) comes first (VSB-129), then
+    // cards someone asked you to answer (VSB-131), then the week's card.
     const chosen = params.get("card");
-    const rank = (c: DeckCard) => (chosen && c.id === chosen ? -1 : c.thisWeek ? 0 : c.answerOnce && c.you ? 2 : 1);
+    const rank = (c: DeckCard) => (chosen && c.id === chosen ? -2 : c.askedBy ? -1 : c.thisWeek ? 0 : c.answerOnce && c.you ? 2 : 1);
     return fitting
       .filter((p) => category === "All" || p.category === category)
       .map((p) => ({
         ...toCard(p, values),
         answerOnce: p.answerOnce,
         thisWeek: p.id === answers?.weekPromptId,
+        askedBy: answers?.asked?.find((a) => a.promptId === p.id)?.from,
         you: !!answers?.answers[p.id]?.you,
         others: answers?.answers[p.id]?.others ?? [],
       }))
@@ -474,17 +480,29 @@ export default function Recorder() {
             <Link className="btn btn--lime btn--caps" to={base}>
               Back to {possessive(child)} story <Chev />
             </Link>
-            <button className="btn btn--ghost btn--caps" onClick={discard}>
-              Add another memory
-            </button>
+            {/* After answering a card you can pass the question on (VSB-131). */}
+            {chosen?.id ? (
+              <Link className="btn btn--ghost btn--caps" to={`${base}/ask/${chosen.id}`}>
+                <IconPeople size={22} /> Ask someone else
+              </Link>
+            ) : (
+              <button className="btn btn--ghost btn--caps" onClick={discard}>
+                Add another memory
+              </button>
+            )}
           </div>
-          {memoryId && (
-            <p style={{ marginTop: 14 }}>
+          <p className="saved-screen__links">
+            {chosen?.id && (
+              <button className="tlink tlink--light" onClick={discard}>
+                Add another memory
+              </button>
+            )}
+            {memoryId && (
               <Link to={`${base}/memories/${memoryId}`} className="tlink tlink--light">
                 View saved memory
               </Link>
-            </p>
-          )}
+            )}
+          </p>
         </div>
       </div>
     );
@@ -671,9 +689,9 @@ export default function Recorder() {
                 aria-label={`Record: ${c.question}`}
                 style={{ border: 0, cursor: "pointer", font: "inherit" }}
               >
-                {c.thisWeek ? (
+                {c.askedBy || c.thisWeek ? (
                   <span className="prompt-card__badges">
-                    <span className="badge badge--caps badge--sm badge--lime">This week</span>
+                    <span className="badge badge--caps badge--sm badge--lime">{c.askedBy ? askedLine(c.askedBy) : "This week"}</span>
                     <span className={`badge badge--caps badge--sm ${c.color === "purple" ? "badge--pink" : "badge--purple"}`}>{c.category}</span>
                   </span>
                 ) : (
