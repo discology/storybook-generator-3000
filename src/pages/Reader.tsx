@@ -178,7 +178,6 @@ export default function Reader() {
 
   const chapterHead = (
     <header className="reader__head">
-      <audio ref={voiceRef} preload="none" onEnded={() => setPlaying(null)} />
       <span className="reader__chapter">
         {chapterLabel(chapter.sequence)}
         {chapter.beforeBirth ? " · Before you arrive" : ""}
@@ -306,6 +305,9 @@ export default function Reader() {
         if (Math.abs(dx) > 60) go(index + (dx < 0 ? 1 : -1));
       }}
     >
+      {/* One player for the whole chapter, always mounted: it lived in the chapter
+          header, which only shows on the first page, so voices on later pages never played. */}
+      <audio ref={voiceRef} preload="none" onEnded={() => setPlaying(null)} />
       <div className="reader__top">
         {ended ? (
           <Link to={base} className="tbar__icon" aria-label="Close the book">
