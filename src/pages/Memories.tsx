@@ -74,6 +74,9 @@ export default function Memories() {
   const child = childLabel(storybook.child.displayName, storybook.me?.role === "owner");
   const filtered = query || who || month || favorites;
   const waitingForYou = storybook.me?.role === "owner" ? waitingChapters(storybook.chapters, child) : [];
+  // Before the birth, a page a check held waits for the parent inside a chapter
+  // that's already in the book (VSB-134).
+  const heldInBook = storybook.me?.role === "owner" ? storybook.chapters.filter((c) => c.status === "published" && c.living && (c.heldPages ?? 0) > 0) : [];
 
   const toggleMark = async (c: StorybookChapter) => {
     const next = !(marks[c.id] ?? c.favorite);
@@ -106,9 +109,24 @@ export default function Memories() {
 
         {tab === "chapters" ? (
           <>
-            {waitingForYou.length > 0 && (
+            {(waitingForYou.length > 0 || heldInBook.length > 0) && (
               <>
                 <h2 className="section-label">Waiting for you</h2>
+            {heldInBook.map((c) => (
+              <Link key={c.id} to={`${base}/chapters/${c.id}/pages`} className="chapter-tile chapter-tile--waiting">
+                <span className="chapter-tile__cover chapter-tile__cover--art">
+                  <Mascot name="peek-worried" />
+                </span>
+                <span className="chapter-tile__text">
+                  <span className="chapter-tile__label">{c.heldPages === 1 ? "A page needs a look" : `${c.heldPages} pages need a look`}</span>
+                  <span className="chapter-tile__title" style={{ display: "block" }}>{c.title}</span>
+                  <span className="chapter-tile__date">A check held it back. Fix it or approve it to add it to the book.</span>
+                </span>
+                <span className="chapter-tile__chev">
+                  <IconChevronRight size={22} />
+                </span>
+              </Link>
+            ))}
                 {waitingForYou.map(({ chapter, step }) => {
                   const body = (
                     <>
@@ -187,7 +205,9 @@ export default function Memories() {
                       <span className="chapter-tile__text">
                         <span className="chapter-tile__label">{chapterLabel(c.sequence)}</span>
                         <span className="chapter-tile__title" style={{ display: "block" }}>{c.title}</span>
-                        <span className="chapter-tile__date">{formatDate(c.publishedAt ?? c.createdAt)}</span>
+                        <span className="chapter-tile__date">
+                          {c.growing ? `Still being written · ${c.voices ?? 0} of ${c.voicesToFinish ?? 8} voices` : formatDate(c.publishedAt ?? c.createdAt)}
+                        </span>
                       </span>
                       <span className="chapter-tile__chev">
                         <IconChevronRight size={22} />

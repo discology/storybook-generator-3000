@@ -3,19 +3,20 @@ import fs from "fs";
 import multer from "multer";
 import path from "path";
 import { prisma } from "./db";
-import { createPagedChapter, recordedBy } from "./storyPages";
+import { createPagedChapter, isLiving, recordedBy } from "./storyPages";
 import { getCurrentUser } from "./session";
 import { normalizePhone } from "./sms";
 import { appUrl, renderMessage } from "./messageTemplates";
 import { sendText } from "./texts";
 import { flagFromFeedback } from "./feedbackRoutes";
-import { UNNAMED_TITLE, childLabel, defaultTitle, hasName, isBeforeBirth, speakerOf } from "./beforeBirth";
+import { LIVING_CHAPTER_PAGES, UNNAMED_TITLE, childLabel, defaultTitle, hasName, isBeforeBirth, speakerOf } from "./beforeBirth";
 import { audioSrc, canSeeChapter, canSeeMemory, isOwner, memberForChapter, memberForMemory, parseIds, requireMember } from "./access";
 import { interpret, processMemory } from "./memoryPipeline";
 import { canStartStorybook } from "./admin";
 import { STAGE_KEYS, ageInYears, effectiveStage, stageForAge, vambieName } from "./readingStages";
 import { eligibleMemories, isGenerating, lastBatchError, makeWeeklyChapter, nextScheduledBatch, TIMEZONES } from "./weeklyChapters";
 import { usageFromRequest } from "./aiUsage";
+import { finishOpenChapter } from "./livingChapters";
 
 const UPLOAD_DIR = path.join(process.cwd(), "uploads", "memories");
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -159,7 +160,7 @@ router.get("/storybooks/:id", async (req, res) => {
           marks: { where: { contributorId: me.id } },
           pages: {
             orderBy: { pageNumber: "asc" },
-            select: { approvedAt: true, assets: { where: { status: "ready" }, orderBy: { version: "desc" }, take: 1, select: { imagePath: true } } },
+            select: { approvedAt: true, sourceMemoryId: true, assets: { where: { status: "ready" }, orderBy: { version: "desc" }, take: 1, select: { imagePath: true } } },
           },
         },
         orderBy: { sequence: "asc" },
@@ -186,6 +187,12 @@ router.get("/storybooks/:id", async (req, res) => {
     .map(({ pages, marks, access, generationSnapshot, characterSheet, content, ...c }) => ({
       ...c,
       beforeBirth: isBeforeBirth(generationSnapshot),
+      // Grown a page per message before the birth (VSB-134): how many voices so
+      // far, and pages a check held for the parent.
+      living: isLiving(generationSnapshot),
+      voices: isLiving(generationSnapshot) ? pages.filter((p) => p.sourceMemoryId).length : 0,
+      heldPages: isLiving(generationSnapshot) ? pages.filter((p) => !p.approvedAt).length : 0,
+      voicesToFinish: LIVING_CHAPTER_PAGES,
       pageCount: pages.length,
       approvedPages: pages.filter((p) => p.approvedAt).length,
       cover: pages.find((p) => p.assets[0])?.assets[0]?.imagePath ?? null,
@@ -384,6 +391,8 @@ router.get("/memories/:id", async (req, res) => {
       .map((c) => ({ id: c.id, title: c.title, sequence: c.sequence, status: c.status, cover: c.pages[0]?.assets[0]?.imagePath ?? null })),
     storybook: { id: member.storybook.id, title: member.storybook.title, childName: childLabel(member.storybook.child.displayName, isOwner(member.me)) },
     nextChapterAt: nextScheduledBatch(member.storybook),
+    // Before the birth, a message becomes its page right away instead (VSB-134).
+    pageRightAway: member.storybook.child.stage === "expecting",
     canDelete: memory.contributorId === member.me.id || isOwner(member.me),
   });
 });
@@ -453,6 +462,9 @@ router.get("/chapters/:id/read", async (req, res) => {
   });
   const readable = chapter.storybook.chapters.filter((c) => canSeeChapter(c, member.me)).sort((a, b) => a.sequence - b.sequence);
   const beforeBirth = isBeforeBirth(chapter.generationSnapshot);
+  // A chapter grown a page per message shows only the pages that are published (VSB-134).
+  const living = isLiving(chapter.generationSnapshot);
+  if (living) chapter.pages = chapter.pages.filter((p) => p.approvedAt);
   const sources = beforeBirth
     ? await prisma.memory.findMany({ where: { id: { in: chapter.pages.map((p) => p.sourceMemoryId).filter((x): x is string => Boolean(x)) } }, include: { contributor: true } })
     : [];
@@ -465,6 +477,9 @@ router.get("/chapters/:id/read", async (req, res) => {
     content: chapter.content,
     publishedAt: chapter.publishedAt,
     beforeBirth,
+    growing: chapter.growing,
+    voices: living ? chapter.pages.filter((p) => p.sourceMemoryId).length : 0,
+    voicesToFinish: LIVING_CHAPTER_PAGES,
     // The question for the grown-ups, shown after the last page (VSB-126).
     reflection: beforeBirth ? null : chapter.reflection,
     pages: chapter.pages.map((p) => {
@@ -679,6 +694,8 @@ router.put("/storybooks/:id/settings", async (req, res) => {
       data: { ...(name ? { displayName: name } : {}), ...(birthDate ? { birthDate: new Date(birthDate) } : {}), ...(arrived ? { stage: "born" } : {}) },
     });
   }
+  // The chapter still being written finishes on the birthday (VSB-134).
+  if (arrived) void finishOpenChapter(storybook.id).catch((e) => console.error("Finishing the open chapter:", e?.message));
   res.json(storybook);
 });
 

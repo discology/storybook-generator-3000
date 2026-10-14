@@ -18,6 +18,7 @@ import { approvedVariants } from "./familyCharacters";
 import { familyPageFlag } from "./feedbackRoutes";
 import { PARENT_REASONS } from "./flagCategories";
 import { DEFAULT_RULES, EMBELLISHMENT_LEVELS, IMAGE_MODELS, getActiveRules, saveRules, validateRules } from "./pageRules";
+import { afterParentApproved } from "./livingChapters";
 
 const router: Router = express.Router();
 
@@ -192,6 +193,8 @@ router.put("/pages/:pageId/approve", async (req, res) => {
   if (!page) return;
   try {
     await approvePages(page.chapterId, [page.id]);
+    // A page held in a growing chapter goes live once the parent approves it (VSB-134).
+    if (!page.approvedAt) void afterParentApproved(page.chapterId, [page.id]).catch((e) => console.error("Approved page:", e?.message));
     res.json(await chapterWithPages(page.chapterId));
   } catch (error: any) {
     res.status(400).json({ error: error.message });
@@ -201,7 +204,9 @@ router.put("/pages/:pageId/approve", async (req, res) => {
 router.put("/chapters/:id/pages/approve", async (req, res) => {
   if (!(await requireChapterAccess(req, res, req.params.id))) return;
   try {
+    const waiting = await prisma.storyPage.findMany({ where: { chapterId: req.params.id, approvedAt: null }, select: { id: true } });
     await approvePages(req.params.id);
+    if (waiting.length) void afterParentApproved(req.params.id, waiting.map((p) => p.id)).catch((e) => console.error("Approved pages:", e?.message));
     res.json(await chapterWithPages(req.params.id));
   } catch (error: any) {
     res.status(400).json({ error: error.message });

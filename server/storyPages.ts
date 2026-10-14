@@ -2,11 +2,12 @@ import fs from "fs";
 import path from "path";
 import { toFile } from "openai";
 import { prisma } from "./db";
+import type { Prisma } from "../src/generated/prisma/client";
 import { runAiStep, isAiConfigured, guardianReview } from "./aiService";
 import { REFLECTION_KEY, getAiInstruction } from "./aiInstructions";
 import { CastMember, buildCast, characterCardValues, currentCast, describeCast, moodArt, renderReferences } from "./characters";
 import { appUrl, fillTemplate, renderMessage } from "./messageTemplates";
-import { BEFORE_BIRTH_CLOSING_KEY, BEFORE_BIRTH_KEY, BEFORE_BIRTH_PROFILE, DEFAULT_BEFORE_BIRTH, DEFAULT_CLOSING_LINE, NO_NAME_NOTE, OWN_WORDS_MIN, arrivalNote, checkNote, childLabel, echoesEarlierOpening, hasName, isBeforeBirth, ownWords, speakerOf, withBeforeBirth, withClosingPage } from "./beforeBirth";
+import { BEFORE_BIRTH_CLOSING_KEY, BEFORE_BIRTH_KEY, BEFORE_BIRTH_PROFILE, DEFAULT_BEFORE_BIRTH, DEFAULT_CLOSING_LINE, NO_NAME_NOTE, ONE_PAGE_NOTE, OWN_WORDS_MIN, arrivalNote, checkNote, childLabel, echoesEarlierOpening, hasName, isBeforeBirth, ownWords, speakerOf, withBeforeBirth, withClosingPage } from "./beforeBirth";
 import { sendText, storybookOwner } from "./texts";
 import {
   AppearanceWithDesign,
@@ -23,7 +24,7 @@ import { getOpenAI } from "./openaiClient";
 import { MAX_REFERENCE_IMAGES, withImageRateLimit } from "./imageQueue";
 import { linkUsage, recordImage } from "./aiUsage";
 import { effectiveStage, vambieName } from "./readingStages";
-import { checkShot, describeShotRules, isCloseUpShot, primaryShotKey, shotFramingFor, withShotRules } from "./shotRules";
+import { checkShot, describeShotRules, isCloseUpShot, primaryShotKey, shotFramingFor, shotTypeLabel, withShotRules } from "./shotRules";
 import {
   EMBELLISHMENT_LEVELS,
   PageRules,
@@ -79,6 +80,8 @@ interface GenerationSnapshot {
   beforeBirth?: boolean;
   // The first chapter after the birth, which opens with Baby Vambie's arrival (VSB-120).
   arrival?: boolean;
+  // Grown a page at a time, one per message, before the birth (VSB-134).
+  living?: boolean;
 }
 
 // What <before_birth> holds for a chapter: the Before you arrive text, the
@@ -413,6 +416,30 @@ function placePeople(pages: PlannedPage[], family: FamilyCastEntry[], rawUnresol
   return { unresolved: unresolved.filter((u) => u.appearances.length > 0), appearances };
 }
 
+// People the planner couldn't place are drawn from the memory's description
+// instead of asking Who's who: for a visitor, who has no family characters yet,
+// and for a page made the moment a message arrives (VSB-134). They join the
+// chapter's extras, so one look holds on every page.
+function drawUnplacedPeople(plan: { characters: CharacterSheetEntry[]; pages: PlannedPage[] }, unresolved: UnresolvedPerson[]) {
+    const names = new Map(unresolved.map((u) => [u.ref.toLowerCase(), u.suggestedName || u.mention]));
+    const named = (text: string) => text.replace(/\bU\d+\b/g, (ref) => names.get(ref.toLowerCase()) ?? ref);
+    for (const p of plan.pages) {
+      p.characters = [...new Set(p.characters.map((t) => names.get(t.toLowerCase()) ?? t))];
+      p.storyMoment = named(p.storyMoment);
+      p.setting = named(p.setting);
+      p.visibleAction = named(p.visibleAction);
+      p.emotionalTone = named(p.emotionalTone);
+      p.continuity = named(p.continuity);
+      if (p.shot) p.shot = { ...p.shot, angle: named(p.shot.angle), focus: named(p.shot.focus) };
+    }
+    for (const u of unresolved) {
+      const name = u.suggestedName || u.mention;
+      if (plan.characters.some((c) => c.name.toLowerCase() === name.toLowerCase())) continue;
+      const outfit = u.appearances.find((a) => a.outfit)?.outfit;
+      plan.characters.push({ name, appearance: [u.suggestedRelationship || "family member", outfit && `wearing ${outfit}`].filter(Boolean).join(", ") });
+    }
+}
+
 export interface CreateChapterInput {
   storybookId: string;
   memories: SourceMemory[];
@@ -440,34 +467,52 @@ export async function createPagedChapter(input: CreateChapterInput) {
   if (previousSnapshot) {
     snapshot = previousSnapshot;
   } else {
-    const active = await getActiveRules();
-    const instructions: Record<string, string> = {};
-    for (const key of ["page_plan", "page_check", "page_revise", "illustration_check", "world", BEFORE_BIRTH_KEY, BEFORE_BIRTH_CLOSING_KEY, REFLECTION_KEY]) {
-      instructions[key] = (await getAiInstruction(key)).body;
-    }
-    const stage = effectiveStage(storybook);
-    const beforeBirth = storybook.child.stage === "expecting";
-    const cast = await buildCast(input.castKeys ?? []);
-    snapshot = {
-      ruleSetVersion: active.version,
-      rules: active.rules,
-      readerAgeBand: stage,
-      // Before the birth, pages follow their own limits: the person's words, not a stage's.
-      readingProfile: beforeBirth ? BEFORE_BIRTH_PROFILE : profileFor(active.rules, stage),
-      vambieName: vambieName(storybook),
-      instructions,
-      // No Baby Vambie before the birth, and no optional Vambies; one a parent picked stays.
-      cast: beforeBirth ? cast.filter((m) => m.key !== "baby_vambie" && m.required) : cast,
-      characterCards: await characterCardValues(),
-      family: await buildFamilyCast(storybook.child.householdId),
-      ...(beforeBirth ? { beforeBirth: true } : {}),
-      // The first chapter after the birth, when every chapter so far was made before it.
-      ...(!beforeBirth && storybook.chapters.some((c) => c.id !== existing?.id && isBeforeBirth(c.generationSnapshot)) &&
-      !storybook.chapters.some((c) => c.id !== existing?.id && !isBeforeBirth(c.generationSnapshot))
-        ? { arrival: true }
-        : {}),
-    };
+    snapshot = await newSnapshot(storybook, input.castKeys ?? [], existing?.id);
   }
+  return planChapter(input, storybook, existing ?? null, priorChapters, snapshot);
+}
+
+type ChapterStorybook = Prisma.StorybookGetPayload<{ include: { child: true; chapters: true } }>;
+
+// The rules a new chapter is made with, saved on it so a later change to the
+// rules never changes it.
+async function newSnapshot(storybook: ChapterStorybook, castKeys: string[], existingId?: string): Promise<GenerationSnapshot> {
+  const active = await getActiveRules();
+  const instructions: Record<string, string> = {};
+  for (const key of ["page_plan", "page_check", "page_revise", "illustration_check", "world", BEFORE_BIRTH_KEY, BEFORE_BIRTH_CLOSING_KEY, REFLECTION_KEY]) {
+    instructions[key] = (await getAiInstruction(key)).body;
+  }
+  const stage = effectiveStage(storybook);
+  const beforeBirth = storybook.child.stage === "expecting";
+  const cast = await buildCast(castKeys);
+  return {
+    ruleSetVersion: active.version,
+    rules: active.rules,
+    readerAgeBand: stage,
+    // Before the birth, pages follow their own limits: the person's words, not a stage's.
+    readingProfile: beforeBirth ? BEFORE_BIRTH_PROFILE : profileFor(active.rules, stage),
+    vambieName: vambieName(storybook),
+    instructions,
+    // No Baby Vambie before the birth, and no optional Vambies; one a parent picked stays.
+    cast: beforeBirth ? cast.filter((m) => m.key !== "baby_vambie" && m.required) : cast,
+    characterCards: await characterCardValues(),
+    family: await buildFamilyCast(storybook.child.householdId),
+    ...(beforeBirth ? { beforeBirth: true } : {}),
+    // The first chapter after the birth, when every chapter so far was made before it.
+    ...(!beforeBirth && storybook.chapters.some((c) => c.id !== existingId && isBeforeBirth(c.generationSnapshot)) &&
+    !storybook.chapters.some((c) => c.id !== existingId && !isBeforeBirth(c.generationSnapshot))
+      ? { arrival: true }
+      : {}),
+  };
+}
+
+async function planChapter(
+  input: CreateChapterInput,
+  storybook: ChapterStorybook,
+  existing: ChapterStorybook["chapters"][number] | null,
+  priorChapters: ChapterStorybook["chapters"],
+  snapshot: GenerationSnapshot
+) {
   const profile = snapshot.readingProfile;
 
   let plan: { title: string; characters: CharacterSheetEntry[]; pages: PlannedPage[]; unresolved: any[] };
@@ -525,27 +570,7 @@ export async function createPagedChapter(input: CreateChapterInput) {
   }
   let { unresolved, appearances } = placePeople(plan.pages, family, plan.unresolved);
   if (input.noQuestions && unresolved.length) {
-    // A visitor has no family characters to ask about yet: people the planner
-    // couldn't place are drawn from the memory's description instead.
-    const names = new Map(unresolved.map((u) => [u.ref.toLowerCase(), u.suggestedName || u.mention]));
-    const named = (text: string) => text.replace(/\bU\d+\b/g, (ref) => names.get(ref.toLowerCase()) ?? ref);
-    for (const p of plan.pages) {
-      p.characters = [...new Set(p.characters.map((t) => names.get(t.toLowerCase()) ?? t))];
-      p.storyMoment = named(p.storyMoment);
-      p.setting = named(p.setting);
-      p.visibleAction = named(p.visibleAction);
-      p.emotionalTone = named(p.emotionalTone);
-      p.continuity = named(p.continuity);
-      if (p.shot) p.shot = { ...p.shot, angle: named(p.shot.angle), focus: named(p.shot.focus) };
-    }
-    // They join the chapter's extras, so the character sheet fixes one look for
-    // every page.
-    for (const u of unresolved) {
-      const name = u.suggestedName || u.mention;
-      if (plan.characters.some((c) => c.name.toLowerCase() === name.toLowerCase())) continue;
-      const outfit = u.appearances.find((a) => a.outfit)?.outfit;
-      plan.characters.push({ name, appearance: [u.suggestedRelationship || "family member", outfit && `wearing ${outfit}`].filter(Boolean).join(", ") });
-    }
+    drawUnplacedPeople(plan, unresolved);
     unresolved = [];
   }
 
@@ -602,6 +627,210 @@ export async function createPagedChapter(input: CreateChapterInput) {
   await runGuardian(chapterId);
   if (!unresolved.length && input.illustrate !== false) void illustrateChapter(chapterId);
   return prisma.chapter.findUniqueOrThrow({ where: { id: chapterId }, include: { sources: true, findings: true } });
+}
+
+// --- Before the birth: a page as soon as a message arrives (VSB-134) ---
+// A pre-birth chapter grows a page at a time, one page per message, one per
+// person. livingChapters.ts decides which chapter a message joins and when one
+// finishes; these write, draw, publish and close.
+
+const isBabyVambieToken = (t: string) => /^baby[\s_-]*vambie$/i.test(t.trim());
+
+// Saved on the chapter's rules, so the reader and lists can tell.
+export const isLiving = (snapshot: string | null | undefined) => Boolean(snapshot && snapshot.includes('"living":true'));
+
+// Who already has a page in a chapter, by the family member who recorded it.
+export async function messageVoices(chapterId: string): Promise<string[]> {
+  const sources = await prisma.chapterSource.findMany({ where: { chapterId }, include: { memory: { select: { contributorId: true } } } });
+  return [...new Set(sources.map((s) => s.memory.contributorId))];
+}
+
+// Starts the family's next growing chapter, with the rules of the day saved on it.
+export async function openLivingChapter(storybookId: string) {
+  const storybook = await prisma.storybook.findUniqueOrThrow({ where: { id: storybookId }, include: { child: true, chapters: { orderBy: { sequence: "asc" } } } });
+  const snapshot: GenerationSnapshot = { ...(await newSnapshot(storybook, [])), living: true };
+  const sequence = storybook.chapters.length + 1;
+  return prisma.chapter.create({
+    data: {
+      storybookId,
+      sequence,
+      title: `Chapter ${sequence}`,
+      content: "",
+      status: "guardian_review",
+      growing: true,
+      ruleSetVersion: snapshot.ruleSetVersion,
+      generationSnapshot: JSON.stringify(snapshot),
+      characterSheet: "[]",
+      unresolvedPeople: "[]",
+      pagesStatus: "illustrating",
+    },
+  });
+}
+
+// Writes one message's page at the end of a growing chapter, checks its words,
+// draws it, and publishes it when the checks pass. Nobody is asked Who's who:
+// someone the planner can't place is drawn from the message instead.
+export async function writeMessagePage(chapterId: string, memory: SourceMemory) {
+  const chapter = await prisma.chapter.findUniqueOrThrow({
+    where: { id: chapterId },
+    include: { pages: { orderBy: { pageNumber: "asc" } }, storybook: { include: { child: true, chapters: true } } },
+  });
+  const snapshot = JSON.parse(chapter.generationSnapshot ?? "null") as GenerationSnapshot | null;
+  if (!snapshot?.living) throw new Error("This chapter doesn't grow a page at a time.");
+  const childName = chapter.storybook.child.displayName;
+  const cast = snapshot.cast ?? [];
+  const family = snapshot.family ?? [];
+
+  let page: PlannedPage | undefined;
+  let title = "";
+  let extras: CharacterSheetEntry[] = [];
+  let rawUnresolved: any[] = [];
+  if (!isAiConfigured()) {
+    page = normalizePage({ text: `${memory.recordedBy} says: ${memory.transcript.slice(0, 160)}`, pictureSize: "framed", visibleAction: "(Placeholder) The family member speaks to the baby.", sourceMemory: 1 });
+  } else {
+    const soFar = chapter.pages.map((p) => `Page ${p.pageNumber} (${parseShot(p.shot)?.type ?? "no shot"}): ${p.text}`).join("\n");
+    const { output } = await runAiStep(
+      "page_plan",
+      namedValues(snapshot, {
+        child_name: childLabel(childName),
+        reading_level: describeProfile(snapshot.readingProfile),
+        embellishment_rules: embellishmentRule(snapshot.rules),
+        memories: formatMemories([memory]),
+        previous_chapters: chapter.storybook.chapters.filter((c) => c.status === "published" && c.id !== chapterId).map((c) => c.title).join(", ") || "(none yet — this is the first chapter)",
+        revision_request: "",
+        shot_rules: describeShotRules(snapshot.rules),
+        before_birth: [beforeBirthValue(snapshot, childName), ONE_PAGE_NOTE, soFar ? `The chapter's pages so far, with their shot types (use a different shot type from the last page's):\n${soFar}` : ""].filter(Boolean).join("\n\n"),
+        ...snapshotCharacterValues(snapshot),
+      }),
+      { body: withShotRules(withBeforeBirth(named(snapshot, snapshot.instructions.page_plan))) },
+      [],
+      { chapterId, householdId: chapter.storybook.child.householdId }
+    );
+    const pages: PlannedPage[] = Array.isArray(output?.pages) ? output.pages.map(normalizePage).filter((p: PlannedPage) => p.text) : [];
+    page = pages.find((p) => speakerOf(p.text)) ?? pages[0];
+    title = str(output?.title);
+    extras = Array.isArray(output?.characters) ? output.characters.map((c: any) => ({ name: str(c?.name), appearance: str(c?.appearance) })).filter((c: CharacterSheetEntry) => c.name) : [];
+    rawUnresolved = Array.isArray(output?.unresolved) ? output.unresolved : [];
+  }
+  if (!page) throw new Error("The AI returned no page for this message.");
+
+  // One message, one page, always with a picture, and no Baby Vambie yet (VSB-119).
+  page.sourceMemory = 1;
+  page.characters = toPageTokens(page.characters, cast, family).filter((t) => !isBabyVambieToken(t));
+  if (page.pictureSize === "none" || page.pictureSize === "wordless") page.pictureSize = "framed";
+  // Back-to-back pages with the same shot type read as the same picture twice:
+  // a repeat of the last page's shot is changed before drawing.
+  const lastShot = parseShot(chapter.pages[chapter.pages.length - 1]?.shot ?? null);
+  const lastKey = lastShot ? primaryShotKey(lastShot.type) ?? lastShot.type.toLowerCase() : null;
+  if (page.shot && lastKey && (primaryShotKey(page.shot.type) ?? page.shot.type.toLowerCase()) === lastKey) {
+    const other = MESSAGE_SHOTS.find((k) => k !== lastKey) ?? "medium";
+    page.shot = { ...page.shot, type: shotTypeLabel(other, snapshot.rules) };
+  }
+  const plan = { characters: extras.filter((c) => !findCastMember(cast, c.name) && !findFamily(family, c.name) && !isBabyVambieToken(c.name)), pages: [page] };
+  const placed = placePeople(plan.pages, family, rawUnresolved);
+  if (placed.unresolved.length) drawUnplacedPeople(plan, placed.unresolved);
+
+  const sheet = JSON.parse(chapter.characterSheet ?? "[]") as CharacterSheetEntry[];
+  for (const c of plan.characters) if (!sheet.some((s) => s.name.toLowerCase() === c.name.toLowerCase())) sheet.push(c);
+  const pageNumber = chapter.pages.length + 1;
+  const saved = await prisma.storyPage.create({ data: { chapterId, pageNumber, ...pageData(page, [memory]) } });
+  await prisma.pageAppearance.createMany({
+    data: placed.appearances.map((a) => ({ pageId: saved.id, familyCharacterId: a.characterId, designId: a.designId, outfit: a.outfit })),
+  });
+  await prisma.chapterSource.create({ data: { chapterId, memoryId: memory.id } });
+  await prisma.memory.update({ where: { id: memory.id }, data: { status: "ready" } });
+  await prisma.chapter.update({
+    where: { id: chapterId },
+    data: {
+      characterSheet: JSON.stringify(sheet),
+      content: [...chapter.pages.map((p) => p.text), saved.text].join("\n\n"),
+      pagesStatus: "illustrating",
+      // The chapter is named with a phrase from its first message.
+      ...(pageNumber === 1 && title ? { title } : {}),
+    },
+  });
+
+  await enforceShots(chapterId, [pageNumber]);
+  await checkPages(chapterId, [pageNumber]);
+  await drawWithOneRetry(saved.id);
+  await updatePagesStatus(chapterId);
+  const published = await publishIfClean(saved.id);
+  return { pageId: saved.id, pageNumber, published };
+}
+
+// Where the closing page of a growing chapter is drawn.
+const CLOSING_SETTING = "A quiet corner of the family's home, ready for the baby: soft window light, a folded blanket on an empty chair, a small plant.";
+
+// Shot types that suit one person speaking, tried in order when a page would
+// repeat the last page's shot.
+const MESSAGE_SHOTS = ["medium", "close_up", "wide", "over_shoulder"];
+
+// Draws a page. A picture the check flags gets one more try (unless the drawing
+// already redrew a family member who didn't match) before the page waits for
+// the parent.
+async function drawWithOneRetry(pageId: string) {
+  await generateIllustration(pageId);
+  const latest = await prisma.pageAsset.findFirst({ where: { pageId }, orderBy: { version: "desc" } });
+  if (latest?.status === "ready" && latest.checkStatus === "flagged" && latest.version === 1) await generateIllustration(pageId);
+}
+
+// A message's page goes live when its checks pass: no notes on its words, and a
+// finished picture the picture check didn't flag. Otherwise it waits for the
+// parent, and the chapter carries on around it.
+export async function publishIfClean(pageId: string) {
+  const page = await prisma.storyPage.findUniqueOrThrow({ where: { id: pageId }, include: { assets: { orderBy: { version: "desc" }, take: 1 } } });
+  const notes = JSON.parse(page.checkNotes ?? "[]") as string[];
+  const asset = page.assets[0];
+  const clean = notes.length === 0 && (!hasPicture(page) || (asset?.status === "ready" && asset.checkStatus !== "flagged"));
+  if (!clean) return false;
+  await prisma.storyPage.update({ where: { id: pageId }, data: { approvedAt: new Date() } });
+  await publishLivingChapter(page.chapterId);
+  return true;
+}
+
+// A growing chapter joins the book with its first published page.
+export async function publishLivingChapter(chapterId: string) {
+  const chapter = await prisma.chapter.findUniqueOrThrow({ where: { id: chapterId } });
+  if (chapter.status === "published" || !isLiving(chapter.generationSnapshot)) return false;
+  await prisma.chapter.update({ where: { id: chapterId }, data: { status: "published", publishedAt: new Date() } });
+  return true;
+}
+
+// Finishes a growing chapter: the family's closing line ends it (VSB-125), drawn
+// as a quiet vignette, and the Guardian reads the whole chapter. Returns false
+// if it had already finished.
+export async function closeLivingChapter(chapterId: string) {
+  const claimed = await prisma.chapter.updateMany({ where: { id: chapterId, growing: true }, data: { growing: false } });
+  if (claimed.count === 0) return false;
+  const chapter = await prisma.chapter.findUniqueOrThrow({ where: { id: chapterId }, include: { pages: { orderBy: { pageNumber: "asc" } }, storybook: { include: { child: true } } } });
+  const snapshot = JSON.parse(chapter.generationSnapshot ?? "null") as GenerationSnapshot | null;
+  const line = snapshot ? closingLine(snapshot, chapter.storybook.child.displayName) : "";
+  const last = chapter.pages[chapter.pages.length - 1];
+  if (line && last) {
+    const closing = await prisma.storyPage.create({
+      data: {
+        chapterId,
+        pageNumber: last.pageNumber + 1,
+        storyMoment: "The family's closing line.",
+        characters: "[]",
+        // Its own quiet place, not the last page's: objects from a message (a doll,
+        // a toy) get drawn as a figure.
+        setting: CLOSING_SETTING,
+        visibleAction: "The place is quiet and ready, waiting. No one is in the picture: no people, no Vambies, no dolls or toys.",
+        emotionalTone: "quiet, hopeful",
+        continuity: "",
+        pictureSize: "vignette",
+        text: line,
+        interpretationNote: "",
+      },
+    });
+    await prisma.chapter.update({ where: { id: chapterId }, data: { content: [...chapter.pages.map((p) => p.text), line].join("\n\n") } });
+    await drawWithOneRetry(closing.id);
+    await updatePagesStatus(chapterId);
+    await publishIfClean(closing.id);
+  }
+  if (isAiConfigured() && !chapter.isMock) await runGuardian(chapterId);
+  return true;
 }
 
 // The question for the grown-ups after the last page (VSB-126): one general
@@ -825,7 +1054,8 @@ export async function checkPages(chapterId: string, pageNumbers?: number[]) {
   }
 
   const count = chapter.pages.length;
-  if (count < profile.pagesMin || count > profile.pagesMax) {
+  // A chapter that grows a page at a time is short on purpose until it finishes (VSB-134).
+  if (!snapshot.living && (count < profile.pagesMin || count > profile.pagesMax)) {
     notes.get(1)?.push(`The chapter has ${count} pages; this reading level calls for ${profile.pagesMin}-${profile.pagesMax}.`);
   }
 

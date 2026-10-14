@@ -4690,6 +4690,30 @@ button.btn-small,
   margin-top: 4px;
 }
 
+/* A chapter still being written before the birth (VSB-134): how many voices so
+   far, and when it finishes. */
+.ending__growing {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.ending__count {
+  font-family: var(--font-book);
+  font-size: 22px;
+  color: var(--paper-ink);
+  margin: 2px 0 0;
+}
+
+.ending__note {
+  max-width: 34ch;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--paper-soft);
+  margin: 0;
+}
+
 /* For the grown-ups: the chapter's question on its own page after the end
    (VSB-126, VSB-128). Nothing to fill in. */
 .grown-ups {

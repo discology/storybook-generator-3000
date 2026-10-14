@@ -57,7 +57,8 @@ docs/                 these guides
 | `weeklyChapters.ts` | The weekly chapter schedule |
 | `readingStages.ts` | The five reading stages and Baby Vambie's name by age |
 | `pageRules.ts` | Versioned page rules: reading profiles, art direction, the Shot list, image model and quality |
-| `beforeBirth.ts` | Chapters made while expecting: the Before you arrive wording, the pre-birth page limits, at most two messages per person, the arrival note for the first chapter after the birth, and the speaker's name for the reader's voice button |
+| `beforeBirth.ts` | Chapters made while expecting: the Before you arrive wording, the pre-birth page limits, the page count that finishes a growing chapter, the arrival note for the first chapter after the birth, and the speaker's name for the reader's voice button |
+| `livingChapters.ts` | Before the birth, a page as soon as a message arrives (VSB-134): which growing chapter a message joins, one page per person, finishing a chapter (eight pages, a second message from someone in it, or the birthday), retries, and the "Your page is in the book" and new-chapter texts. `storyPages.ts` writes, draws, publishes and closes the pages |
 | `childName.ts` | What to call the child before a name is given ("your baby" to a parent, "the baby" to others, "Baby on the way" in admin lists) and the default book title. Shared with the web app through `src/lib/format.ts` |
 | `shotRules.ts` | The Shot list: allowed shot types with their framing lines, shots that don't work, matching a planned shot, and grouping flagged shots for review |
 | `characters.ts`, `familyCharacters.ts` | Character cards, casting, reference art and render choice, design proposals |
@@ -89,7 +90,8 @@ Background jobs run inside the API process. There's no separate worker yet.
 | When | What runs |
 | --- | --- |
 | A recording is uploaded | The memory pipeline: transcribe, title and interpret. The audio is deleted afterwards if the family doesn't keep recordings. |
-| Every 5 minutes | The weekly chapter check: any storybook whose scheduled time has passed gets its chapter. This runs on the hosted app, and on a development copy only with `WEEKLY_CHAPTERS=on`. |
+| Every 5 minutes | The weekly chapter check: any storybook whose scheduled time has passed gets its chapter. Expecting families have no weekly chapter; the check only places any of their messages still waiting, retrying a failed one at most three times, an hour apart. This runs on the hosted app, and on a development copy only with `WEEKLY_CHAPTERS=on`. |
+| A message is ready (expecting families) | It becomes its page in the growing chapter, one message at a time per family: written, checked, drawn, then published if its checks pass (`livingChapters.ts`, VSB-134). |
 | A slow action is requested | Rewriting a chapter, drawing a design, revising a page and similar actions answer right away with a job id and finish in the background. The browser asks `/api/jobs/:id` until the result is ready (`server/jobs.ts`, `src/lib/api.ts`). |
 | A chapter is planned (or Who's who is answered) | Illustration: the character sheet, then three pages at a time, paced to the image limit. |
 | An export is requested | The zip is built, and the download expires after 7 days. |

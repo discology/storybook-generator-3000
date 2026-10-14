@@ -80,6 +80,7 @@ export interface Chapter {
   characterSheet?: string | null;
   // The question for the grown-ups after the last page (VSB-126).
   reflection?: string | null;
+  growing?: boolean; // before the birth, still taking a page per message (VSB-134)
   createdAt: string;
 }
 
@@ -371,6 +372,12 @@ export interface StorybookChapter {
   excerpt: string;
   isMock: boolean;
   beforeBirth?: boolean; // made while the family was expecting (VSB-120)
+  // Grown a page per message before the birth (VSB-134).
+  living?: boolean;
+  growing?: boolean; // still taking pages
+  voices?: number; // message pages so far
+  voicesToFinish?: number; // pages that finish the chapter
+  heldPages?: number; // pages a check held for the parent
 }
 
 export interface FamilyMember {
@@ -459,6 +466,7 @@ export interface MemoryDetail {
   chapters: { id: string; title: string; sequence: number; status: string; cover: string | null }[];
   storybook: { id: string; title: string; childName: string };
   nextChapterAt: string;
+  pageRightAway?: boolean; // before the birth, a message becomes its page right away (VSB-134)
   canDelete: boolean;
 }
 
@@ -480,6 +488,10 @@ export interface ReaderChapter {
     voice?: { src: string | null; name: string; durationSec: number | null } | null;
   }[];
   beforeBirth?: boolean;
+  // Still taking a page per message, and how many it has (VSB-134).
+  growing?: boolean;
+  voices?: number;
+  voicesToFinish?: number;
   // The question for the grown-ups after the last page (VSB-126).
   reflection?: string | null;
   mark: { favorite: boolean; lastPage: number; readAt: string | null; finishedAt: string | null } | null;

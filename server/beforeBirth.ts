@@ -37,6 +37,15 @@ export function withClosingPage<P extends { text: string; pictureSize: string; c
   return [...pages, { ...opening, text: closing, pictureSize: "vignette", sourceQuote: "" }];
 }
 
+// Before the birth, each message becomes a page as soon as it arrives (VSB-134):
+// a chapter grows to eight pages, one per person, and finishes early when
+// someone already in it records again, or on the birthday.
+export const LIVING_CHAPTER_PAGES = 8;
+
+// Added to <before_birth> when the planner writes one message's page.
+export const ONE_PAGE_NOTE =
+  "This time, write only the page for the one message below, to add to a chapter that grows a page at a time. Return exactly one page whose text starts with what the child will call them and \"says:\". No opening page and no closing page: the chapter's other pages already exist or come later. The title is a short phrase from this message.";
+
 // The first chapter after the birth, when the chapters before it were made from
 // the family's words.
 export const arrivalNote = (childName: string) =>
@@ -68,23 +77,11 @@ export const BEFORE_BIRTH_PROFILE: ReadingProfile = {
   pictures: "A picture on every page: framed or full for each message; the opening and closing pages may be vignettes.",
 };
 
-export const PAGES_PER_PERSON = 2;
-
 // The prompt gets the Before you arrive text wherever an instruction says
 // <before_birth>; instructions saved before it existed get it at the top.
 export const withBeforeBirth = (body: string) => (body.includes("<before_birth>") ? body : `<before_birth>\n\n${body}`);
 
 export const isBeforeBirth = (generationSnapshot: string | null | undefined) => Boolean(generationSnapshot && generationSnapshot.includes('"beforeBirth":true'));
-
-// At most two messages per person in one chapter; the rest wait for the next one.
-export function capPerPerson<T extends { contributorId: string }>(memories: T[], perPerson = PAGES_PER_PERSON) {
-  const counts = new Map<string, number>();
-  return memories.filter((m) => {
-    const n = counts.get(m.contributorId) ?? 0;
-    counts.set(m.contributorId, n + 1);
-    return n < perPerson;
-  });
-}
 
 // "Grandma Rose says: …" → "Grandma Rose", for "Hear Grandma Rose say it".
 export function speakerOf(text: string): string | null {

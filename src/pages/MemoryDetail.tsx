@@ -254,7 +254,16 @@ export default function MemoryDetail() {
               <IconChevronRight size={22} />
             </Link>
           ))}
-          {memory.chapters.length === 0 && memory.storyUseConsent && memory.status !== "failed" && (
+          {memory.chapters.length === 0 && memory.storyUseConsent && memory.status !== "failed" && (memory.pageRightAway ? (
+            // Before the birth, a message becomes its page right away (VSB-134).
+            <div className="inspired" style={{ borderColor: "var(--purple-line)" }}>
+              <span className="inspired__cover" />
+              <span className="grow">
+                <span className="inspired__kicker">Becoming a page</span>
+                <span className="inspired__title" style={{ display: "block" }}>In the book in a few minutes</span>
+              </span>
+            </div>
+          ) : (
             <Link to={`${base}/this-week`} className="inspired" style={{ borderColor: "var(--purple-line)" }}>
               <span className="inspired__cover" />
               <span className="grow">
@@ -263,7 +272,7 @@ export default function MemoryDetail() {
               </span>
               <IconChevronRight size={22} />
             </Link>
-          )}
+          ))}
         </div>
 
         <button className="btn btn--dark" style={{ marginTop: 18, justifyContent: "space-between" }} onClick={() => setOptions(true)}>

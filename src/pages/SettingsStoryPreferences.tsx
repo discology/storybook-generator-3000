@@ -98,7 +98,7 @@ export default function SettingsStoryPreferences() {
           <Field
             label="They’re here? Add their birthday"
             htmlFor="birthDate"
-            hint={`Saving a birthday marks ${name} as born. Chapters made before stay as they are, and the next chapter opens with Baby Vambie’s arrival.`}
+            hint={`Saving a birthday marks ${name} as born. The chapter still being written finishes, chapters made before stay as they are, and the next chapter opens with Baby Vambie’s arrival.`}
           >
             <span className="input-icon">
               <input id="birthDate" type="date" className="input" value={form.birthDate} max={new Date().toISOString().slice(0, 10)} onChange={(e) => set("birthDate", e.target.value)} />

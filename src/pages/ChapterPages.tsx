@@ -122,6 +122,12 @@ export default function ChapterPages() {
             Pages appear as they finish. This takes a few minutes; you can leave this page.
           </Note>
         )}
+        {chapter.growing && (
+          // Before the birth, pages publish on their own as messages arrive (VSB-134).
+          <Note kind="info" title="Pages publish on their own">
+            Each message becomes a page as it arrives. A page marked "Check this page" waits for you: fix it or approve it, and it joins the book.
+          </Note>
+        )}
         {waitingOnPeople && <WhoIsWho chapter={chapter} storybookId={id!} busy={busy} act={act} />}
         {!drawing && !waitingOnPeople && failed > 0 && (
           <Note kind="warn" title={`${failed} ${failed === 1 ? "picture" : "pictures"} didn't finish`}>

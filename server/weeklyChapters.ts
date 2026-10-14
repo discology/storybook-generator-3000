@@ -1,7 +1,8 @@
 import { prisma } from "./db";
 import { createPagedChapter, recordedBy } from "./storyPages";
 import { withUsage } from "./aiUsage";
-import { capPerPerson, childLabel } from "./beforeBirth";
+import { childLabel } from "./beforeBirth";
+import { placeWaitingMessages } from "./livingChapters";
 import { appUrl, renderMessage } from "./messageTemplates";
 import { sendText, storybookOwner } from "./texts";
 
@@ -82,9 +83,14 @@ export async function makeWeeklyChapter(storybookId: string) {
   lastErrors.delete(storybookId);
   try {
     const storybook = await prisma.storybook.findUniqueOrThrow({ where: { id: storybookId }, include: { child: true } });
-    // Before the birth, at most two messages per person; the rest wait for next week (VSB-118).
-    const eligible = await eligibleMemories(storybookId);
-    const memories = storybook.child.stage === "expecting" ? capPerPerson(eligible) : eligible;
+    // Before the birth there are no weekly chapters: each message becomes a page
+    // as soon as it's ready (VSB-134). This only places any that are still waiting.
+    if (storybook.child.stage === "expecting") {
+      await placeWaitingMessages(storybookId);
+      await prisma.storybook.update({ where: { id: storybookId }, data: { lastBatchAt: new Date() } });
+      return null;
+    }
+    const memories = await eligibleMemories(storybookId);
     if (memories.length === 0) {
       await prisma.storybook.update({ where: { id: storybookId }, data: { lastBatchAt: new Date() } });
       return null;
@@ -140,6 +146,8 @@ async function tick() {
   const now = new Date();
   const storybooks = await prisma.storybook.findMany({ where: { status: "active" } });
   for (const sb of storybooks) {
+    // A safety net for messages that couldn't be placed when they arrived (VSB-134).
+    void placeWaitingMessages(sb.id).catch(() => undefined);
     const due = lastScheduledBatch(sb, now);
     if (due <= (sb.lastBatchAt ?? sb.createdAt)) continue;
     await withUsage({ trigger: "weekly" }, () => makeWeeklyChapter(sb.id)).catch(() => undefined);

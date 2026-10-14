@@ -5,6 +5,7 @@ import { interpretMemory, transcribeAudio } from "./aiService";
 import { appUrl, renderMessage } from "./messageTemplates";
 import { sendText } from "./texts";
 import { childLabel } from "./beforeBirth";
+import { placeWaitingMessages } from "./livingChapters";
 
 // VSB-9: the person who recorded a memory hears when its words couldn't be made out.
 async function textTranscriptionFailed(storybookId: string, storybookTitle: string, contributorId: string, memoryId: string) {
@@ -88,6 +89,8 @@ export async function interpret(memoryId: string, transcript: string, setTitle: 
       ...(setTitle && result.title ? { title: result.title.slice(0, 80) } : {}),
     },
   });
+  // Before the birth, a message becomes its page right away (VSB-134).
+  if (!memory.chapterSources.length) void placeWaitingMessages(memory.storybookId).catch((e) => console.error("Placing messages:", e?.message));
 }
 
 async function removeAudio(memoryId: string, audioUrl: string) {

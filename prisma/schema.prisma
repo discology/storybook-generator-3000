@@ -289,6 +289,7 @@ model Chapter {
   pagesStatus        String  @default("none") // none | needs_characters | illustrating | ready | needs_attention
   unresolvedPeople   String? // JSON: people the planner couldn't match to a family character, awaiting the parent
   reflection         String? // VSB-126: the question for the grown-ups after the last page (chapters after the birth)
+  growing            Boolean  @default(false) // VSB-134: a pre-birth chapter still taking pages, one per message
   createdAt   DateTime @default(now())
 }
 

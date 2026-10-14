@@ -73,6 +73,13 @@ export const MESSAGE_TYPES: MessageType[] = [
     defaultBody: "A new chapter of <storybook_title> is ready: \"<chapter_title>\". Read it here: <chapter_url>",
   },
   {
+    key: "page_added",
+    name: "Your page is in the book",
+    trigger: "Sent before the birth to the family member whose message just became a page in the book (VSB-134)",
+    variables: [v.childName, v.storybookTitle, v.chapterTitle, v.chapterUrl],
+    defaultBody: "Your words are in <storybook_title>, in the chapter \"<chapter_title>\". See your page: <chapter_url>",
+  },
+  {
     key: "chapter_shared",
     name: "Chapter sent to you",
     trigger: "Sent to each family member a parent chooses in \"Send a little story\"",

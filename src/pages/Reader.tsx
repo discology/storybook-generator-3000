@@ -181,6 +181,7 @@ export default function Reader() {
       <span className="reader__chapter">
         {chapterLabel(chapter.sequence)}
         {chapter.beforeBirth ? " · Before you arrive" : ""}
+        {chapter.growing ? " · Still being written" : ""}
       </span>
       <h1 className="reader__title">{chapter.title}</h1>
     </header>
@@ -256,7 +257,20 @@ export default function Reader() {
       <div className="reader__ornament" aria-hidden="true">
         <IconSparkle size={20} />
       </div>
-      <p className="ending__end">End of chapter {chapter.sequence}</p>
+      {chapter.growing ? (
+        // Before the birth the chapter grows a page per message (VSB-134).
+        <div className="ending__growing">
+          <p className="ending__end">Still being written</p>
+          <p className="ending__count">
+            {chapter.voices ?? 0} of {chapter.voicesToFinish ?? 8} voices so far
+          </p>
+          <p className="ending__note">
+            A new page arrives each time someone in the family records a message. This chapter finishes at {chapter.voicesToFinish ?? 8} voices, or sooner if someone already in it adds another message.
+          </p>
+        </div>
+      ) : (
+        <p className="ending__end">End of chapter {chapter.sequence}</p>
+      )}
       <div className="stack" style={{ marginTop: 22, maxWidth: 380, marginLeft: "auto", marginRight: "auto" }}>
         <button className="btn btn--purple" onClick={() => go(0)}>
           Read again

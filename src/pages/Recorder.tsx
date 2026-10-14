@@ -471,7 +471,9 @@ export default function Recorder() {
               <p className="preparing-card__title">Preparing your memory</p>
               <p className="t-small" style={{ margin: 0, opacity: 0.92 }}>
                 {storyUse
-                  ? `It joins this week's chapter, made ${nextDay} morning. We'll let you know when it's ready.`
+                  ? storybook.child.stage === "expecting"
+                    ? "In a few minutes it becomes a page in the book. We'll text you when it's in."
+                    : `It joins this week's chapter, made ${nextDay} morning. We'll let you know when it's ready.`
                   : "It stays in your memories and won't be used in stories."}
               </p>
             </div>
