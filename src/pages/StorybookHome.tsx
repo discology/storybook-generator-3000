@@ -7,7 +7,7 @@ import { IconMic, IconPeople, IconSparkle } from "../components/icons";
 import { Chev, Loading, Mascot } from "../components/ui";
 import { useStorybookData } from "../hooks/useStorybookData";
 import { apiGet } from "../lib/api";
-import { waitingChapters } from "../lib/chapterStatus";
+import { heldChapters, heldLabel, voicesLine, waitingChapters } from "../lib/chapterStatus";
 import { askedLine, audienceFor, cardFitsChild, cardPose, JUST_TALK, type AskedCard } from "../lib/promptStages";
 import { fillPrompt, promptValues } from "../lib/promptVariables";
 import { capitalize, childLabel, possessive } from "../lib/format";
@@ -90,21 +90,39 @@ export default function StorybookHome() {
   const published = storybook.chapters.filter((c) => c.status === "published").sort((a, b) => b.sequence - a.sequence);
   const featured = published[0];
   const waitingForYou = owner ? waitingChapters(storybook.chapters, child) : [];
+  // Before the birth, chapters in the book with a page a check held (VSB-134).
+  const held = owner ? heldChapters(storybook.chapters) : [];
   const waiting = storybook.memories.filter((m) => m.chapterIds.length === 0 && m.storyUseConsent && m.status !== "failed");
-  const nextLine = storybook.generating ? "Writing the next chapter now." : waiting.length ? `Next chapter: ${weekday(storybook.nextChapterAt)} morning.` : "";
+  // Before the birth there are no weekly chapters: each message becomes a page right away (VSB-134).
+  const weekly = storybook.child.stage !== "expecting";
+  const nextLine = storybook.generating ? "Writing the next chapter now." : weekly && waiting.length ? `Next chapter: ${weekday(storybook.nextChapterAt)} morning.` : "";
   // The chapter covers: chapters that need the owner first, then the ones in the book.
-  const strip = [
-    ...waitingForYou.map(({ chapter, step }) => ({ chapter, tag: step.tag, done: false, to: step.cta ? `${base}/chapters/${chapter.id}/pages` : null })),
-    ...published.map((c) => ({ chapter: c, tag: c.readAt ? "Finished" : "New", done: true, to: `${base}/read/${c.id}` })),
+  type Tone = "todo" | "new" | "done" | "growing";
+  const strip: { chapter: (typeof published)[number]; tag: string; tone: Tone; to: string | null }[] = [
+    ...held.map((c) => ({ chapter: c, tag: "Needs a look", tone: "todo" as Tone, to: `${base}/chapters/${c.id}/pages` })),
+    ...waitingForYou.map(({ chapter, step }) => ({ chapter, tag: step.tag, tone: "todo" as Tone, to: step.cta ? `${base}/chapters/${chapter.id}/pages` : null })),
+    ...published
+      .filter((c) => !held.includes(c))
+      .map((c) => ({ chapter: c, tag: c.growing ? voicesLine(c) : c.readAt ? "Finished" : "New", tone: (c.growing ? "growing" : c.readAt ? "done" : "new") as Tone, to: `${base}/read/${c.id}` })),
   ].slice(0, 8);
   const total = published.length + waitingForYou.length;
-  // The one chapter slot: what a chapter needs from the owner, else the newest chapter to read.
+  // The one chapter slot: what a chapter needs from the owner (a held page first),
+  // else the newest chapter to read.
   const todo = waitingForYou.find(({ step }) => step.go);
-  const slot = todo
-    ? { to: `${base}/chapters/${todo.chapter.id}/pages`, cover: todo.chapter.cover, kicker: todo.step.kicker, title: todo.chapter.title, go: todo.step.go }
-    : featured
-      ? { to: `${base}/read/${featured.id}`, cover: featured.cover, kicker: `${possessive(child)} newest chapter`, title: featured.title, go: "Read" }
-      : { to: `${base}/this-week`, cover: null, kicker: "Read together", title: "Your first chapter is on its way.", go: null };
+  const slot = held[0]
+    ? { to: `${base}/chapters/${held[0].id}/pages`, cover: held[0].cover, kicker: heldLabel(held[0].heldPages ?? 1), title: held[0].title, go: "Review", needsYou: true }
+    : todo
+      ? { to: `${base}/chapters/${todo.chapter.id}/pages`, cover: todo.chapter.cover, kicker: todo.step.kicker, title: todo.chapter.title, go: todo.step.go, needsYou: true }
+      : featured
+        ? {
+            to: `${base}/read/${featured.id}`,
+            cover: featured.cover,
+            kicker: featured.growing ? `Still being written · ${voicesLine(featured)}` : `${possessive(child)} newest chapter`,
+            title: featured.title,
+            go: "Read",
+            needsYou: false,
+          }
+        : { to: `${base}/this-week`, cover: null, kicker: "Read together", title: "Your first chapter is on its way.", go: null, needsYou: false };
   const question = prompt ? prompt.question : prompt === null ? JUST_TALK : "";
 
   return (
@@ -130,7 +148,7 @@ export default function StorybookHome() {
           <IconMic size={24} filled /> Record a memory
         </Link>
 
-        <Link to={slot.to} className={`home-read-row ${todo ? "home-read-row--todo" : ""}`}>
+        <Link to={slot.to} className={`home-read-row ${slot.needsYou ? "home-read-row--todo" : ""}`}>
           {slot.cover ? <img src={`/${slot.cover}`} alt="" className="home-read-row__cover" /> : <Mascot name="closedbook" className="home-read-row__cover home-read-row__cover--art" />}
           <span className="home-read-row__text">
             <span className="home-read-row__kicker">{slot.kicker}</span>
@@ -149,11 +167,11 @@ export default function StorybookHome() {
               </Link>
             </div>
             <div className="home-strip">
-              {strip.map(({ chapter, tag, done, to }) => {
+              {strip.map(({ chapter, tag, tone, to }) => {
                 const body = (
                   <>
                     <span className="home-strip__cover">{chapter.cover ? <img src={`/${chapter.cover}`} alt="" /> : <Mascot name="closedbook" />}</span>
-                    <span className={`home-strip__tag ${done ? (tag === "New" ? "home-strip__tag--new" : "home-strip__tag--done") : ""}`}>{tag}</span>
+                    <span className={`home-strip__tag ${tone === "todo" ? "" : `home-strip__tag--${tone}`}`}>{tag}</span>
                     <span className="home-strip__title">{chapter.title}</span>
                   </>
                 );

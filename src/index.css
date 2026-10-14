@@ -6041,6 +6041,12 @@ input[type="radio"] {
   background: var(--wash-peach);
 }
 
+/* Before the birth, a chapter still taking a page per message (VSB-134) */
+.home-strip__tag--growing {
+  border-color: var(--dark-line);
+  background: var(--wash-lilac);
+}
+
 .home-strip__title {
   display: -webkit-box;
   -webkit-line-clamp: 2;

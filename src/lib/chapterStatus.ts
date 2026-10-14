@@ -19,6 +19,14 @@ export function chapterStep(c: StorybookChapter, childName: string) {
   return { kicker: "Ready to publish", tag: "To publish", text: `Publish it to add it to ${possessive(childName)} book.`, art: "hug-book" as MascotName, cta: "pages" as const, go: "Publish" };
 }
 
+// Before the birth a chapter grows a page per message and is in the book from its
+// first page (VSB-134). A page a check held waits for the owner; the chapter shows
+// how many voices it has until it finishes.
+export const heldChapters = (chapters: StorybookChapter[]) =>
+  chapters.filter((c) => c.status === "published" && c.living && (c.heldPages ?? 0) > 0).sort((a, b) => b.sequence - a.sequence);
+export const heldLabel = (pages: number) => (pages === 1 ? "A page needs a look" : `${pages} pages need a look`);
+export const voicesLine = (c: StorybookChapter) => `${c.voices ?? 0} of ${c.voicesToFinish ?? 8} voices`;
+
 // The owner's chapters that aren't in the book yet, newest first, with what each needs.
 export const waitingChapters = (chapters: StorybookChapter[], childName: string) =>
   chapters
