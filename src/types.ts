@@ -341,7 +341,8 @@ export interface StorybookMemory {
   visibility: string;
   storyUseConsent: boolean;
   contributorId: string;
-  contributor: { id: string; name: string; relationship: string | null };
+  // portrait: their approved Vambie look, if they have one (VSB-135)
+  contributor: { id: string; name: string; relationship: string | null; portrait?: string | null };
   mine: boolean;
   favorite: boolean;
   excerpt: string | null;

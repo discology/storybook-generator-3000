@@ -292,7 +292,6 @@ export default function Memories() {
                   to={`${base}/memories/${m.id}`}
                   playing={audio.playingId === m.id}
                   onPlay={() => m.audioSrc && audio.toggle(m.id, m.audioSrc)}
-                  showWho
                 />
               ))
             )}

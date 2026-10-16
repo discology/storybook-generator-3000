@@ -168,13 +168,26 @@ router.get("/storybooks/:id", async (req, res) => {
     },
   });
 
+  // Each person's Vambie look for the Memories list (VSB-135): the family
+  // character saved under their name, as "You, in the pictures" saves it.
+  // Approved Vambie looks only; anyone else shows their initials.
+  const looks = await prisma.familyCharacter.findMany({
+    where: { householdId: storybook.child.householdId },
+    include: { designs: { where: { status: "approved", look: "vambie", portraitPath: { not: null } }, orderBy: { version: "desc" } } },
+  });
+  const portraitFor = (name: string) => {
+    const character = looks.find((l) => l.name.trim().toLowerCase() === name.trim().toLowerCase());
+    const design = character?.designs.find((d) => d.variant === "today") ?? character?.designs[0];
+    return design?.portraitPath ? `/${design.portraitPath}` : null;
+  };
+
   const memories = storybook.memories
     .filter((m) => canSeeMemory(m, me))
     .map(({ transcripts, chapterSources, contributor, audioUrl, favoritedBy, ...m }) => ({
       ...m,
       typed: transcripts[0]?.source === "typed", // written, not recorded (VSB-85)
       audioSrc: audioSrc({ id: m.id, audioUrl }),
-      contributor: { id: contributor.id, name: contributor.name, relationship: contributor.relationship },
+      contributor: { id: contributor.id, name: contributor.name, relationship: contributor.relationship, portrait: portraitFor(contributor.name) },
       mine: m.contributorId === me.id,
       favorite: parseIds(favoritedBy).includes(me.id),
       excerpt: transcripts[0]?.text.slice(0, 220) ?? null,

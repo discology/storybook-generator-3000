@@ -2095,6 +2095,25 @@ label.chip {
   border-top: 1.5px solid var(--dark-line);
 }
 
+/* Who a memory is from (VSB-135): their Vambie look, cropped to the head and
+   shoulders, or their initials until they have one. */
+.mem-row__who {
+  flex: none;
+  display: inline-flex;
+}
+
+.mem-row__who .avatar {
+  width: 46px;
+  height: 46px;
+  font-size: 18px;
+  box-shadow: 0 0 0 1.5px var(--dark-line);
+}
+
+.mem-row__who .avatar img {
+  transform: scale(2.3);
+  transform-origin: 50% 24%;
+}
+
 .mem-row__play {
   flex: none;
   width: 46px;
