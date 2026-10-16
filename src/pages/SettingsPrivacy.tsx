@@ -79,7 +79,7 @@ export default function SettingsPrivacy() {
         <h2 className="h-title">Your data</h2>
         <div className="menu" style={{ marginTop: 4 }}>
           <MenuRow icon={<IconDownload size={24} />} title="Export my memories" to={`${base}/settings/export`} />
-          <MenuRow icon={<IconDatabase size={24} />} title="Manage saved memories" to={`${base}/memories?tab=memories`} />
+          <MenuRow icon={<IconDatabase size={24} />} title="Manage saved memories" to={`${base}/memories`} />
           <MenuRow icon={<IconTrash size={24} />} title="Delete account" sub="Review what will be removed before confirming." to={`${base}/settings/delete-account`} danger />
         </div>
         <h2 className="h-title" style={{ marginTop: 22 }}>The fine print</h2>

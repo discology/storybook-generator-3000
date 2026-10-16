@@ -1,51 +1,28 @@
-import { useMemo, useState, Fragment } from "react";
-import { Link, useParams, useSearchParams } from "react-router-dom";
+import { useMemo, useState } from "react";
+import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
 import BottomNav from "../components/BottomNav";
 import AccessDenied from "../components/AccessDenied";
 import MemoryListRow from "../components/MemoryListRow";
-import { IconBookmark, IconChevronRight, IconClose, IconMic, IconSearch, IconSpinner, IconStar } from "../components/icons";
-import { Chev, Loading, Mascot, Segmented } from "../components/ui";
+import { IconChevronRight, IconClose, IconMic, IconSearch, IconStar } from "../components/icons";
+import { Chev, Loading, Mascot } from "../components/ui";
 import { useStorybookData } from "../hooks/useStorybookData";
 import { useInlineAudio } from "../hooks/useInlineAudio";
-import { apiSend } from "../lib/api";
-import { waitingChapters } from "../lib/chapterStatus";
-import { capitalize, chapterLabel, childLabel, formatDate, formatMonth, possessive } from "../lib/format";
-import type { StorybookChapter } from "../types";
-
-const DATE_RANGES = [
-  { value: "all", label: "All dates" },
-  { value: "30", label: "Last 30 days" },
-  { value: "90", label: "Last 3 months" },
-  { value: "365", label: "This past year" },
-];
+import { capitalize, childLabel, formatMonth, possessive } from "../lib/format";
 
 const monthKey = (iso: string) => iso.slice(0, 7);
 
-// The Memories tab: every chapter (the owner's waiting ones first, VSB-129) and the
-// family's memories, with filters.
+// The Memories tab (VSB-136): the family's memories, each with who it's from
+// (VSB-135), with search and filters. Chapters are in the Book tab.
 export default function Memories() {
   const { id } = useParams();
-  const [params, setParams] = useSearchParams();
+  const [params] = useSearchParams();
   const { storybook, status } = useStorybookData(id);
   const audio = useInlineAudio();
-  const tab = params.get("tab") === "memories" ? "memories" : "chapters";
-  const [range, setRange] = useState("all");
   const [favorites, setFavorites] = useState(false);
   const [query, setQuery] = useState("");
   const [who, setWho] = useState("");
   const [month, setMonth] = useState("");
-  const [marks, setMarks] = useState<Record<string, boolean>>({});
-
-  const chapters = useMemo(() => {
-    if (!storybook) return [];
-    const since = range === "all" ? 0 : Date.now() - Number(range) * 86400000;
-    return storybook.chapters
-      .filter((c) => c.status === "published")
-      .filter((c) => new Date(c.publishedAt ?? c.createdAt).getTime() >= since)
-      .filter((c) => !favorites || (marks[c.id] ?? c.favorite))
-      .sort((a, b) => b.sequence - a.sequence);
-  }, [storybook, range, favorites, marks]);
 
   const people = useMemo(() => {
     const seen = new Map<string, string>();
@@ -67,22 +44,14 @@ export default function Memories() {
     );
   }, [storybook, query, who, month, favorites]);
 
+  // The chapter list used to live here, behind a switch: an old link to it opens Book.
+  if (params.get("tab") === "chapters") return <Navigate to={`/storybooks/${id}/book`} replace />;
   if (status === "denied") return <AccessDenied />;
   if (!storybook) return <Loading />;
 
   const base = `/storybooks/${storybook.id}`;
   const child = childLabel(storybook.child.displayName, storybook.me?.role === "owner");
   const filtered = query || who || month || favorites;
-  const waitingForYou = storybook.me?.role === "owner" ? waitingChapters(storybook.chapters, child) : [];
-  // Before the birth, a page a check held waits for the parent inside a chapter
-  // that's already in the book (VSB-134).
-  const heldInBook = storybook.me?.role === "owner" ? storybook.chapters.filter((c) => c.status === "published" && c.living && (c.heldPages ?? 0) > 0) : [];
-
-  const toggleMark = async (c: StorybookChapter) => {
-    const next = !(marks[c.id] ?? c.favorite);
-    setMarks((m) => ({ ...m, [c.id]: next }));
-    await apiSend(`/api/chapters/${c.id}/mark`, "PUT", { favorite: next }).catch(() => setMarks((m) => ({ ...m, [c.id]: !next })));
-  };
 
   const clearFilters = () => {
     setWho("");
@@ -94,208 +63,74 @@ export default function Memories() {
     <div className="page page--nav">
       <TopBar wordmark avatar={`${base}/settings`} />
       <header className="masthead" style={{ paddingTop: 0, paddingBottom: 18 }}>
-        <h1 className="h-display h-display--md masthead__title">{capitalize(tab === "chapters" ? `${possessive(child)} growing story.` : `${possessive(child)} memories.`)}</h1>
+        <h1 className="h-display h-display--md masthead__title">{capitalize(`${possessive(child)} memories.`)}</h1>
       </header>
       <div className="pad">
-        <Segmented
-          dark
-          value={tab}
-          onChange={(t) => setParams(t === "memories" ? { tab: "memories" } : {}, { replace: true })}
-          options={[
-            { value: "chapters", label: "Chapters" },
-            { value: "memories", label: "Memories" },
-          ]}
-        />
-
-        {tab === "chapters" ? (
-          <>
-            {(waitingForYou.length > 0 || heldInBook.length > 0) && (
-              <>
-                <h2 className="section-label">Waiting for you</h2>
-            {heldInBook.map((c) => (
-              <Link key={c.id} to={`${base}/chapters/${c.id}/pages`} className="chapter-tile chapter-tile--waiting">
-                <span className="chapter-tile__cover chapter-tile__cover--art">
-                  <Mascot name="peek-worried" />
-                </span>
-                <span className="chapter-tile__text">
-                  <span className="chapter-tile__label">{c.heldPages === 1 ? "A page needs a look" : `${c.heldPages} pages need a look`}</span>
-                  <span className="chapter-tile__title" style={{ display: "block" }}>{c.title}</span>
-                  <span className="chapter-tile__date">A check held it back. Fix it or approve it to add it to the book.</span>
-                </span>
-                <span className="chapter-tile__chev">
-                  <IconChevronRight size={22} />
-                </span>
-              </Link>
-            ))}
-                {waitingForYou.map(({ chapter, step }) => {
-                  const body = (
-                    <>
-                      {chapter.cover ? (
-                        <img src={`/${chapter.cover}`} alt="" className="chapter-tile__cover" />
-                      ) : (
-                        <span className="chapter-tile__cover chapter-tile__cover--art">{"spinner" in step && step.spinner ? <IconSpinner size={30} /> : <Mascot name={step.art ?? "open-book"} />}</span>
-                      )}
-                      <span className="chapter-tile__text">
-                        <span className="chapter-tile__label">{step.kicker}</span>
-                        <span className="chapter-tile__title" style={{ display: "block" }}>{chapter.title}</span>
-                        <span className="chapter-tile__date">{step.text}</span>
-                      </span>
-                      {step.cta && (
-                        <span className="chapter-tile__chev">
-                          <IconChevronRight size={22} />
-                        </span>
-                      )}
-                    </>
-                  );
-                  return step.cta ? (
-                    <Link key={chapter.id} to={`${base}/chapters/${chapter.id}/pages`} className="chapter-tile chapter-tile--waiting">
-                      {body}
-                    </Link>
-                  ) : (
-                    <div key={chapter.id} className="chapter-tile chapter-tile--waiting">
-                      {body}
-                    </div>
-                  );
-                })}
-                <h2 className="section-label">In the book</h2>
-              </>
-            )}
-            <div className="chips" style={{ margin: "16px 0" }}>
-              <label className="chip">
-                <span className="sr-only">Date range</span>
-                <select value={range} onChange={(e) => setRange(e.target.value)}>
-                  {DATE_RANGES.map((r) => (
-                    <option key={r.value} value={r.value}>
-                      {r.label}
-                    </option>
-                  ))}
-                </select>
-                <IconChevronRight size={16} className="chip__chev" />
-              </label>
-              <button className={`chip ${favorites ? "chip--on" : ""}`} onClick={() => setFavorites((f) => !f)} aria-pressed={favorites}>
-                <IconStar size={18} filled={favorites} /> Favorites
-              </button>
-            </div>
-            {chapters.length === 0 ? (
-              <EmptyCard
-                art={favorites ? "magnifier" : "open-book"}
-                title={favorites ? "No favorites yet." : waitingForYou.length ? "Nothing in the book yet." : "No chapters yet."}
-                text={
-                  favorites
-                    ? "Tap the bookmark on a chapter to keep it here."
-                    : waitingForYou.length
-                      ? "Chapters show up here once they're added to the book."
-                      : "The week's memories become a new chapter each week."
-                }
-              />
-            ) : (
-              chapters.map((c, i) => {
-                const marked = marks[c.id] ?? c.favorite;
-                // One book, two parts: newest first, so "You're here" comes before "Before you arrive" (VSB-120).
-                const hasBefore = chapters.some((x) => x.beforeBirth);
-                const part = c.beforeBirth ? "Before you arrive" : "You’re here";
-                const prevPart = i > 0 ? (chapters[i - 1].beforeBirth ? "Before you arrive" : "You’re here") : null;
-                const divider = hasBefore && part !== prevPart ? <h2 className="section-label chapter-part">{part}</h2> : null;
-                return (
-                  <Fragment key={c.id}>
-                  {divider}
-                  <div className="chapter-tile">
-                    <Link to={`${base}/read/${c.id}`} className="hstack" style={{ flex: 1, color: "inherit", textDecoration: "none", gap: 14, minWidth: 0 }}>
-                      {c.cover ? <img src={`/${c.cover}`} alt="" className="chapter-tile__cover" /> : <span className="chapter-tile__cover" />}
-                      <span className="chapter-tile__text">
-                        <span className="chapter-tile__label">{chapterLabel(c.sequence)}</span>
-                        <span className="chapter-tile__title" style={{ display: "block" }}>{c.title}</span>
-                        <span className="chapter-tile__date">
-                          {c.growing ? `Still being written · ${c.voices ?? 0} of ${c.voicesToFinish ?? 8} voices` : formatDate(c.publishedAt ?? c.createdAt)}
-                        </span>
-                      </span>
-                      <span className="chapter-tile__chev">
-                        <IconChevronRight size={22} />
-                      </span>
-                    </Link>
-                    <button
-                      className={`chapter-tile__mark ${marked ? "chapter-tile__mark--on" : ""}`}
-                      onClick={() => void toggleMark(c)}
-                      aria-pressed={marked}
-                      aria-label={marked ? "Remove bookmark" : "Bookmark this chapter"}
-                    >
-                      <IconBookmark size={24} filled={marked} />
+        <div className="search" style={{ marginTop: 16 }}>
+          <span className="search__icon">
+            <IconSearch size={22} />
+          </span>
+          <input className="input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search memories" aria-label="Search memories" />
+          {query && (
+            <button className="search__clear" onClick={() => setQuery("")} aria-label="Clear search">
+              <IconClose size={22} />
+            </button>
+          )}
+        </div>
+        <div className="chips" style={{ margin: "12px 0 8px" }}>
+          <FilterChip
+            label="Anyone"
+            value={who}
+            onChange={setWho}
+            options={people.map(([value, label]) => ({ value, label }))}
+          />
+          <FilterChip label="Any month" value={month} onChange={setMonth} options={months.map((m) => ({ value: m, label: formatMonth(`${m}-15T12:00:00`) }))} />
+          <button className={`chip ${favorites ? "chip--on" : ""}`} onClick={() => setFavorites((f) => !f)} aria-pressed={favorites}>
+            <IconStar size={18} filled={favorites} /> Favorites
+          </button>
+        </div>
+        {memories.length === 0 ? (
+          filtered ? (
+            <div className="sheet" style={{ margin: "8px 0 0", textAlign: "center" }}>
+              <Mascot name="magnifier" style={{ width: 170, margin: "0 auto", display: "block" }} />
+              <h2 className="h-display h-display--sm" style={{ color: "var(--ink)", fontSize: 40, marginTop: 6 }}>
+                No matches
+                <br />
+                this time.
+              </h2>
+              <p className="t-body t-muted" style={{ margin: "10px 0 18px" }}>Try another word or clear your filters.</p>
+              <div className="stack">
+                {who || month || favorites ? (
+                  <>
+                    <button className="btn btn--lime btn--caps" onClick={clearFilters}>
+                      Clear filters <Chev />
                     </button>
-                  </div>
-                  </Fragment>
-                );
-              })
-            )}
-          </>
-        ) : (
-          <>
-            <div className="search" style={{ marginTop: 16 }}>
-              <span className="search__icon">
-                <IconSearch size={22} />
-              </span>
-              <input className="input" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search memories" aria-label="Search memories" />
-              {query && (
-                <button className="search__clear" onClick={() => setQuery("")} aria-label="Clear search">
-                  <IconClose size={22} />
-                </button>
-              )}
-            </div>
-            <div className="chips" style={{ margin: "12px 0 8px" }}>
-              <FilterChip
-                label="Anyone"
-                value={who}
-                onChange={setWho}
-                options={people.map(([value, label]) => ({ value, label }))}
-              />
-              <FilterChip label="Any month" value={month} onChange={setMonth} options={months.map((m) => ({ value: m, label: formatMonth(`${m}-15T12:00:00`) }))} />
-              <button className={`chip ${favorites ? "chip--on" : ""}`} onClick={() => setFavorites((f) => !f)} aria-pressed={favorites}>
-                <IconStar size={18} filled={favorites} /> Favorites
-              </button>
-            </div>
-            {memories.length === 0 ? (
-              filtered ? (
-                <div className="sheet" style={{ margin: "8px 0 0", textAlign: "center" }}>
-                  <Mascot name="magnifier" style={{ width: 170, margin: "0 auto", display: "block" }} />
-                  <h2 className="h-display h-display--sm" style={{ color: "var(--ink)", fontSize: 40, marginTop: 6 }}>
-                    No matches
-                    <br />
-                    this time.
-                  </h2>
-                  <p className="t-body t-muted" style={{ margin: "10px 0 18px" }}>Try another word or clear your filters.</p>
-                  <div className="stack">
-                    {who || month || favorites ? (
-                      <>
-                        <button className="btn btn--lime btn--caps" onClick={clearFilters}>
-                          Clear filters <Chev />
-                        </button>
-                        {query && (
-                          <button className="btn btn--outline" onClick={() => setQuery("")}>
-                            Clear search
-                          </button>
-                        )}
-                      </>
-                    ) : (
-                      <button className="btn btn--lime btn--caps" onClick={() => setQuery("")}>
-                        Clear search <Chev />
+                    {query && (
+                      <button className="btn btn--outline" onClick={() => setQuery("")}>
+                        Clear search
                       </button>
                     )}
-                  </div>
-                </div>
-              ) : (
-                <EmptyCard art="mic" title="No memories yet." text="Record a little moment to start the story." />
-              )
-            ) : (
-              memories.map((m) => (
-                <MemoryListRow
-                  key={m.id}
-                  memory={m}
-                  to={`${base}/memories/${m.id}`}
-                  playing={audio.playingId === m.id}
-                  onPlay={() => m.audioSrc && audio.toggle(m.id, m.audioSrc)}
-                />
-              ))
-            )}
-          </>
+                  </>
+                ) : (
+                  <button className="btn btn--lime btn--caps" onClick={() => setQuery("")}>
+                    Clear search <Chev />
+                  </button>
+                )}
+              </div>
+            </div>
+          ) : (
+            <EmptyCard art="mic" title="No memories yet." text="Record a little moment to start the story." />
+          )
+        ) : (
+          memories.map((m) => (
+            <MemoryListRow
+              key={m.id}
+              memory={m}
+              to={`${base}/memories/${m.id}`}
+              playing={audio.playingId === m.id}
+              onPlay={() => m.audioSrc && audio.toggle(m.id, m.audioSrc)}
+            />
+          ))
         )}
 
         <Link className="btn btn--lime btn--caps" to={`${base}/record`} style={{ marginTop: 20 }}>
@@ -354,3 +189,4 @@ function EmptyCard({ art, title, text }: { art: "magnifier" | "open-book" | "mic
     </div>
   );
 }
+

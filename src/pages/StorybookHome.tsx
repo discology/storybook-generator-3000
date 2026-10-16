@@ -162,7 +162,7 @@ export default function StorybookHome() {
           <>
             <div className="home-chapters-head">
               <h2 className="home-chapters-head__title">Chapters</h2>
-              <Link to={`${base}/memories`} className="home-chapters-head__all">
+              <Link to={`${base}/book`} className="home-chapters-head__all">
                 See all {total}
               </Link>
             </div>

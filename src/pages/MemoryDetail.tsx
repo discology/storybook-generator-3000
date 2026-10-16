@@ -87,7 +87,7 @@ export default function MemoryDetail() {
   if (state === "missing")
     return (
       <div className="page">
-        <TopBar back={`/storybooks/${id}/memories?tab=memories`} title="Memories" />
+        <TopBar back={`/storybooks/${id}/memories`} title="Memories" />
         <p className="loading">This memory isn't here anymore.</p>
       </div>
     );
@@ -103,7 +103,7 @@ export default function MemoryDetail() {
   return (
     <div className="page">
       <TopBar
-        back={`${base}/memories?tab=memories`}
+        back={`${base}/memories`}
         title={capitalize(`${possessive(memory.storybook.childName)} memories`)}
         right={
           <button className="tbar__icon" onClick={() => void toggleFavorite()} aria-pressed={memory.favorite} aria-label={memory.favorite ? "Remove bookmark" : "Bookmark this memory"}>

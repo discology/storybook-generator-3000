@@ -53,7 +53,7 @@ export default function MemoryDelete() {
   const base = `/storybooks/${id}`;
   const title = memoryTitle({ title: preview.memory.title, status: "ready" });
   const held = preview.connectedChapters;
-  const backToMemories = `${base}/memories?tab=memories`;
+  const backToMemories = `${base}/memories`;
 
   if (step === "removing" || step === "removed") {
     const done = step === "removed";

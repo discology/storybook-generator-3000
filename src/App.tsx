@@ -5,6 +5,7 @@ import SignIn from "./pages/SignIn";
 import StorybookHome from "./pages/StorybookHome";
 import Setup from "./pages/Setup";
 import ThisWeek from "./pages/ThisWeek";
+import Book from "./pages/Book";
 import Memories from "./pages/Memories";
 import MemoryDetail from "./pages/MemoryDetail";
 import MemoryDelete from "./pages/MemoryDelete";
@@ -83,6 +84,7 @@ export default function App() {
                 <Route path="/storybooks/:id/record" element={<Recorder />} />
                 <Route path="/storybooks/:id/ask/:promptId" element={<AskQuestion />} />
                 <Route path="/storybooks/:id/this-week" element={<ThisWeek />} />
+                <Route path="/storybooks/:id/book" element={<Book />} />
                 <Route path="/storybooks/:id/memories" element={<Memories />} />
                 <Route path="/storybooks/:id/memories/:memoryId" element={<MemoryDetail />} />
                 <Route path="/storybooks/:id/memories/:memoryId/delete" element={<MemoryDelete />} />

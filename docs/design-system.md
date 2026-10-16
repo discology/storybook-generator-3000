@@ -55,7 +55,7 @@ The shared building blocks are in `src/components/ui.tsx`, and their styles are 
 
 Buttons use the `.btn` class with a variant: `--lime` for the main action (aqua), `--purple`, `--dark` (ink with light text), `--outline`, `--ghost`, `--danger` or `--soft`. `--caps` gives the headline-button style: Nunito ExtraBold in the family app, Anton capitals in the admin. `--sm` and `--xs` are smaller sizes.
 
-The other shared pieces are `TopBar` (back button, wordmark or title, and actions), `BottomNav` (Home, Memories, Family), `AudioPlayer` (play button with the recording's real waveform) and `PagePicture` (a page picture in its size).
+The other shared pieces are `TopBar` (back button, wordmark or title, and actions), `BottomNav` (Home, Book, Memories, Family), `AudioPlayer` (play button with the recording's real waveform) and `PagePicture` (a page picture in its size).
 
 ## Baby Vambie artwork
 
