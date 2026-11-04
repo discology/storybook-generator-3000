@@ -4,7 +4,7 @@ Who can see what, what leaves the app, and how families can take their data or d
 
 ## Who's who
 
-- **The owner** is the family member who started the storybook, usually a parent. They choose the storybook's settings, invite family, review and publish chapters, and choose who can read each one.
+- **The owner** is the family member who started the storybook, usually a parent. They choose the storybook's settings, invite family, answer Who's who, fix pages after a chapter goes into the book on its own (VSB-137), and choose who can read each one.
 - **Family members** join with an invitation link. They can record memories and read the chapters shared with them.
 - **Admins** are the Vambie team: the phone numbers listed in `ADMIN_PHONES`. They review held chapters, manage prompt cards and characters, and edit the settings that shape every chapter. If `ADMIN_PHONES` is empty, anyone signed in can open the admin panel on a development copy; the hosted app keeps it closed.
 

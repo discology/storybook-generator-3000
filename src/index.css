@@ -5919,7 +5919,7 @@ input[type="radio"] {
 }
 
 /* The chapter slot under the button: the newest chapter to read (peach), or a
-   chapter that needs the owner (butter, like its "To review" tag) */
+   chapter that needs the owner (butter, like its "Needs a look" tag) */
 .home-read-row {
   display: flex;
   align-items: center;
@@ -5999,7 +5999,7 @@ input[type="radio"] {
   color: var(--accent-text);
 }
 
-/* Chapter covers, each tagged with what it is (To review, Finished...) */
+/* Chapter covers, each tagged with what it is (Needs a look, New, Finished...) */
 .home-strip {
   display: flex;
   gap: 12px;

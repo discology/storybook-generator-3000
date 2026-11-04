@@ -94,6 +94,8 @@ export default function ChapterPages() {
 
   const base = `/storybooks/${id}`;
   const approved = chapter.pages.filter((p) => p.approvedAt).length;
+  // Only chapters before the birth have pages to approve; the rest publish themselves (VSB-137).
+  const reviewed = Boolean(chapter.living);
   const allApproved = approved === chapter.pages.length;
   const failed = chapter.pages.filter((p) => hasPicture(p) && (!p.assets[0] || p.assets[0].status === "failed")).length;
   const waitingOnPeople = (chapter.unresolved ?? []).length > 0;
@@ -105,14 +107,14 @@ export default function ChapterPages() {
 
   return (
     <div className="page">
-      <TopBar back={base} title="Review pages" />
+      <TopBar back={base} title={reviewed ? "Review pages" : "Pages"} />
       <header className="masthead" style={{ paddingTop: 0, paddingBottom: 16 }}>
         <span className="chapter-tile__label masthead__title">{chapterLabel(chapter.sequence)}</span>
         <h1 className="h-display h-display--sm masthead__title" style={{ marginTop: 6, fontSize: 36 }}>
           {chapter.title}
         </h1>
         <p className="masthead__sub" style={{ fontSize: 17, marginTop: 8 }}>
-          {chapter.pages.length} pages · {approved} approved
+          {chapter.pages.length} pages · {reviewed ? `${approved} approved` : chapter.status === "published" ? "in the book" : "goes into the book on its own"}
         </p>
       </header>
 
@@ -158,13 +160,33 @@ export default function ChapterPages() {
             chapterDrawing={chapter.pagesStatus === "illustrating"}
             waitingOnPeople={waitingOnPeople}
             castNames={castNames}
+            reviewed={reviewed}
           />
         ))}
         {chapter.reflection && <ReflectionCard key={chapter.reflection} chapter={chapter} busy={busy} act={act} />}
       </div>
 
       <div className="pad" style={{ padding: "8px 20px calc(28px + var(--safe-bottom))" }}>
-        {!allApproved ? (
+        {!reviewed ? (
+          // No review and no Publish button: it goes into the book on its own (VSB-137).
+          chapter.status === "published" ? (
+            <Link className="btn btn--lime btn--caps" to={`${base}/read/${chapterId}`}>
+              Read the chapter <Chev />
+            </Link>
+          ) : (
+            <Note kind="dark" title="It goes into the book on its own">
+              {waitingOnPeople
+                ? "As soon as you've said who's who and the pictures are drawn."
+                : drawing
+                  ? "As soon as the pictures are drawn."
+                  : failed > 0
+                    ? "As soon as every picture is drawn."
+                    : chapter.guardianStatus !== "approved"
+                      ? "The Vambie team is giving it a final read first."
+                      : "Going in now."}
+            </Note>
+          )
+        ) : !allApproved ? (
           <>
             <button
               className="btn btn--lime btn--caps"
@@ -330,6 +352,7 @@ function PageCard({
   chapterDrawing,
   waitingOnPeople,
   castNames,
+  reviewed,
 }: {
   page: StoryPage;
   busy: string | null;
@@ -337,6 +360,7 @@ function PageCard({
   chapterDrawing: boolean;
   waitingOnPeople: boolean;
   castNames: Record<string, string>; // character key or ref → name
+  reviewed: boolean; // before the birth, pages are approved one by one (VSB-134)
 }) {
   const [mode, setMode] = useState<"view" | "edit" | "revise" | "off">("view");
   const [text, setText] = useState(page.text);
@@ -387,7 +411,7 @@ function PageCard({
           Page {page.pageNumber}
           {page.pictureSize ? ` · ${page.pictureSize === "none" ? "words only" : page.pictureSize}` : ""}
         </span>
-        {page.approvedAt ? (
+        {reviewed && page.approvedAt ? (
           <span className="badge badge--green badge--sm">
             <IconCheck size={14} strokeWidth={3} /> Approved
           </span>
@@ -608,7 +632,7 @@ function PageCard({
 
       {mode === "view" && (
         <div className="hstack" style={{ flexWrap: "wrap", gap: 8, marginTop: 14 }}>
-          {!page.approvedAt && (
+          {reviewed && !page.approvedAt && (
             <button
               className="btn btn--lime btn--xs btn--auto"
               disabled={disabled || (pictured && !ready)}

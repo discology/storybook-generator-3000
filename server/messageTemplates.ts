@@ -103,7 +103,7 @@ export const MESSAGE_TYPES: MessageType[] = [
   {
     key: "review_ready",
     name: "Chapter ready for review",
-    trigger: "Sent to the parent when the weekly chapter is drafted and waiting for page approval",
+    trigger: "No longer sent: chapters go into the book on their own (VSB-137). Kept so older texts in the log still have a name",
     variables: [v.parentName, v.childName, v.storybookTitle, v.chapterTitle, v.reviewUrl],
     defaultBody: "This week's chapter for <child_name> is ready for your review: \"<chapter_title>\". <review_url>",
   },

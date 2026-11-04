@@ -1,5 +1,6 @@
 import express, { Router } from "express";
 import { prisma } from "./db";
+import { autoPublish } from "./autoPublish";
 import { guardianReview } from "./aiService";
 import { createPagedChapter, recordedBy } from "./storyPages";
 import { effectiveStage, stageInfo } from "./readingStages";
@@ -167,7 +168,9 @@ router.put("/admin/chapters/:id/approve", async (req, res) => {
   const open = await prisma.guardianFinding.count({ where: { chapterId: req.params.id, status: "needs_revision" } });
   if (open > 0) return res.status(400).json({ error: "Resolve the open findings first." });
   await prisma.chapter.update({ where: { id: req.params.id }, data: { guardianStatus: "approved", revisionRequested: false } });
-  res.json({ ok: true });
+  // Approved by the team: it goes into the book on its own (VSB-137).
+  const published = await autoPublish(req.params.id).catch(() => false);
+  res.json({ ok: true, published });
 });
 
 router.put("/admin/chapters/:id/hold", async (req, res) => {

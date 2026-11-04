@@ -12,11 +12,10 @@ export function chapterStep(c: StorybookChapter, childName: string) {
   if (c.pagesStatus === "illustrating") return { kicker: "Drawing the pictures", tag: "Drawing", text: "This takes a few minutes. You can leave this page.", spinner: true, cta: "pages" as const, go: null };
   if (c.pagesStatus === "needs_attention")
     return { kicker: "A picture needs another try", tag: "Needs a redraw", text: "Open the chapter to redraw it.", art: "peek-worried" as MascotName, cta: "pages" as const, go: "Open" };
-  if (c.approvedPages < c.pageCount)
-    return { kicker: "Ready to review", tag: "To review", text: `Look through the pages and add it to ${possessive(childName)} book.`, art: "open-book" as MascotName, cta: "pages" as const, go: "Review" };
+  // No review and no Publish tap: a drawn chapter goes into the book on its own (VSB-137).
   if (c.guardianStatus !== "approved")
     return { kicker: "Almost ready", tag: "Almost ready", text: "The Vambie team is giving it a final read.", art: "papers" as MascotName, cta: null, go: null };
-  return { kicker: "Ready to publish", tag: "To publish", text: `Publish it to add it to ${possessive(childName)} book.`, art: "hug-book" as MascotName, cta: "pages" as const, go: "Publish" };
+  return { kicker: "Almost ready", tag: "Almost ready", text: `It's going into ${possessive(childName)} book.`, art: "hug-book" as MascotName, cta: null, go: null };
 }
 
 // Before the birth a chapter grows a page per message and is in the book from its

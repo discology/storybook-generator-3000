@@ -892,7 +892,13 @@ async function runGuardian(chapterId: string) {
   });
   const hasIssues = review.findings.some((f) => f.status === "needs_revision");
   await prisma.chapter.update({ where: { id: chapterId }, data: { guardianStatus: hasIssues ? "needs_revision" : "approved" } });
+  // Passed: it goes into the book on its own once its pictures are drawn (VSB-137).
+  if (!hasIssues) publishWhenReady(chapterId);
 }
+
+// Chapters publish themselves (VSB-137); loaded lazily because autoPublish reads this file.
+const publishWhenReady = (chapterId: string) =>
+  void import("./autoPublish").then((m) => m.autoPublish(chapterId)).catch((e) => console.error("Auto-publish:", e?.message));
 
 // --- Answering "who is this?" ---
 
@@ -1657,6 +1663,8 @@ export async function updatePagesStatus(chapterId: string) {
       ? "needs_attention"
       : "ready";
   await prisma.chapter.update({ where: { id: chapterId }, data: { pagesStatus: status } });
+  // Every picture drawn: the chapter goes into the book if nothing else is waiting (VSB-137).
+  if (status === "ready") publishWhenReady(chapterId);
   // The parent hears once that some pictures need another try (VSB-9); not for
   // a visitor's draft, which has no parent yet.
   if (status === "needs_attention" && chapter.pagesStatus !== "needs_attention") {

@@ -81,6 +81,7 @@ export interface Chapter {
   // The question for the grown-ups after the last page (VSB-126).
   reflection?: string | null;
   growing?: boolean; // before the birth, still taking a page per message (VSB-134)
+  living?: boolean; // grown a page per message; the only chapters with page approval (VSB-137)
   createdAt: string;
 }
 
@@ -489,6 +490,7 @@ export interface ReaderChapter {
     voice?: { src: string | null; name: string; durationSec: number | null } | null;
   }[];
   beforeBirth?: boolean;
+  pagesToCheck?: number; // the owner's count of pages with a note to check (VSB-137)
   // Still taking a page per message, and how many it has (VSB-134).
   growing?: boolean;
   voices?: number;

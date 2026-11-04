@@ -17,6 +17,7 @@ import { STAGE_KEYS, ageInYears, effectiveStage, stageForAge, vambieName } from 
 import { eligibleMemories, isGenerating, lastBatchError, makeWeeklyChapter, nextScheduledBatch, TIMEZONES } from "./weeklyChapters";
 import { usageFromRequest } from "./aiUsage";
 import { finishOpenChapter } from "./livingChapters";
+import { textNewChapter } from "./autoPublish";
 
 const UPLOAD_DIR = path.join(process.cwd(), "uploads", "memories");
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -509,8 +510,20 @@ router.get("/chapters/:id/read", async (req, res) => {
     nextChapterId: index >= 0 ? readable[index + 1]?.id ?? null : null,
     previousChapterId: index > 0 ? readable[index - 1].id : null,
     canShare: isOwner(member.me),
+    // Chapters publish themselves with any flagged page in them (VSB-137): the owner
+    // sees how many have a note to check, next to "Edit pages".
+    pagesToCheck: isOwner(member.me) ? chapter.pages.filter((p) => checkNoteCount(p.checkNotes) > 0 || p.assets[0]?.checkStatus === "flagged").length : 0,
   });
 });
+
+const checkNoteCount = (json: string | null) => {
+  try {
+    const notes = JSON.parse(json ?? "[]");
+    return Array.isArray(notes) ? notes.length : 0;
+  } catch {
+    return 0;
+  }
+};
 
 router.put("/chapters/:id/mark", async (req, res) => {
   const member = await memberForChapter(req, res, req.params.id);
@@ -556,26 +569,6 @@ router.put("/chapters/:id/publish", async (req, res) => {
   void textNewChapter(updated.id, member.me.id).catch((e) => console.error("New chapter texts:", e?.message));
   res.json(updated);
 });
-
-// "A new chapter is ready" to everyone else in the family who can read it.
-export async function textNewChapter(chapterId: string, publisherId: string) {
-  const chapter = await prisma.chapter.findUniqueOrThrow({
-    where: { id: chapterId },
-    include: { access: true, storybook: { include: { child: { include: { household: { include: { contributors: { include: { user: true } } } } } } } } },
-  });
-  const sb = chapter.storybook;
-  const body = await renderMessage("chapter_ready", {
-    child_name: childLabel(sb.child.displayName),
-    storybook_title: sb.title,
-    chapter_title: chapter.title,
-    chapter_url: appUrl(`/storybooks/${sb.id}/read/${chapter.id}`),
-  });
-  if (!body) return;
-  for (const c of sb.child.household.contributors) {
-    if (c.id === publisherId || c.inviteStatus !== "joined" || !c.user?.phone || !canSeeChapter(chapter, c)) continue;
-    await sendText({ event: "chapter_ready", to: { userId: c.user.id, phone: c.user.phone }, body, householdId: sb.child.householdId });
-  }
-}
 
 // --- Chapter sharing ---
 router.get("/chapters/:id/access", async (req, res) => {

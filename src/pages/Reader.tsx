@@ -229,10 +229,19 @@ export default function Reader() {
       Close the book
     </Link>
   );
+  const toCheck = chapter.pagesToCheck ?? 0;
   const grownUpLinks = (feedbackLabel: string) => (
     <>
       {chapter.canShare && (
+        // Chapters go into the book on their own (VSB-137); the owner can still fix a page.
         <p style={{ marginTop: 16 }}>
+          <Link to={`${base}/chapters/${chapter.id}/pages`} className="tlink" style={{ fontSize: 17 }}>
+            Edit pages{toCheck ? ` · ${toCheck === 1 ? "1 page" : `${toCheck} pages`} to check` : ""}
+          </Link>
+        </p>
+      )}
+      {chapter.canShare && (
+        <p style={{ marginTop: 14 }}>
           <Link to={`${base}/chapters/${chapter.id}/share`} className="tlink" style={{ fontSize: 17 }}>
             Send this chapter to family
           </Link>

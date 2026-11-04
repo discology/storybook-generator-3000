@@ -7,6 +7,7 @@ import {
   editPageText,
   generateIllustration,
   illustrateChapter,
+  isLiving,
   parseUnresolved,
   PersonAnswer,
   resolvePeople,
@@ -92,6 +93,9 @@ export async function chapterWithPages(chapterId: string) {
   return {
     ...rest,
     storybookId: storybook.id,
+    // Only chapters before the birth still have pages the parent approves (VSB-134);
+    // every other chapter goes into the book on its own (VSB-137).
+    living: isLiving(chapter.generationSnapshot),
     cast,
     unresolved: parseUnresolved(chapter.unresolvedPeople),
     familyCharacters: familyCharacters.map((c) => ({
