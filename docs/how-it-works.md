@@ -159,6 +159,21 @@ Pages made before picture sizes existed keep their original wide format.
 - **For the grown-ups.** A chapter made after the birth has one more page after its end screen, reached with one more swipe or the "For the grown-ups" link: one reflective question for the adult who read it, a place to pause with nothing to fill in. Sending the chapter to family and story feedback live there too, so the end screen stays the child's (VSB-128). Chapters without a question keep those links on the end screen.
 - **Story feedback.** At the end of a chapter, grown-ups can say what felt off. The feedback appears in Story Review, and the chapter stays available meanwhile.
 
+## Text messages
+
+The app texts families for the moments that matter: the welcome, memory reminders, a new chapter or page in the book, a chapter or question someone sends you, someone joining, something that needs a fix, and a download that's ready. Every text starts "Vambie Storybook:", and admins set the wording of each one (see the [admin guide](admin-guide.md#text-messages)).
+
+**Each person chooses their own texts** (VSB-138). Settings → **Text messages**, for parents and family members alike, has:
+
+- **Texts from Vambie**: off stops every text except sign-in codes and things the person asked to be texted about (their download, their storybook being ready).
+- **Text me when**: a switch for each kind, all on to start. *A new chapter or page*; *Family sends me something* (a chapter or a question someone picks for you); *Someone joins the family* (parents only, with new invite link requests); *Something needs a fix* (a picture that didn't finish, a memory we couldn't hear).
+- **Memory reminders** (parents): on or off for each storybook they run, with the schedule and a link to change it in Reminders.
+- **Quiet hours**: "Hold texts overnight", on to start, 9 PM to 8 AM Pacific; the start, end and time zone can be changed. A text that comes during quiet hours waits until they end, and the person's settings are checked again before it goes. Memory reminders keep the time the parent picked, and the welcome and things the person asked for are never held.
+
+Changes save as they're made. If the person replied STOP, the page says their phone is blocking Vambie texts and that replying START turns them back on.
+
+**The link in texts.** The `<subscription_preferences>` variable, available in every message, becomes a link to that person's own Text messages page (`/t/<key>`). It opens without signing in and shows only their text settings. The memory reminder and new chapter texts end with "Change your texts: <link>" by default. When a parent copies a message to send by hand (an invite, a chapter, a question), the link and its label are left out, since the link belongs to whoever the app texts.
+
 ## Running costs
 
 These are estimates from measured token usage at OpenAI's prices in October 2026, for gpt-image-2 at medium quality with GPT-5.5 for every text step.
@@ -175,5 +190,4 @@ The real costs are recorded for every AI call. Admin → Costs shows them per ch
 
 ## Not built yet
 
-- Text messages other than sign-in codes: invites, reminders, chapter links and "your chapter is ready" alerts. The app shows the message for the person to send themselves.
 - Stories in languages other than English.

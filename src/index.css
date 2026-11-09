@@ -1687,6 +1687,79 @@ button {
   gap: 14px;
 }
 
+/* Text messages settings (VSB-138): a switch per kind of text, with a line on what it covers. */
+.text-pref {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 13px 0;
+  border-top: 1px solid var(--line);
+}
+
+.h-section + .text-pref {
+  border-top: 0;
+}
+
+.text-pref__text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.text-pref__title {
+  font-size: 18px;
+  font-weight: 600;
+  line-height: 1.25;
+}
+
+.text-pref__sub {
+  font-size: 15px;
+  line-height: 1.35;
+  color: var(--ink-3);
+}
+
+.text-pref__link {
+  color: inherit;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.text-pref .switch {
+  flex: none;
+}
+
+/* "Saved" floats at the bottom of the screen, since a switch can be far from the page's end. */
+.text-pref__status {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom, 0px));
+  transform: translate(-50%, 8px);
+  margin: 0;
+  padding: 8px 18px;
+  border-radius: 999px;
+  background: var(--ink);
+  color: var(--white);
+  font-size: 15px;
+  font-weight: 700;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.text-pref__status--on {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .text-pref__status {
+    transition: none;
+  }
+}
+
 /* Segmented control */
 .seg {
   display: flex;

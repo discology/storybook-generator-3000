@@ -6,7 +6,7 @@ import { prisma } from "./db";
 import { createPagedChapter, isLiving, recordedBy } from "./storyPages";
 import { getCurrentUser } from "./session";
 import { normalizePhone } from "./sms";
-import { appUrl, renderMessage } from "./messageTemplates";
+import { appUrl, forHandSending, renderMessage } from "./messageTemplates";
 import { sendText } from "./texts";
 import { flagFromFeedback } from "./feedbackRoutes";
 import { LIVING_CHAPTER_PAGES, UNNAMED_TITLE, childLabel, defaultTitle, hasName, isBeforeBirth, speakerOf } from "./beforeBirth";
@@ -645,10 +645,12 @@ router.post("/chapters/:id/share", async (req, res) => {
   for (const r of recipients) {
     if (!body) break;
     const result = await sendText({ event: "chapter_shared", to: { userId: r.user?.id, phone: r.user?.phone ?? null }, body: body.replace(/\s{2,}/g, " "), householdId: member.storybook.child.householdId });
-    if (result.sent) texted.push(r.name);
-    else notTexted.push({ name: r.name, reason: result.reason === "no_phone" ? "no number yet" : result.reason === "opted_out" ? "asked not to get texts" : result.reason === "off" ? "texting isn't on" : "couldn't be texted" });
+    // A text held for their quiet hours goes out in the morning.
+    if (result.sent || result.reason === "held") texted.push(r.name);
+    else notTexted.push({ name: r.name, reason: result.reason === "no_phone" ? "no number yet" : result.reason === "opted_out" || result.reason === "turned_off" ? "asked not to get texts" : result.reason === "off" ? "texting isn't on" : "couldn't be texted" });
   }
-  res.json({ ok: true, link, text: message ? `${message}\n\n${text ?? link}` : text ?? link, texted, notTexted });
+  const handText = text ? forHandSending(text) : link;
+  res.json({ ok: true, link, text: message ? `${message}\n\n${handText}` : handText, texted, notTexted });
 });
 
 // --- Settings ---

@@ -21,6 +21,7 @@ import FamilyCharacterDetail from "./pages/FamilyCharacterDetail";
 import InvitationAccept from "./pages/InvitationAccept";
 import Settings from "./pages/Settings";
 import SettingsReminders from "./pages/SettingsReminders";
+import { SettingsTextsByLink, SettingsTextsSignedIn } from "./pages/SettingsTexts";
 import SettingsStoryPreferences from "./pages/SettingsStoryPreferences";
 import SettingsPrivacy from "./pages/SettingsPrivacy";
 import ExportMemories, { ExportStatus } from "./pages/Export";
@@ -99,6 +100,7 @@ export default function App() {
                 <Route path="/storybooks/:id/characters/:characterId" element={<FamilyCharacterDetail />} />
                 <Route path="/storybooks/:id/settings" element={<Settings />} />
                 <Route path="/storybooks/:id/settings/reminders" element={<SettingsReminders />} />
+                <Route path="/storybooks/:id/settings/texts" element={<SettingsTextsSignedIn />} />
                 <Route path="/storybooks/:id/settings/story-preferences" element={<SettingsStoryPreferences />} />
                 <Route path="/storybooks/:id/settings/privacy" element={<SettingsPrivacy />} />
                 <Route path="/storybooks/:id/settings/export" element={<ExportMemories />} />
@@ -112,6 +114,7 @@ export default function App() {
                 <Route path="/storybooks" element={<YourStorybooks />} />
                 <Route path="/try" element={<TryStory />} />
                 <Route path="/try/save" element={<TrySave />} />
+                <Route path="/t/:key" element={<SettingsTextsByLink />} />
               </Routes>
             </div>
           }

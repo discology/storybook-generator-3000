@@ -41,7 +41,16 @@ const v = {
   answerUrl: { name: "answer_url", description: "Link straight to recording an answer to that question", sample: "https://vambie.app/q/ck61d" },
 } satisfies Record<string, MessageVariable>;
 
-export const MESSAGE_TYPES: MessageType[] = [
+// In every message (VSB-138): a link to the person's own Text messages page, where
+// they choose which texts they get and set quiet hours. It opens without signing
+// in, and each person gets their own; sendText fills it in for each recipient.
+export const SETTINGS_LINK_VARIABLE: MessageVariable = {
+  name: "subscription_preferences",
+  description: "Link to the person's own text settings, to turn texts off or set quiet hours (opens without signing in)",
+  sample: "https://vambie.app/t/8kq2Xr",
+};
+
+const BASE_TYPES: MessageType[] = [
   {
     key: "welcome",
     name: "Welcome",
@@ -63,14 +72,15 @@ export const MESSAGE_TYPES: MessageType[] = [
     name: "Memory reminder",
     trigger: "Sent on the schedule each parent picks in Reminder settings",
     variables: [v.parentName, v.childName, v.storybookTitle, v.storybookUrl, v.recordUrl],
-    defaultBody: "Hi <parent_name>, anything from this week with <child_name> worth keeping? Tap to record: <record_url>",
+    defaultBody:
+      "Hi <parent_name>, anything from this week with <child_name> worth keeping? Tap to record: <record_url> Change your texts: <subscription_preferences>",
   },
   {
     key: "chapter_ready",
     name: "New chapter ready",
     trigger: "Sent to the family when a chapter is approved and published",
     variables: [v.childName, v.storybookTitle, v.chapterTitle, v.chapterUrl],
-    defaultBody: "A new chapter of <storybook_title> is ready: \"<chapter_title>\". Read it here: <chapter_url>",
+    defaultBody: "A new chapter of <storybook_title> is ready: \"<chapter_title>\". Read it here: <chapter_url> Change your texts: <subscription_preferences>",
   },
   {
     key: "page_added",
@@ -144,6 +154,8 @@ export const MESSAGE_TYPES: MessageType[] = [
   },
 ];
 
+export const MESSAGE_TYPES: MessageType[] = BASE_TYPES.map((t) => ({ ...t, variables: [...t.variables, SETTINGS_LINK_VARIABLE] }));
+
 export const getMessageType = (key: string) => MESSAGE_TYPES.find((t) => t.key === key);
 
 const VARIABLE_PATTERN = /<([a-z][a-z0-9_]*)>/g;
@@ -178,6 +190,12 @@ export async function renderMessage(key: string, values: Record<string, string>)
   const template = await getTemplate(key);
   return template.enabled ? startSentences(fillTemplate(template.body, values)) : null;
 }
+
+// Wording the parent sends by hand (an invite or a chapter to copy) leaves out the
+// text settings link and its label, e.g. "Change your texts: <subscription_preferences>":
+// that link belongs to whoever the app texts, not to the people they send it to.
+export const forHandSending = (text: string) =>
+  text.replace(/\s*(?:[A-Z][^.!?:<>\n]{0,40}:\s*)?<subscription_preferences>/g, "").trim();
 
 // Links in texts must be absolute; APP_URL is the public address of the app.
 export const appUrl = (path: string) => `${(process.env.APP_URL || "http://localhost:5174").replace(/\/$/, "")}${path}`;

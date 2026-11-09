@@ -12,6 +12,7 @@ interface TextLogRow {
   body: string | null;
   status: string;
   skipReason: string | null;
+  sendAfter: string | null;
   errorCode: string | null;
   errorMessage: string | null;
   createdAt: string;
@@ -34,7 +35,8 @@ const MODES: Record<TextLog["mode"], { pill: string; label: string; note: string
   live: { pill: "pill good", label: "Live", note: "Texts go to everyone who verified their number and hasn't replied STOP." },
 };
 
-const STATUS_PILL: Record<string, string> = { delivered: "pill good", sent: "pill good", queued: "pill", accepted: "pill", skipped: "pill dark", failed: "pill bad", undelivered: "pill bad" };
+const SKIP_REASON: Record<string, string> = { test_mode: "not a test phone", opted_out: "replied STOP", turned_off: "turned off in their Text messages settings" };
+const STATUS_PILL: Record<string, string> = { held: "pill", sending: "pill", delivered: "pill good", sent: "pill good", queued: "pill", accepted: "pill", skipped: "pill dark", failed: "pill bad", undelivered: "pill bad" };
 
 export default function AdminMessages() {
   const [templates, setTemplates] = useState<MessageTemplate[] | null>(null);
@@ -149,7 +151,10 @@ export default function AdminMessages() {
                     </td>
                     <td>
                       <span className={STATUS_PILL[x.status] ?? "pill"}>{x.status}</span>
-                      {x.skipReason && <div className="status-line">{x.skipReason === "test_mode" ? "not a test phone" : "replied STOP"}</div>}
+                      {x.skipReason && <div className="status-line">{SKIP_REASON[x.skipReason] ?? x.skipReason}</div>}
+                      {x.status === "held" && x.sendAfter && (
+                        <div className="status-line">quiet hours: sends {new Date(x.sendAfter).toLocaleString([], { weekday: "short", hour: "numeric", minute: "2-digit" })}</div>
+                      )}
                       {x.errorCode && (
                         <div className="status-line">
                           Error {x.errorCode}
@@ -157,7 +162,7 @@ export default function AdminMessages() {
                         </div>
                       )}
                     </td>
-                    <td style={{ maxWidth: 320, color: "var(--ink-soft)" }}>{x.body ?? "(cleared after 30 days)"}</td>
+                    <td style={{ maxWidth: 320, color: "var(--ink-soft)", overflowWrap: "anywhere" }}>{x.body ?? "(cleared after 30 days)"}</td>
                   </tr>
                 ))}
               </tbody>

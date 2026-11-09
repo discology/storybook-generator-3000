@@ -503,3 +503,33 @@ export interface ReaderChapter {
   previousChapterId: string | null;
   canShare: boolean;
 }
+
+// Someone's Text messages settings (VSB-138), from /api/me/texts or the private link.
+export interface TextPrefs {
+  textsPaused: boolean;
+  textNewChapters: boolean;
+  textFromFamily: boolean;
+  textFamilyNews: boolean;
+  textFixes: boolean;
+  quietHours: boolean;
+  quietStart: string;
+  quietEnd: string;
+  textTimezone: string;
+}
+
+export interface TextSettingsView {
+  phone: string | null;
+  optedOut: boolean;
+  parent: boolean;
+  prefs: TextPrefs;
+  timezones: string[];
+  reminders: {
+    storybookId: string;
+    childName: string | null;
+    remindersPaused: boolean;
+    remindersPausedUntil: string | null;
+    reminderFrequency: string;
+    reminderDay: string;
+    reminderTime: string;
+  }[];
+}

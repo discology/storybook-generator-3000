@@ -62,7 +62,10 @@ router.post("/admin/messages/:key/test", async (req, res) => {
   if (!user || !type) return res.status(404).json({ error: "Not found" });
   if (textsMode() === "off") return res.status(400).json({ error: "Texting isn't set up on this copy of the app (no Twilio messaging service)." });
   const template = await getTemplate(type.key);
-  const samples = Object.fromEntries(type.variables.map((v) => [v.name, v.name.endsWith("_url") ? appUrl("/") : v.sample]));
+  // <subscription_preferences> is left for sendText, so the admin gets their own real link.
+  const samples = Object.fromEntries(
+    type.variables.filter((v) => v.name !== "subscription_preferences").map((v) => [v.name, v.name.endsWith("_url") ? appUrl("/") : v.sample])
+  );
   const result = await sendText({ event: `test:${type.key}`, to: { userId: user.id, phone: user.phone }, body: fillTemplate(template.body, samples) });
   if (!result.sent) {
     const why: Record<string, string> = {

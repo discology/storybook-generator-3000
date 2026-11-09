@@ -88,6 +88,7 @@ On the hosted app ([Deployment](deployment.md)):
 
 - everything travels over HTTPS, and session cookies are HTTPS-only and HTTP-only;
 - sign-in codes are only texted, through Twilio Verify, which also limits how often codes can be requested;
+- the link to someone's Text messages settings in a text (`/t/<key>`, VSB-138) opens without signing in, so it carries a random key of 72 bits; it only shows and changes that person's text settings and memory reminders on or off (their number masked, no storybook content, a child's name only to tell two storybooks apart);
 - the database and files live on an encrypted disk, with a daily snapshot kept for 5 days.
 
 ## Known limitations

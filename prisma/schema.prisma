@@ -25,6 +25,20 @@ model User {
   // Replied STOP (or Twilio reported them unsubscribed): no texts until START.
   textsOptedOut    Boolean   @default(false)
   textsOptedOutAt  DateTime?
+  // Their Text messages settings (VSB-138). textsPaused is the page's "Texts from
+  // Vambie" switch (STOP above is the phone's own block). Quiet hours hold texts
+  // until quietEnd in textTimezone. textSettingsKey is the private link to the
+  // page, put in texts by <subscription_preferences>.
+  textsPaused      Boolean   @default(false)
+  textNewChapters  Boolean   @default(true)
+  textFromFamily   Boolean   @default(true)
+  textFamilyNews   Boolean   @default(true)
+  textFixes        Boolean   @default(true)
+  quietHours       Boolean   @default(true)
+  quietStart       String    @default("21:00")
+  quietEnd         String    @default("08:00")
+  textTimezone     String    @default("Pacific Time")
+  textSettingsKey  String?   @unique
   texts            TextMessage[]
   flags            Flag[]
   actionItems      ActionItem[]
@@ -593,8 +607,9 @@ model TextMessage {
   householdId  String?
   toMasked     String // last four digits only
   body         String?
-  status       String // queued | sent | delivered | undelivered | failed | skipped
-  skipReason   String? // test_mode | opted_out
+  status       String // held | sending | queued | sent | delivered | undelivered | failed | skipped
+  skipReason   String? // test_mode | opted_out | turned_off
+  sendAfter    DateTime? // held for the person's quiet hours until then (VSB-138)
   twilioSid    String?  @unique
   errorCode    String?
   errorMessage String?

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { Link, useParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
 import AccessDenied from "../components/AccessDenied";
 import { IconHold } from "../components/icons";
@@ -128,7 +128,9 @@ export default function SettingsReminders() {
         <button className="btn btn--lime btn--caps" style={{ marginTop: 18 }} onClick={() => void save()}>
           {saved ? "Saved" : "Save changes"} <Chev />
         </button>
-        <p className="t-center t-small t-muted" style={{ marginTop: 10 }}>Chapter-ready alerts are managed separately.</p>
+        <p className="t-center t-small t-muted" style={{ marginTop: 10 }}>
+          Other texts are in <Link to={`/storybooks/${id}/settings/texts`}>Text messages</Link>.
+        </p>
       </Sheet>
     </div>
   );

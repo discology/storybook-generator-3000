@@ -3,7 +3,7 @@ import express, { Router } from "express";
 import { prisma } from "./db";
 import type { Invitation } from "../src/generated/prisma/client";
 import { getCurrentUser } from "./session";
-import { renderMessage, appUrl } from "./messageTemplates";
+import { renderMessage, appUrl, forHandSending } from "./messageTemplates";
 import { normalizePhone } from "./sms";
 import { householdStorybook, sendText } from "./texts";
 
@@ -95,7 +95,7 @@ router.post("/storybooks/:id/family/invite", async (req, res) => {
   });
   const message = await inviteMessage(me.name, storybook.child.displayName, storybook.title, relationship, token);
   const texted = await textInvite(contact, message, storybook.child.householdId).catch(() => false);
-  res.status(201).json({ contributor, invitation, inviteLink: appUrl(`/invitations/${token}`), inviteMessage: message, devMode: !texted, texted });
+  res.status(201).json({ contributor, invitation, inviteLink: appUrl(`/invitations/${token}`), inviteMessage: message && forHandSending(message), devMode: !texted, texted });
 });
 
 // A fresh link for a pending invite (the old link stops working).
@@ -114,7 +114,7 @@ router.post("/family/:contributorId/resend", async (req, res) => {
   });
   const message = await inviteMessage(member.me.name, member.storybook.child.displayName, storybook.title, invitation.relationship, token);
   const texted = await textInvite(invitation.contact, message, contributor.householdId).catch(() => false);
-  res.json({ inviteLink: appUrl(`/invitations/${token}`), inviteMessage: message, devMode: !texted, texted });
+  res.json({ inviteLink: appUrl(`/invitations/${token}`), inviteMessage: message && forHandSending(message), devMode: !texted, texted });
 });
 
 // Cancels a pending invite or removes someone from the storybook.

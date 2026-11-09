@@ -2,7 +2,7 @@ import express, { Router } from "express";
 import { prisma } from "./db";
 import { canSeeMemory, requireMember, type Member } from "./access";
 import { childLabel } from "./childName";
-import { appUrl, renderMessage } from "./messageTemplates";
+import { appUrl, forHandSending, renderMessage } from "./messageTemplates";
 import { cardStagesFor } from "./promptStages";
 import { fillPrompt, firstName, promptValues } from "./promptVariables";
 import { sendText } from "./texts";
@@ -190,11 +190,13 @@ router.post("/storybooks/:id/prompts/:promptId/ask", async (req, res) => {
     const result = body
       ? await sendText({ event: "question_asked", to: { userId: r.user?.id, phone: r.user?.phone ?? null }, body, householdId: storybook.child.householdId })
       : ({ sent: false, reason: "off" } as const);
-    if (result.sent) texted.push(r.name);
-    else notTexted.push({ name: r.name, reason: result.reason === "no_phone" ? "no number yet" : result.reason === "opted_out" ? "asked not to get texts" : result.reason === "off" ? "texting isn't on" : "couldn't be texted" });
+    // A text held for their quiet hours goes out in the morning.
+    if (result.sent || result.reason === "held") texted.push(r.name);
+    else notTexted.push({ name: r.name, reason: result.reason === "no_phone" ? "no number yet" : result.reason === "opted_out" || result.reason === "turned_off" ? "asked not to get texts" : result.reason === "off" ? "texting isn't on" : "couldn't be texted" });
   }
   const unreached = asking.find((r) => notTexted.some((n) => n.name === r.name));
-  const text = (unreached && (await messageFor(unreached))) || `${fillPrompt(prompt.question, valuesFor(storybook, asking[0]))} ${link}`;
+  const handMessage = unreached && (await messageFor(unreached));
+  const text = (handMessage && forHandSending(handMessage)) || `${fillPrompt(prompt.question, valuesFor(storybook, asking[0]))} ${link}`;
   res.json({ ok: true, link, text, asked: asking.map((r) => r.name), texted, notTexted });
 });
 

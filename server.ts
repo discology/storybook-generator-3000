@@ -26,10 +26,11 @@ import { usageFromRequest } from "./server/aiUsage";
 import costRoutes from "./server/costRoutes";
 import guestRoutes, { startGuestCleanup } from "./server/guests";
 import textRoutes from "./server/textRoutes";
+import textSettingsRoutes from "./server/textSettings";
 import feedbackRoutes from "./server/feedbackRoutes";
 import promptAnswerRoutes from "./server/promptAnswers";
 import { startWeeklyDigest } from "./server/feedbackAnalysis";
-import { startTextCleanup } from "./server/texts";
+import { startHeldTexts, startTextCleanup } from "./server/texts";
 import { startReminders } from "./server/reminders";
 
 const production = process.env.NODE_ENV === "production";
@@ -106,6 +107,7 @@ app.use("/api", costRoutes);
 app.use("/api", guestRoutes);
 app.use("/api", jobRoutes);
 app.use("/api", textRoutes);
+app.use("/api", textSettingsRoutes);
 app.use("/api", feedbackRoutes);
 app.use("/api", promptAnswerRoutes);
 
@@ -133,6 +135,7 @@ app.listen(PORT, () => {
   void failInterruptedExports();
   startGuestCleanup();
   startTextCleanup();
+  startHeldTexts();
   // Memory reminder texts, like weekly chapters, only go out from the hosted app
   // unless asked (TEXT_REMINDERS=on), so two copies never both text a family.
   if (production || process.env.TEXT_REMINDERS === "on") startReminders();
