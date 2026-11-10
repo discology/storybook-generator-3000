@@ -21,7 +21,8 @@ import {
   parseAliases,
 } from "./familyCharacters";
 import { getOpenAI } from "./openaiClient";
-import { LESSON_NOTE, isLessonPrompt } from "./lessons";
+import { DEFAULT_LESSON_STORY, LESSON_STORY_KEY, isLessonPrompt, type LessonContext } from "./lessons";
+import { writeTeacherReply, type ChapterLesson } from "./teachers";
 import { MAX_REFERENCE_IMAGES, withImageRateLimit } from "./imageQueue";
 import { linkUsage, recordImage } from "./aiUsage";
 import { effectiveStage, vambieName } from "./readingStages";
@@ -83,7 +84,17 @@ interface GenerationSnapshot {
   arrival?: boolean;
   // Grown a page at a time, one per message, before the birth (VSB-134).
   living?: boolean;
+  // A lesson story's teacher (VSB-147): their card as it was, their reply to
+  // Baby Vambie, and the lesson for the grown-ups page. Admins only see who.
+  lesson?: ChapterLesson;
 }
+
+// What a lesson memory carries to the AI in this chapter (VSB-140, VSB-147).
+const lessonContext = (snapshot: GenerationSnapshot | null | undefined): LessonContext => ({
+  rules: snapshot?.instructions?.[LESSON_STORY_KEY] || DEFAULT_LESSON_STORY,
+  reply: snapshot?.lesson?.reply,
+  forGrownUps: snapshot?.lesson?.forGrownUps,
+});
 
 // What <before_birth> holds for a chapter: the Before you arrive text, the
 // arrival note, or nothing.
@@ -158,12 +169,15 @@ export interface UnresolvedPerson {
 
 // --- Formatting helpers for AI variables ---
 
-export const formatMemories = (memories: SourceMemory[]) =>
+export const formatMemories = (memories: SourceMemory[], lesson?: LessonContext) =>
   memories
     .map((m, i) =>
-      // A lesson from the landing page (VSB-140) carries its own note: there's no event to stay true to.
+      // A lesson from the landing page (VSB-140) carries the chapter's Lesson
+      // stories rules and the teacher's reply (VSB-147): there's no event to stay true to.
       isLessonPrompt(m.prompt)
-        ? `Memory ${i + 1}:${m.recordedBy ? `\nRecorded by: ${m.recordedBy}` : ""}\nA lesson, not a memory: ${LESSON_NOTE}\nPossible themes: ${m.themes}\nThe grown-up's words: "${m.transcript}"`
+        ? `Memory ${i + 1}:${m.recordedBy ? `\nRecorded by: ${m.recordedBy}` : ""}\nA lesson, not a memory: ${lesson?.rules ?? DEFAULT_LESSON_STORY}\nPossible themes: ${m.themes}\nThe grown-up's words: "${m.transcript}"${
+            lesson?.reply ? `\nA teacher's reply to Baby Vambie (build the story from it; the teacher is never in the story or named): "${lesson.reply}"\nThe lesson underneath: ${lesson.forGrownUps ?? ""}` : ""
+          }`
         : `Memory ${i + 1}:${m.recordedBy ? `\nRecorded by: ${m.recordedBy}` : ""}${m.prompt ? `\nAnswering: ${m.prompt}` : ""}\nWhat happened: ${m.events}\nEmotions present: ${m.emotions}\nPossible themes: ${m.themes}\nOriginal account: "${m.transcript}"`
     )
     .join("\n\n");
@@ -467,12 +481,29 @@ export async function createPagedChapter(input: CreateChapterInput) {
   // A full rewrite keeps the chapter's original rule snapshot.
   const previousSnapshot = existing?.generationSnapshot ? (JSON.parse(existing.generationSnapshot) as GenerationSnapshot) : null;
   let snapshot: GenerationSnapshot;
+  let teacherUsageId: string | null = null;
   if (previousSnapshot) {
     snapshot = previousSnapshot;
   } else {
     snapshot = await newSnapshot(storybook, input.castKeys ?? [], existing?.id);
+    // A lesson story starts from a teacher's reply (VSB-147), kept with the chapter.
+    const lesson = input.memories.find((m) => isLessonPrompt(m.prompt));
+    if (lesson && !snapshot.beforeBirth) {
+      const replied = await writeTeacherReply({
+        storybookId: storybook.id,
+        lesson: lesson.transcript,
+        readingLevel: describeProfile(snapshot.readingProfile),
+        tags: { chapterId: existing?.id ?? null, householdId: storybook.child.householdId },
+      });
+      if (replied) {
+        snapshot.lesson = replied.lesson;
+        teacherUsageId = replied.usageId;
+      }
+    }
   }
-  return planChapter(input, storybook, existing ?? null, priorChapters, snapshot);
+  const chapter = await planChapter(input, storybook, existing ?? null, priorChapters, snapshot);
+  await linkUsage(teacherUsageId, chapter.id);
+  return chapter;
 }
 
 type ChapterStorybook = Prisma.StorybookGetPayload<{ include: { child: true; chapters: true } }>;
@@ -482,7 +513,7 @@ type ChapterStorybook = Prisma.StorybookGetPayload<{ include: { child: true; cha
 async function newSnapshot(storybook: ChapterStorybook, castKeys: string[], existingId?: string): Promise<GenerationSnapshot> {
   const active = await getActiveRules();
   const instructions: Record<string, string> = {};
-  for (const key of ["page_plan", "page_check", "page_revise", "illustration_check", "world", BEFORE_BIRTH_KEY, BEFORE_BIRTH_CLOSING_KEY, REFLECTION_KEY]) {
+  for (const key of ["page_plan", "page_check", "page_revise", "illustration_check", "world", BEFORE_BIRTH_KEY, BEFORE_BIRTH_CLOSING_KEY, REFLECTION_KEY, LESSON_STORY_KEY]) {
     instructions[key] = (await getAiInstruction(key)).body;
   }
   const stage = effectiveStage(storybook);
@@ -531,7 +562,7 @@ async function planChapter(
         child_name: childLabel(storybook.child.displayName),
         reading_level: describeProfile(profile),
         embellishment_rules: embellishmentRule(snapshot.rules),
-        memories: formatMemories(input.memories),
+        memories: formatMemories(input.memories, lessonContext(snapshot)),
         previous_chapters: priorChapters.map((c) => c.title).join(", ") || "(none yet — this is the first chapter)",
         revision_request: input.revisionRequest ? `A reviewer asked for this revision: "${input.revisionRequest}"` : "",
         shot_rules: describeShotRules(snapshot.rules),
@@ -1076,7 +1107,7 @@ export async function checkPages(chapterId: string, pageNumbers?: number[]) {
           child_name: childLabel(chapter.storybook.child.displayName),
           reading_level: describeProfile(profile),
           embellishment_rules: embellishmentRule(snapshot.rules),
-          memories: formatMemories(memories),
+          memories: formatMemories(memories, lessonContext(snapshot)),
           characters: formatCharacters(characterSheet),
           pages: chapter.pages.map((p) => formatPage(p, snapshot, unresolved)).join("\n\n"),
           pages_to_check: targets.map((p) => p.pageNumber).join(", "),
@@ -1144,7 +1175,7 @@ function reviseValues(target: PageRow, ctx: Loaded, request: string, rules: Page
   return namedValues(snapshot, {
     reading_level: describeProfile(snapshot.readingProfile),
     embellishment_rules: embellishmentRule(snapshot.rules),
-    memories: formatMemories(memories),
+    memories: formatMemories(memories, lessonContext(snapshot)),
     characters: formatCharacters(characterSheet),
     page_number: String(target.pageNumber),
     current_page: formatPage(target, snapshot, unresolved),

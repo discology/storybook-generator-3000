@@ -30,6 +30,7 @@ import textSettingsRoutes from "./server/textSettings";
 import feedbackRoutes from "./server/feedbackRoutes";
 import promptAnswerRoutes from "./server/promptAnswers";
 import featuredStoryRoutes from "./server/featuredStories";
+import teacherRoutes from "./server/teachers";
 import { startWeeklyDigest } from "./server/feedbackAnalysis";
 import { startHeldTexts, startTextCleanup } from "./server/texts";
 import { startReminders } from "./server/reminders";
@@ -112,6 +113,7 @@ app.use("/api", textSettingsRoutes);
 app.use("/api", feedbackRoutes);
 app.use("/api", promptAnswerRoutes);
 app.use("/api", featuredStoryRoutes);
+app.use("/api", teacherRoutes);
 
 // In production this server also serves the built web app (npm run build);
 // in development Vite serves it.

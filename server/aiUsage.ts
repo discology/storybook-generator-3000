@@ -50,6 +50,7 @@ const priceFor = (model: string, kind: UsageKind) => {
 // What each step is, in the words the Costs page uses.
 export const STEP_LABELS: Record<string, { label: string; kind: UsageKind; group: "chapter" | "memory" | "family" | "admin" }> = {
   page_plan: { label: "Writing the chapter", kind: "text", group: "chapter" },
+  teacher_reply: { label: "Teacher's reply", kind: "text", group: "chapter" },
   page_check: { label: "Checking the pages", kind: "text", group: "chapter" },
   guardian: { label: "Guardian review", kind: "text", group: "chapter" },
   page_revise: { label: "Rewriting a page", kind: "text", group: "chapter" },

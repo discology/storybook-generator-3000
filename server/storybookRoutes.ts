@@ -17,6 +17,7 @@ import { STAGE_KEYS, ageInYears, effectiveStage, stageForAge, vambieName } from 
 import { eligibleMemories, isGenerating, lastBatchError, makeWeeklyChapter, nextScheduledBatch, TIMEZONES } from "./weeklyChapters";
 import { usageFromRequest } from "./aiUsage";
 import { finishOpenChapter } from "./livingChapters";
+import { chapterLesson } from "./teachers";
 import { textNewChapter } from "./autoPublish";
 
 const UPLOAD_DIR = path.join(process.cwd(), "uploads", "memories");
@@ -320,6 +321,7 @@ router.post("/storybooks/:id/chapters", async (req, res) => {
         emotions: m.interpretation?.emotions ?? "",
         themes: m.interpretation?.themes ?? "",
         recordedBy: recordedBy(m.contributor),
+        prompt: m.promptText,
       })),
     });
     await prisma.memory.updateMany({ where: { id: { in: memoryIds } }, data: { status: "ready" } });
@@ -496,6 +498,8 @@ router.get("/chapters/:id/read", async (req, res) => {
     voicesToFinish: LIVING_CHAPTER_PAGES,
     // The question for the grown-ups, shown after the last page (VSB-126).
     reflection: beforeBirth ? null : chapter.reflection,
+    // A lesson story's lesson, in plain words, on the same page (VSB-147). Never the teacher.
+    lesson: chapterLesson(chapter.generationSnapshot)?.forGrownUps ?? null,
     pages: chapter.pages.map((p) => {
       // Before the birth, a page made from a recorded message plays it, for anyone who may hear it (VSB-118).
       // Only a page that quotes its speaker ("Grandma Rose says: …"); the opening and

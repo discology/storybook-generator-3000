@@ -84,6 +84,7 @@ const TEMPERATURE: Record<string, number> = {
   guardian: 0.2,
   feedback_analysis: 0.3,
   reflection: 0.8,
+  teacher_reply: 0.7,
 };
 
 // Unsaved instructions from the admin editor, used for test runs.

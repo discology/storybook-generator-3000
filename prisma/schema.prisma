@@ -537,6 +537,22 @@ model ChapterShare {
   createdAt      DateTime @default(now())
 }
 
+// A teacher whose ideas shape lesson stories (VSB-147). One replies to Baby
+// Vambie before a lesson story is planned; families never see who. Editing
+// makes a new version, and a chapter keeps the card it was made with.
+model Teacher {
+  id        String   @id @default(cuid())
+  name      String
+  ideas     String   // their core ideas, a few lines
+  voice     String   // how they'd speak to a small child
+  never     String   @default("") // what they'd never do
+  bestFor   String   @default("") // the lessons they suit best (optional)
+  status    String   @default("draft") // draft | active | retired
+  version   Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
 // A sample-family chapter shown on the landing page (VSB-141): its card, and
 // the public link anyone can read it at (/stories/<slug>).
 model FeaturedStory {

@@ -99,11 +99,19 @@ The Vambie Character Library. Every chapter can include these characters, and AI
 - **Expressions in the book's style:** when the reference art is in the book's style, **Draw expressions in the book's style** draws nine moods from it (about three minutes, about $2). Each page then attaches the expression matching its mood in place of the reference art, so the character's face changes with the story. **Redraw the expressions** replaces the set.
 - Editing a card or changing the reference art creates a new version. Chapters keep the version they were made with.
 
+## Teachers
+
+For lesson stories (VSB-147). Before one is planned, the active teacher whose ideas fit the lesson best replies to Baby Vambie and names the lesson underneath; the story is built from that reply. Families never see a teacher's name, only the lesson in plain words on the "For the grown-ups" page. Story Review shows which teacher replied and what they said.
+
+- **A card:** name, their core ideas (in your own words, from their public teachings; no quotes), how they'd speak to a small child, what they'd never do, and optionally the lessons they suit best.
+- **Status:** only *active* teachers reply. The page starts with five drafts (Esther Perel, Ram Dass, Alan Watts, Thich Nhat Hanh, Brené Brown) to read and turn on. With none active, lesson stories use the Lesson stories rules alone.
+- Editing a card makes a new version; chapters keep the version they were made with. Each reply costs one text step, shown on the Costs page as "Teacher's reply".
+
 ## Featured stories
 
 The landing page's "Stories from other families" (VSB-141). These are the team's own sample stories, never a real family's.
 
-- **Sample family:** only this family's chapters can be featured. It has to be a family whose members are all on the Vambie team (their numbers are in `ADMIN_PHONES`). To make one, start a storybook from your own account (Your storybooks, then "Start a storybook for another child"), record sample memories there, and choose it here. Choosing another sample family removes the stories featured now.
+- **Sample family:** only this family's chapters can be featured, and it's left out of Families, the Overview counts and the per-family cost averages (on the Costs page it shows as "(sample stories)"). It has to be a family whose members are all on the Vambie team (their numbers are in `ADMIN_PHONES`). To make one, start a storybook from your own account (Your storybooks, then "Start a storybook for another child"), record sample memories there, and choose it here. Choosing another sample family removes the stories featured now.
 - **Feature** a published chapter, then give its card a title, a one-line blurb and a color (yellow, green, blue or purple, to match the landing page). The order here is the order on the landing page. Untick **Shown** to hide one.
 - Each story has a public link (`/stories/<name>`) that anyone can read without signing in. The link follows the card's title. A hidden or removed story's link says "This story isn't available", with "Make your own story".
 - The landing page reads `/api/public/stories`: each story's title, blurb, color, cover picture and link. Its pictures are served only through that list and the story's link; every other page picture stays private.
@@ -142,7 +150,7 @@ The page also shows the texting mode (off, test or live), a "Text me a test" but
 
 ### AI instructions
 
-The instructions given to the AI at each step: interpret memory, plan pages, check pages, revise a page, check a picture, describe a person, the Guardian, and Reflection (the question for the grown-ups after the last page of a chapter made after the birth, VSB-126; chapters keep the version they were made with). See [AI steps](architecture.md#ai-steps) for when each one runs.
+The instructions given to the AI at each step: interpret memory, plan pages, check pages, revise a page, check a picture, describe a person, the Guardian, Reflection (the question for the grown-ups after the last page of a chapter made after the birth, VSB-126; chapters keep the version they were made with), and Teacher's reply (VSB-147: before a lesson story, the best-fitting teacher's reply to Baby Vambie and the lesson in plain words). **Lesson stories** is a block like The Vambie world: the rules a lesson from the landing page carries to Plan pages, Check pages and Revise page. See [AI steps](architecture.md#ai-steps) for when each one runs.
 
 **The Vambie world** is the first entry and isn't a step: it's the shared text that describes Baby Vambie, Parts, the band as background and the storybook's voice at each reading stage. Plan pages, Check pages, Revise page and the Guardian read it wherever their instructions say `<world>`. It has no model and no test run; to see its effect, test run Plan pages. Chapters keep the version of it they were made with.
 

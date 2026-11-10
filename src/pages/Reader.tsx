@@ -160,7 +160,7 @@ export default function Reader({ publicSlug }: { publicSlug?: string }) {
     : [];
   const ended = index >= pages.length;
   // A chapter with a question for the grown-ups gets its own page after the end (VSB-128).
-  const grownUpsIndex = chapter?.reflection ? pages.length + 1 : null;
+  const grownUpsIndex = chapter?.reflection || chapter?.lesson ? pages.length + 1 : null;
   const onGrownUps = grownUpsIndex !== null && index === grownUpsIndex;
 
   const go = useCallback(
@@ -366,9 +366,20 @@ export default function Reader({ publicSlug }: { publicSlug?: string }) {
     <div className="ending grown-ups">
       <span className="reader__chapter">{chapterLabel(chapter.sequence)}</span>
       <p className="grown-ups__label">For the grown-ups</p>
-      <p className="grown-ups__question" style={{ fontSize: `${(wide ? 32 : 26) * textSize}px` }}>
-        {chapter.reflection}
-      </p>
+      {chapter.lesson && (
+        // A lesson story names its lesson here, never on the child's pages (VSB-147).
+        <>
+          <p className="grown-ups__lesson-label">The lesson in this story</p>
+          <p className="grown-ups__lesson" style={{ fontSize: `${(wide ? 22 : 19) * textSize}px` }}>
+            {chapter.lesson}
+          </p>
+        </>
+      )}
+      {chapter.reflection && (
+        <p className="grown-ups__question" style={{ fontSize: `${(wide ? 32 : 26) * textSize}px` }}>
+          {chapter.reflection}
+        </p>
+      )}
       <div className="reader__ornament" aria-hidden="true">
         <IconSparkle size={20} />
       </div>

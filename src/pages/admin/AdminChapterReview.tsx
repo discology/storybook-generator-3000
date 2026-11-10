@@ -38,6 +38,8 @@ interface ChapterDetail {
   findings: Finding[];
   feedback: Feedback[];
   sources: { id: string; title: string | null; recordedBy: string; events: string | null; emotions: string | null; themes: string | null }[];
+  // A lesson story's teacher (VSB-147). Families never see who.
+  lesson: { teacher: { name: string; version: number }; reply: string; forGrownUps: string } | null;
 }
 
 const CATEGORIES = ["continuity", "reader_fit", "private_details", "source_removed"];
@@ -158,6 +160,18 @@ export default function AdminChapterReview() {
         </section>
 
         <aside>
+          {chapter.lesson && (
+            <section className="adm-panel" style={{ padding: 16, marginBottom: 16 }}>
+              <h2 className="h-title" style={{ marginBottom: 6 }}>Lesson story</h2>
+              <p className="t-small t-muted" style={{ margin: "0 0 10px" }}>
+                {chapter.lesson.teacher.name} replied (card version {chapter.lesson.teacher.version}). Families never see the teacher.
+              </p>
+              <p className="t-small" style={{ margin: "0 0 8px" }}>“{chapter.lesson.reply}”</p>
+              <p className="t-small" style={{ margin: 0 }}>
+                <strong>On the grown-ups page:</strong> {chapter.lesson.forGrownUps}
+              </p>
+            </section>
+          )}
           <section className="adm-panel" style={{ padding: 16 }}>
             <h2 className="h-title" style={{ marginBottom: 10 }}>Guardian findings</h2>
             {byCategory.length === 0 && <p className="t-small t-muted">No review yet.</p>}

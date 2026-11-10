@@ -47,6 +47,7 @@ import AdminCharacterEdit from "./pages/admin/AdminCharacterEdit";
 import AdminOverview, { AdminFamilies, AdminSettings, AdminVisitors } from "./pages/admin/AdminOverview";
 import AdminCosts from "./pages/admin/AdminCosts";
 import AdminFeaturedStories from "./pages/admin/AdminFeaturedStories";
+import AdminTeachers from "./pages/admin/AdminTeachers";
 
 export default function App() {
   return (
@@ -67,6 +68,7 @@ export default function App() {
           <Route path="page-rules" element={<AdminPageRules />} />
           <Route path="characters" element={<AdminCharacters />} />
           <Route path="featured" element={<AdminFeaturedStories />} />
+          <Route path="teachers" element={<AdminTeachers />} />
           <Route path="characters/:id" element={<AdminCharacterEdit />} />
           <Route path="costs" element={<AdminCosts />} />
           <Route path="visitors" element={<AdminVisitors />} />

@@ -63,7 +63,7 @@ router.get("/admin/costs", async (req, res) => {
         h.id,
         {
           id: h.id,
-          name: `${h.children.map((c) => adminChildLabel(c.displayName)).join(" & ") || h.name || "Unnamed family"}${h.guestToken ? " (visitor, unsaved)" : ""}`,
+          name: `${h.children.map((c) => adminChildLabel(c.displayName)).join(" & ") || h.name || "Unnamed family"}${h.guestToken ? " (visitor, unsaved)" : h.isSample ? " (sample stories)" : ""}`,
           owner: owner?.name ?? h.owner?.name ?? h.owner?.phone ?? null,
           stage: storybook ? effectiveStage(storybook, now) : null,
           createdAt: h.createdAt,
@@ -160,7 +160,8 @@ router.get("/admin/costs", async (req, res) => {
   const costs = tracked.map((c) => c.cost!);
   const familySpend = sum(rows.filter((r) => r.householdId).map((r) => r.costUsd));
   const shownFamilies = families.filter(
-    (f) => !f.guestToken && (!filters.family || f.id === filters.family) && (!filters.stage || familyInfo.get(f.id)?.stage === filters.stage || chapters.some((c) => c.familyId === f.id))
+    // The team's sample family (VSB-141) isn't a family's spend: it shows on its own line, outside the per-family averages.
+    (f) => !f.guestToken && !f.isSample && (!filters.family || f.id === filters.family) && (!filters.stage || familyInfo.get(f.id)?.stage === filters.stage || chapters.some((c) => c.familyId === f.id))
   );
   const familyWeeks = sum(shownFamilies.filter((f) => f.createdAt.getTime() < end).map((f) => weeksFor(f.createdAt.getTime())));
   const stepSpend = (steps: string[]) => sum(rows.filter((r) => steps.includes(r.step)).map((r) => r.costUsd));

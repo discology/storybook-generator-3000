@@ -4835,6 +4835,23 @@ button.btn-small,
   margin: 14px auto 8px;
 }
 
+/* A lesson story's lesson, above the question (VSB-147). */
+.grown-ups__lesson-label {
+  font-family: var(--font-body);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--paper-soft);
+  margin: 18px 0 0;
+}
+
+.grown-ups__lesson {
+  font-family: var(--font-book);
+  line-height: 1.45;
+  color: var(--paper-ink);
+  max-width: 460px;
+  margin: 6px auto 4px;
+}
+
 /* Two-page spread on tablets and wide screens */
 @media (min-width: 900px) and (min-aspect-ratio: 5/4) {
   .reader__frame {

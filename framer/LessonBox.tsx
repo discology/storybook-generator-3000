@@ -2,8 +2,9 @@
 // Paste this file into Framer as a code component (Assets, Code, New file).
 // The lesson box and its button sit on the page; the button opens a modal for
 // the child's name and birthday, then opens the app's /try with all three in
-// the link, where the preview starts by itself. Colors, fonts, words and the
-// app's address are settings in Framer's right-hand panel.
+// the link, where the preview starts by itself. "Make your own story" at the end
+// of a book in StoryShelf.tsx opens the same modal (VSB-148). Colors, fonts,
+// words and the app's address are settings in Framer's right-hand panel.
 
 import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { createPortal } from "react-dom";
@@ -51,6 +52,17 @@ export default function LessonBox(props: Props) {
     setOpen(true);
   };
 
+  // "Make your own story" at the end of a book (StoryShelf.tsx, VSB-148).
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      (e as CustomEvent<{ handled: boolean }>).detail.handled = true;
+      setNudge(false);
+      setOpen(true);
+    };
+    window.addEventListener("vambie:open-lesson", onOpen);
+    return () => window.removeEventListener("vambie:open-lesson", onOpen);
+  }, []);
+
   return (
     <div style={{ ...props.style, width: "100%", fontFamily: textFont }}>
       <div style={{ background: boxColor, borderRadius: 12, padding: "16px 14px 12px", boxSizing: "border-box" }}>
@@ -90,7 +102,10 @@ export default function LessonBox(props: Props) {
 }
 
 function LessonModal(props: Props & { lesson: string; onClose: () => void }) {
-  const { appUrl, modalTitle, modalButtonLabel, modalNote, textFont, headingFont, buttonColor, buttonTextColor, lesson, onClose } = props;
+  const { appUrl, modalTitle, modalButtonLabel, modalNote, textFont, headingFont, buttonColor, buttonTextColor, onClose } = props;
+  // Opened from a book with nothing typed yet, the modal asks for the lesson too.
+  const [askLesson] = useState(!props.lesson.trim());
+  const [lesson, setLesson] = useState(props.lesson);
   const [name, setName] = useState("");
   const [birthday, setBirthday] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -103,6 +118,7 @@ function LessonModal(props: Props & { lesson: string; onClose: () => void }) {
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
+    if (!lesson.trim()) return setError("Tell us what you'd like to teach Baby Vambie.");
     if (!name.trim()) return setError("Add their name or nickname.");
     if (!birthday || birthday > today()) return setError("Add their birthday. Stories are written for their age.");
     window.location.href = lessonUrl(appUrl, lesson, name, birthday);
@@ -127,10 +143,27 @@ function LessonModal(props: Props & { lesson: string; onClose: () => void }) {
         <button type="button" onClick={onClose} aria-label="Close" style={{ position: "absolute", top: 10, right: 12, border: "none", background: "none", fontSize: 26, lineHeight: 1, cursor: "pointer", color: "#111" }}>
           ×
         </button>
-        <h2 style={{ fontFamily: headingFont, fontSize: 30, lineHeight: 1, textTransform: "uppercase", margin: "0 28px 12px 0" }}>{modalTitle}</h2>
-        <p style={{ fontSize: 15, lineHeight: 1.4, margin: 0, padding: "10px 12px", background: "#F3F3F3", borderRadius: 10 }}>
-          “{/^i want to teach/i.test(lesson.trim()) ? lesson.trim() : `I want to teach Baby Vambie ${lesson.trim()}`}”
-        </p>
+        <h2 style={{ fontFamily: headingFont, fontSize: 30, lineHeight: 1, textTransform: "uppercase", textAlign: "left", color: "#111", background: "none", padding: 0, margin: "0 28px 12px 0" }}>{modalTitle}</h2>
+        {askLesson ? (
+          <>
+            <label style={{ ...label, marginTop: 0 }} htmlFor="vambie-lesson-text">
+              I want to teach Baby Vambie…
+            </label>
+            <textarea
+              id="vambie-lesson-text"
+              value={lesson}
+              onChange={(e) => setLesson(e.target.value)}
+              maxLength={300}
+              rows={2}
+              placeholder="to share, to be brave at the doctor…"
+              style={{ ...input, resize: "none", lineHeight: 1.4 }}
+            />
+          </>
+        ) : (
+          <p style={{ fontSize: 15, lineHeight: 1.4, margin: 0, padding: "10px 12px", background: "#F3F3F3", borderRadius: 10 }}>
+            “{/^i want to teach/i.test(lesson.trim()) ? lesson.trim() : `I want to teach Baby Vambie ${lesson.trim()}`}”
+          </p>
+        )}
         <label style={label} htmlFor="vambie-lesson-name">
           Their name or nickname
         </label>

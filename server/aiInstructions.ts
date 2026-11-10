@@ -1,6 +1,7 @@
 import { prisma } from "./db";
 import type { MessageVariable } from "./messageTemplates";
 import { BEFORE_BIRTH_CLOSING_KEY, BEFORE_BIRTH_KEY, DEFAULT_BEFORE_BIRTH, DEFAULT_CLOSING_LINE } from "./beforeBirth";
+import { DEFAULT_LESSON_STORY, LESSON_STORY_KEY } from "./lessons";
 
 // The AI steps are fixed in code because the code decides when each runs and reads
 // its reply. Admins edit the instructions (stored in AiInstruction); the reply
@@ -21,6 +22,8 @@ export interface AiStep {
 export const WORLD_KEY = "world";
 // The question for the grown-ups after the last page (VSB-126).
 export const REFLECTION_KEY = "reflection";
+// A teacher's reply to Baby Vambie before a lesson story is planned (VSB-147).
+export const TEACHER_REPLY_KEY = "teacher_reply";
 
 export const AI_STEPS: AiStep[] = [
   {
@@ -479,6 +482,45 @@ How to work
 - Suggest at most two fixes per pattern, the most likely to work first. A fix changes one place. Quote the exact current words to replace in "before" (copied character for character from the current wording, or empty to add new words) and give the exact new words in "after". Keep the house style: plain, specific, no jargon. Say how to verify it (for example: "re-test the Camera / framing flags").
 - Be honest about confidence. Prefer one well-aimed fix over many small ones. At most 6 patterns, most important first.`,
     outputFormat: `Respond with ONLY a JSON object, no markdown fences, in this shape: {"summary": "two or three sentences: what's going wrong most and what to fix first", "patterns": [{"name": "short name", "summary": "what's going wrong, in one or two sentences", "flagRefs": ["F1", "F3"], "ruleIds": ["P-2"], "rootCause": "picture_prompt | page_rules | planner | characters | guide_gap | model_limit | other", "rootCauseNote": "one sentence", "trend": "new | growing | steady | shrinking", "suggestions": [{"title": "short imperative title", "target": "one key from the list above, or guide:RULE-ID / guide:new", "before": "exact current words to replace, or empty", "after": "the exact new words", "why": "one or two sentences", "verify": "how to check it worked", "confidence": "high | medium | low"}]}]}`,
+  },
+  {
+    key: LESSON_STORY_KEY,
+    name: "Lesson stories",
+    kind: "block",
+    trigger: "Lessons from the landing page (VSB-140, VSB-147): wherever a lesson appears in <memories> for Plan pages, Check pages and Revise page, this text goes with it, followed by the teacher's reply. Chapters keep the version they were made with",
+    variables: [],
+    defaultBody: DEFAULT_LESSON_STORY,
+    outputFormat: "",
+  },
+  {
+    key: TEACHER_REPLY_KEY,
+    name: "Teacher's reply",
+    trigger: "Runs before a lesson story is planned (VSB-147): picks the active teacher (Admin, Teachers) whose ideas fit the lesson best, and writes their reply to Baby Vambie and the lesson under it. The reply guides the story; the lesson shows on the grown-ups page. Families never see the teacher's name",
+    variables: [
+      { name: "lesson", description: "The grown-up's lesson, in their words", sample: "I want to teach Baby Vambie to share." },
+      { name: "reading_level", description: "The child's reading stage and its limits", sample: "Picture book (ages 3–5): three or four short sentences a page." },
+      { name: "teachers", description: "The active teachers' cards, each with its id", sample: "teacher_thich_nhat_hanh: Thich Nhat Hanh\nIdeas: Breathe and come back to now. We are made of each other.\nHow they speak to a small child: Slow, simple and very gentle.\nNever: Rush or scold.\nBest for: Big feelings, sharing." },
+      { name: "recent_teacher", description: "The teacher of this family's last lesson story, if any", sample: "Brené Brown" },
+    ],
+    defaultBody: `A grown-up wants to teach Baby Vambie something. In this storybook Baby Vambie stands in for their child. Before the story is written, one teacher replies to Baby Vambie and names the lesson underneath.
+
+Pick the one teacher below whose ideas fit this lesson best. If the teacher of this family's last lesson fits only about as well as another, pick the other.
+
+Then write, as that teacher would, drawing only on the ideas and way of speaking on their card:
+- reply: what they would say to Baby Vambie about this lesson, in three to five short sentences a small child could follow. Warm and specific; one concrete picture is better than an explanation. It may go deeper than the grown-up's words or gently turn them (a lesson about sharing can become one about how good it feels when two are happy), but it stays true to what the grown-up wants. Never a famous quote or a line the teacher is known for, never their name, and nothing that only makes sense if you know who they are.
+- lesson: the lesson underneath, in one or two plain sentences written to the grown-up, for example "Sharing grows out of feeling safe: a child who trusts their turn will come can open their hand." No teacher's name, no jargon, and never "should".
+
+The grown-up's words:
+<lesson>
+
+Reading level:
+<reading_level>
+
+Teachers:
+<teachers>
+
+Teacher of this family's last lesson: <recent_teacher>`,
+    outputFormat: `Respond with ONLY a JSON object, no markdown fences, in this shape: {"teacher": "the teacher's id from the list", "reply": "what they say to Baby Vambie", "lesson": "the lesson underneath, written to the grown-up"}`,
   },
 ];
 

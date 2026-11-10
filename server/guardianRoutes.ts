@@ -4,6 +4,7 @@ import { autoPublish } from "./autoPublish";
 import { guardianReview } from "./aiService";
 import { createPagedChapter, recordedBy } from "./storyPages";
 import { effectiveStage, stageInfo } from "./readingStages";
+import { chapterLesson } from "./teachers";
 import { adminChildLabel, childLabel, isBeforeBirth } from "./beforeBirth";
 
 // The Vambie team's side: Story Review, family feedback, an overview and the
@@ -23,8 +24,9 @@ function tabFor(c: { guardianStatus: string; revisionRequested: boolean }, openF
   return "needs_review";
 }
 
-// Visitors' unsaved drafts (server/guests.ts) aren't families yet and stay out of the admin views.
-const familyBook = { status: { not: "guest" } };
+// Visitors' unsaved drafts (server/guests.ts) aren't families yet and stay out
+// of the admin views, and so does the team's sample family (VSB-141).
+const familyBook = { status: { not: "guest" }, child: { household: { isSample: false } } };
 
 router.get("/admin/chapters", async (_req, res) => {
   const chapters = await prisma.chapter.findMany({
@@ -86,6 +88,8 @@ router.get("/admin/chapters/:id", async (req, res) => {
     shareMode: chapter.shareMode,
     isMock: chapter.isMock,
     createdAt: chapter.createdAt,
+    // A lesson story's teacher and reply (VSB-147): admins only.
+    lesson: chapterLesson(chapter.generationSnapshot),
     storybook: {
       id: chapter.storybookId,
       title: chapter.storybook.title,

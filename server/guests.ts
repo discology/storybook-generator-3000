@@ -8,7 +8,7 @@ import { getCurrentUser } from "./session";
 import { canStartStorybook } from "./admin";
 import { ageInYears, stageForAge } from "./readingStages";
 import { interpret, processMemory } from "./memoryPipeline";
-import { createPagedChapter, illustrateChapter, recordedBy } from "./storyPages";
+import { createPagedChapter, illustrateChapter, recordedBy, writeReflection } from "./storyPages";
 import { withUsage } from "./aiUsage";
 import { acceptInvitation, invitationProblem } from "./familyRoutes";
 import { appUrl, renderMessage } from "./messageTemplates";
@@ -401,6 +401,7 @@ async function writePreview(d: Draft, memory: NonNullable<Draft["memory"]>) {
             emotions: memory.interpretation?.emotions ?? "",
             themes: memory.interpretation?.themes ?? "",
             recordedBy: d.me?.relationship ? `their ${d.me.relationship.toLowerCase()}` : undefined,
+            prompt: memory.promptText, // a lesson is known by its question (VSB-140)
           },
         ],
       })
@@ -497,6 +498,13 @@ router.post("/guest/claim", async (req, res) => {
   ]);
   if (!keep) res.clearCookie(GUEST_COOKIE);
 
+  // Previews skip the question for the grown-ups (VSB-126); a saved story gets
+  // it now, under the lesson on a lesson story's grown-ups page (VSB-147).
+  if (d.chapter && !d.chapter.reflection) {
+    const chapterId = d.chapter.id;
+    void withUsage({ trigger: "family", householdId: d.household.id }, () => writeReflection(chapterId)).catch((e) => console.error("Question for the grown-ups after saving failed:", e?.message));
+  }
+
   // Draw the rest of the chapter, or make it now if the preview was skipped.
   // A preview still being written or drawn carries on with the rest itself.
   if (writing.has(d.household.id) || drawing.has(d.household.id)) {
@@ -515,6 +523,7 @@ router.post("/guest/claim", async (req, res) => {
           emotions: memory.interpretation?.emotions ?? "",
           themes: memory.interpretation?.themes ?? "",
           recordedBy: recordedBy({ name, relationship: d.me.relationship }),
+          prompt: memory.promptText,
         },
       ],
     }).catch((e) => console.error("Chapter after saving failed:", e?.message));

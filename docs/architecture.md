@@ -25,7 +25,8 @@ src/                  web app
   auth/               signed-in user context
   index.css           all styles: design tokens, components, screens
 server/               API: routes and the services behind them
-framer/               code components for the Framer landing page (pasted into Framer)
+framer/               code components for the Framer landing page (pasted into Framer):
+                      LessonBox (the lesson box and modal), StoryShelf (the story cards and reading modal)
 server.ts             API entry point: routes, private folders, background jobs
 prisma/
   schema.prisma       data model
@@ -61,7 +62,8 @@ docs/                 these guides
 | `beforeBirth.ts` | Chapters made while expecting: the Before you arrive wording, the pre-birth page limits, the page count that finishes a growing chapter, the arrival note for the first chapter after the birth, and the speaker's name for the reader's voice button |
 | `livingChapters.ts` | Before the birth, a page as soon as a message arrives (VSB-134): which growing chapter a message joins, one page per person, finishing a chapter (eight pages, a second message from someone in it, or the birthday), retries, and the "Your page is in the book" and new-chapter texts. `storyPages.ts` writes, draws, publishes and closes the pages |
 | `featuredStories.ts` | The landing page's sample stories (VSB-141): the sample family, Admin → Featured stories, and the public list, story and pictures under `/api/public/stories` (open to any site, read-only) |
-| `lessons.ts` | "Teach Baby Vambie a lesson" from the landing page (VSB-140): the lesson's fixed question, the note that travels with it to the AI, and the sentence it's saved as |
+| `lessons.ts` | "Teach Baby Vambie a lesson" from the landing page (VSB-140): the lesson's fixed question, the default Lesson stories rules, and the sentence it's saved as |
+| `teachers.ts` | Teachers for lesson stories (VSB-147): Admin → Teachers, and the Teacher's reply step that picks the best-fitting active teacher before a lesson story is planned. The reply and the teacher's card are kept in the chapter's rules snapshot (`lesson`); families only ever see the lesson in plain words |
 | `childName.ts` | What to call the child before a name is given ("your baby" to a parent, "the baby" to others, "Baby on the way" in admin lists) and the default book title. Shared with the web app through `src/lib/format.ts` |
 | `shotRules.ts` | The Shot list: allowed shot types with their framing lines, shots that don't work, matching a planned shot, and grouping flagged shots for review |
 | `characters.ts`, `familyCharacters.ts` | Character cards, casting, reference art and render choice, design proposals |
@@ -79,10 +81,10 @@ The schema is in `prisma/schema.prisma`. Here are the models, grouped by what th
 
 - **People and access:** `User`, `Session`, `OtpCode`, `Household` (a family; `isSample` marks the team's sample family, VSB-141), `Contributor` (a person's place in a family: owner or contributor; one per person per family, so someone in several families' storybooks has one place in each), `Invitation`.
 - **Storybooks and memories:** `Child`, `Storybook` (settings, reminder schedule, reading stage), `Memory`, `TranscriptVersion` (machine and corrected transcripts), `MemoryInterpretation`.
-- **Chapters:** `Chapter` (with its rules snapshot and the question for the grown-ups), `ChapterSource` (which memories it came from), `StoryPage`, `PageAsset` (every picture attempt for a page), `GuardianFinding`, `ChapterAccess` and `ChapterShare` (sharing), `ChapterMark` (bookmarks and reading progress), `StoryFeedback`, `FeaturedStory` (a sample-family chapter on the landing page: its card and public link).
+- **Chapters:** `Chapter` (with its rules snapshot and the question for the grown-ups), `ChapterSource` (which memories it came from), `StoryPage`, `PageAsset` (every picture attempt for a page), `GuardianFinding`, `ChapterAccess` and `ChapterShare` (sharing), `ChapterMark` (bookmarks and reading progress), `StoryFeedback`, `FeaturedStory` (a sample-family chapter on the landing page: its card and public link). A lesson story's teacher, reply and lesson live in the chapter's rules snapshot, not in columns.
 - **Characters:** `Character` and `CharacterArt` (the Vambies), `FamilyCharacter`, `CharacterDesign` (versioned looks per age), `DesignProposal`, `PageAppearance` (which design of a family member is on a page, and what they're wearing).
 - **Visitors:** a visitor's draft is an ordinary `Household` with a guest token (and, for a relative recording before joining, the invitation it came from), holding a storybook with status `guest`. `GuestPreview` logs each free preview for the daily limits, and `AppSetting` holds the daily cap.
-- **Configuration:** `Prompt`, `PromptArtwork` (pictures generated or uploaded for prompt cards), `MessageTemplate`, `AiInstruction`, `GenerationRuleSet` (one row per page rules version), `ShotReview` (a flagged shot pattern the team accepted or blocked).
+- **Configuration:** `Teacher` (VSB-147: a teacher's card for lesson stories, versioned; draft, active or retired), `Prompt`, `PromptArtwork` (pictures generated or uploaded for prompt cards), `MessageTemplate`, `AiInstruction`, `GenerationRuleSet` (one row per page rules version), `ShotReview` (a flagged shot pattern the team accepted or blocked).
 - **Exports:** `ExportRequest`.
 - **Costs:** `AiUsage` (one row per AI call: step, model, tokens, cost in dollars, and the family, chapter or memory it was for).
 
@@ -104,6 +106,8 @@ Background jobs run inside the API process. There's no separate worker yet.
 
 Each step's instructions can be edited under Admin → Settings → AI instructions, and each can use its own model. The reply format is fixed in code, because the app reads it. Every step uses `OPENAI_MODEL` (`gpt-5.5`) unless a step has its own model set.
 
+A lesson in `<memories>` (VSB-140) carries **Lesson stories** (key `lesson_story`), a second block that chapters snapshot, and the teacher's reply when there is one (VSB-147).
+
 The story steps (`page_plan`, `page_check`, `page_revise`, `guardian`) also read **The Vambie world** (key `world`), an editable block rather than a step: `runAiStep` fills it in wherever an instruction says `<world>`, chapters snapshot it with their other instructions, and older chapters without a snapshot read the current text.
 
 | Step | Runs when | Produces |
@@ -115,6 +119,7 @@ The story steps (`page_plan`, `page_check`, `page_revise`, `guardian`) also read
 | `illustration_check` | Each new picture (the image is attached) | Whether it matches the page, and which family members don't match their design |
 | `describe_person` | A photo is uploaded for a family member | A draft of their fixed features and usual clothing |
 | `reflection` | After Check pages on a chapter made after the birth, or when the parent asks for another | The question for the grown-ups after the last page (`Chapter.reflection`) |
+| `teacher_reply` | Before a lesson story is planned, when a teacher is active (VSB-147) | Which teacher replies, their reply to Baby Vambie (the planner builds the story from it) and the lesson in plain words for the grown-ups page |
 | `guardian` | After planning, or when an admin re-runs it | Findings for continuity, reader fit and private details |
 
 Transcription uses `OPENAI_TRANSCRIBE_MODEL` (`gpt-4o-transcribe`). Pictures use the image model and quality from Page Rules (`gpt-image-2`, medium).
