@@ -68,6 +68,7 @@ export const STEP_LABELS: Record<string, { label: string; kind: UsageKind; group
   library_art: { label: "Vambie library art", kind: "image", group: "admin" },
   prompt_art: { label: "Prompt card art", kind: "image", group: "admin" },
   admin_test: { label: "Admin test runs", kind: "text", group: "admin" },
+  card_line: { label: "Card line", kind: "text", group: "admin" },
   feedback_redraw: { label: "Feedback redraws (compare)", kind: "image", group: "admin" },
   feedback_analysis: { label: "Feedback analysis", kind: "text", group: "admin" },
   feedback_replan: { label: "Feedback replans (compare)", kind: "text", group: "admin" },

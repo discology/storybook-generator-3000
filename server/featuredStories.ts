@@ -3,6 +3,9 @@ import { Router, type Response } from "express";
 import { prisma } from "./db";
 import { isAdmin } from "./admin";
 import { appUrl } from "./messageTemplates";
+import { isAiConfigured, runAiStep } from "./aiService";
+import { CARD_LINE_KEY } from "./aiInstructions";
+import { chapterLesson } from "./teachers";
 
 // The landing page's "Stories from other families" (VSB-141): chapters from the
 // team's sample family, each with a card and a public link anyone can read.
@@ -54,6 +57,31 @@ function readCard(body: any, partial = false): { title?: string; blurb?: string;
   }
   if (body?.enabled !== undefined) card.enabled = Boolean(body.enabled);
   return card;
+}
+
+// The card's one line, "Baby Vambie learns…", written from the story (VSB-151).
+// Null without AI or when it fails: the admin writes it instead.
+async function writeCardLine(chapterId: string): Promise<string | null> {
+  if (!isAiConfigured()) return null;
+  const chapter = await prisma.chapter.findUnique({ where: { id: chapterId }, include: { pages: { orderBy: { pageNumber: "asc" } } } });
+  if (!chapter) return null;
+  try {
+    const { output } = await runAiStep(
+      CARD_LINE_KEY,
+      {
+        story: [`Title: ${chapter.title}`, ...chapter.pages.filter((p) => p.text).map((p) => `Page ${p.pageNumber}: ${p.text}`)].join("\n"),
+        lesson: chapterLesson(chapter.generationSnapshot)?.forGrownUps ?? "",
+      },
+      undefined,
+      [],
+      { chapterId }
+    );
+    const line = typeof output?.line === "string" ? output.line.trim().replace(/^["“]|["”]$/g, "").slice(0, 200) : "";
+    return line || null;
+  } catch (error: any) {
+    console.error(`Card line failed for chapter ${chapterId}:`, error?.message ?? error);
+    return null;
+  }
 }
 
 // --- Admin, Featured stories ---
@@ -123,7 +151,7 @@ router.post("/admin/featured", async (req, res) => {
       chapterId: chapter.id,
       slug: slugFor(card.title!, all.map((f) => f.slug)),
       title: card.title!,
-      blurb: card.blurb ?? "",
+      blurb: card.blurb ?? (await writeCardLine(chapter.id)) ?? "",
       color: card.color ?? STORY_COLORS[all.length % STORY_COLORS.length],
       sortOrder: Math.max(0, ...all.map((f) => f.sortOrder + 1)),
     },
@@ -140,6 +168,15 @@ router.put("/admin/featured/:id", async (req, res) => {
   const others = await prisma.featuredStory.findMany({ where: { id: { not: story.id } }, select: { slug: true } });
   const slug = card.title && card.title !== story.title ? slugFor(card.title, others.map((f) => f.slug)) : story.slug;
   res.json(await prisma.featuredStory.update({ where: { id: story.id }, data: { ...card, slug } }));
+});
+
+// "Write another": a fresh card line from the story (VSB-151).
+router.post("/admin/featured/:id/card-line", async (req, res) => {
+  const story = await prisma.featuredStory.findUnique({ where: { id: req.params.id } });
+  if (!story) return res.status(404).json({ error: "That featured story is gone." });
+  const line = await writeCardLine(story.chapterId);
+  if (!line) return res.status(502).json({ error: "Couldn't write a line just now. Try again, or write one." });
+  res.json(await prisma.featuredStory.update({ where: { id: story.id }, data: { blurb: line } }));
 });
 
 router.put("/admin/featured-order", async (req, res) => {

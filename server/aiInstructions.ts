@@ -24,6 +24,8 @@ export const WORLD_KEY = "world";
 export const REFLECTION_KEY = "reflection";
 // A teacher's reply to Baby Vambie before a lesson story is planned (VSB-147).
 export const TEACHER_REPLY_KEY = "teacher_reply";
+// A featured story's one-line card on the landing page (VSB-151).
+export const CARD_LINE_KEY = "card_line";
 
 export const AI_STEPS: AiStep[] = [
   {
@@ -521,6 +523,29 @@ Teachers:
 
 Teacher of this family's last lesson: <recent_teacher>`,
     outputFormat: `Respond with ONLY a JSON object, no markdown fences, in this shape: {"teacher": "the teacher's id from the list", "reply": "what they say to Baby Vambie", "lesson": "the lesson underneath, written to the grown-up"}`,
+  },
+  {
+    key: CARD_LINE_KEY,
+    name: "Card line",
+    trigger: "Runs when a chapter is featured under Admin, Featured stories, or when an admin asks for another (VSB-151): the one line under the story's title on the landing page",
+    variables: [
+      { name: "story", description: "The chapter's title and pages", sample: "Title: Little Storm Cloud\nPage 1: A grey cloud rumbles over the blocks.\nPage 2: Baby Vambie stomps. Papa sits close." },
+      { name: "lesson", description: "A lesson story's lesson, in plain words (empty for other chapters)", sample: "Big feelings pass more easily when a child knows they're still loved while having them." },
+    ],
+    defaultBody: `Write the one-line card for a storybook on Vambie's public website. It sits under the story's title and tells a parent, at a glance, what Baby Vambie learns in this story.
+
+- One short line that starts "Baby Vambie learns", at most 12 words in all. For example: "Baby Vambie learns that storms pass, and love stays."
+- Name the lesson through a small picture from this story when it fits, not as a lecture.
+- Warm, simple words. No "should", no "how to", no exclamation marks.
+- Never name anyone from the story except Baby Vambie: no child's, family member's or teacher's name, because it's public.
+- Stay true to the story: nothing the pages don't show.
+
+The story:
+<story>
+
+The lesson underneath (lesson stories only):
+<lesson>`,
+    outputFormat: `Respond with ONLY a JSON object, no markdown fences, in this shape: {"line": "Baby Vambie learns …"}`,
   },
 ];
 

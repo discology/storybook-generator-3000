@@ -138,6 +138,7 @@ export default function AdminFeaturedStories() {
                 last={i === data.featured.length - 1}
                 onMove={(by) => move(i, by)}
                 onSave={(card) => run(() => apiSend(`/api/admin/featured/${f.id}`, "PUT", card))}
+                onRewrite={() => run(() => apiSend(`/api/admin/featured/${f.id}/card-line`, "POST"))}
                 onRemove={() => {
                   if (window.confirm(`Remove "${f.title}" from the landing page? Its link stops working.`)) void run(() => apiSend(`/api/admin/featured/${f.id}`, "DELETE"));
                 }}
@@ -187,6 +188,7 @@ export default function AdminFeaturedStories() {
 
 function FeaturedRow({
   story,
+  onRewrite,
   colors,
   first,
   last,
@@ -200,11 +202,13 @@ function FeaturedRow({
   last: boolean;
   onMove: (by: number) => void;
   onSave: (card: Partial<Featured>) => void;
+  onRewrite: () => Promise<void>;
   onRemove: () => void;
 }) {
   const [title, setTitle] = useState(story.title);
   const [blurb, setBlurb] = useState(story.blurb);
   const changed = title !== story.title || blurb !== story.blurb;
+  const [rewriting, setRewriting] = useState(false);
 
   return (
     <tr>
@@ -213,7 +217,20 @@ function FeaturedRow({
       </td>
       <td style={{ minWidth: 280 }}>
         <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={60} aria-label="Card title" />
-        <textarea value={blurb} onChange={(e) => setBlurb(e.target.value)} maxLength={200} rows={2} placeholder="One line about the story" aria-label="Card blurb" style={{ marginTop: 6 }} />
+        <textarea value={blurb} onChange={(e) => setBlurb(e.target.value)} maxLength={200} rows={2} placeholder="Baby Vambie learns…" aria-label="Card line" style={{ marginTop: 6 }} />
+        {/* Written from the story when it's featured (VSB-151); another on request. */}
+        <button
+          type="button"
+          className="btn-small btn-secondary"
+          style={{ marginTop: 4 }}
+          disabled={rewriting}
+          onClick={() => {
+            setRewriting(true);
+            void onRewrite().finally(() => setRewriting(false));
+          }}
+        >
+          {rewriting ? "Writing…" : "Write another"}
+        </button>
         <div className="status-line">
           From "{story.chapterTitle}" ·{" "}
           <a href={story.url} target="_blank" rel="noreferrer">

@@ -119,6 +119,7 @@ The story steps (`page_plan`, `page_check`, `page_revise`, `guardian`) also read
 | `illustration_check` | Each new picture (the image is attached) | Whether it matches the page, and which family members don't match their design |
 | `describe_person` | A photo is uploaded for a family member | A draft of their fixed features and usual clothing |
 | `reflection` | After Check pages on a chapter made after the birth, or when the parent asks for another | The question for the grown-ups after the last page (`Chapter.reflection`) |
+| `card_line` | When a chapter is featured, or an admin presses Write another (VSB-151) | The card's one line on the landing page: "Baby Vambie learns…", at most 12 words |
 | `teacher_reply` | Before a lesson story is planned, when a teacher is active (VSB-147) | Which teacher replies, their reply to Baby Vambie (the planner builds the story from it) and the lesson in plain words for the grown-ups page |
 | `guardian` | After planning, or when an admin re-runs it | Findings for continuity, reader fit and private details |
 
