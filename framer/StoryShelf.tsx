@@ -8,7 +8,7 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
-import { addPropertyControls, ControlType } from "framer";
+import { addPropertyControls, ControlType, RenderTarget } from "framer";
 
 interface Props {
   appUrl: string;
@@ -64,8 +64,18 @@ export default function StoryShelf(props: Props) {
       .catch(() => setStories("unavailable"));
   }, [appUrl]);
 
-  // Nothing to show, or Vambie can't be reached: nothing broken on the page.
-  if (stories === "unavailable" || (Array.isArray(stories) && stories.length === 0)) return null;
+  // Nothing to show, or Vambie can't be reached: nothing broken on the page. In
+  // Framer's editor, a note says why the row is empty.
+  if (stories === "unavailable" || (Array.isArray(stories) && stories.length === 0)) {
+    if (RenderTarget.current() !== RenderTarget.canvas) return null;
+    return (
+      <div style={{ ...props.style, width: "100%", padding: 16, boxSizing: "border-box", border: "1.5px dashed #999", borderRadius: 12, fontFamily: props.textFont, fontSize: 13, color: "#555", textAlign: "center" }}>
+        {stories === "unavailable"
+          ? `Couldn't reach ${appBase(appUrl)}. Check the App address setting.`
+          : "No featured stories yet. Feature some in Vambie's Admin → Featured stories and they'll appear here, with their pictures. (Only you see this note, in the editor.)"}
+      </div>
+    );
+  }
 
   return (
     <div style={{ ...props.style, width: "100%" }}>
