@@ -76,7 +76,9 @@ export default function AdminFeaturedStories() {
 
       <div className="card">
         <h3 style={{ marginTop: 0 }}>Sample family</h3>
-        <p className="status-line">Only this family's chapters can be featured, so a real family's story never appears. It has to be a family whose members are all on the Vambie team.</p>
+        <p className="status-line">
+          Only this family's chapters can be featured, and only the ones you feature here are public. It has to be a family owned by someone on the Vambie team. Check with everyone in it first: their stories, and their Vambie looks in the pictures, become public.
+        </p>
         {data.sampleFamily ? (
           <p>
             <strong>{data.sampleFamily.label}</strong>

@@ -6,8 +6,9 @@ import { appUrl } from "./messageTemplates";
 
 // The landing page's "Stories from other families" (VSB-141): chapters from the
 // team's sample family, each with a card and a public link anyone can read.
-// A real family's chapter can never be featured: only a family whose members
-// are all admins can be the sample family, and every public read checks the
+// Only a family owned by someone on the Vambie team can be the sample family
+// (VSB-150: its other members needn't be, so the team's own family books work),
+// only chapters the team features are public, and every public read checks the
 // chapter still belongs to it.
 
 export const STORY_COLORS = ["yellow", "green", "blue", "purple"] as const;
@@ -20,14 +21,14 @@ const withPictures = { pages: { orderBy: { pageNumber: "asc" as const }, include
 const coverPage = (pages: { pageNumber: number; assets: { imagePath: string | null }[] }[]) => pages.find((p) => p.assets[0]?.imagePath)?.pageNumber ?? null;
 const pictureUrl = (slug: string, pageNumber: number) => `api/public/stories/${slug}/pictures/${pageNumber}`;
 
-// A family can be the sample family when everyone who has joined it is an admin.
+// A family can be the sample family when its owner is on the Vambie team (VSB-150).
 async function sampleCandidates() {
   const households = await prisma.household.findMany({
     where: { guestToken: null },
     include: { contributors: { where: { inviteStatus: "joined" }, include: { user: true } }, children: { include: { storybooks: { select: { title: true } } } } },
     orderBy: { createdAt: "asc" },
   });
-  return households.filter((h) => h.contributors.length > 0 && h.contributors.every((c) => c.user && isAdmin(c.user)));
+  return households.filter((h) => h.contributors.some((c) => c.role === "owner" && c.user && isAdmin(c.user)));
 }
 
 const familyLabel = (h: { name: string | null; children: { displayName: string; storybooks: { title: string }[] }[] }) =>
@@ -98,7 +99,7 @@ router.get("/admin/featured", async (_req, res) => {
 router.put("/admin/featured/sample-family", async (req, res) => {
   const id = req.body?.householdId ? String(req.body.householdId) : null;
   if (id && !(await sampleCandidates()).some((h) => h.id === id)) {
-    return res.status(400).json({ error: "Only a family whose members are all on the Vambie team can be the sample family." });
+    return res.status(400).json({ error: "Only a family owned by someone on the Vambie team can be the sample family." });
   }
   await prisma.$transaction([
     prisma.household.updateMany({ where: { isSample: true, ...(id ? { id: { not: id } } : {}) }, data: { isSample: false } }),
