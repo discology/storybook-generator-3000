@@ -21,6 +21,7 @@ import {
   parseAliases,
 } from "./familyCharacters";
 import { getOpenAI } from "./openaiClient";
+import { LESSON_NOTE, isLessonPrompt } from "./lessons";
 import { MAX_REFERENCE_IMAGES, withImageRateLimit } from "./imageQueue";
 import { linkUsage, recordImage } from "./aiUsage";
 import { effectiveStage, vambieName } from "./readingStages";
@@ -159,9 +160,11 @@ export interface UnresolvedPerson {
 
 export const formatMemories = (memories: SourceMemory[]) =>
   memories
-    .map(
-      (m, i) =>
-        `Memory ${i + 1}:${m.recordedBy ? `\nRecorded by: ${m.recordedBy}` : ""}${m.prompt ? `\nAnswering: ${m.prompt}` : ""}\nWhat happened: ${m.events}\nEmotions present: ${m.emotions}\nPossible themes: ${m.themes}\nOriginal account: "${m.transcript}"`
+    .map((m, i) =>
+      // A lesson from the landing page (VSB-140) carries its own note: there's no event to stay true to.
+      isLessonPrompt(m.prompt)
+        ? `Memory ${i + 1}:${m.recordedBy ? `\nRecorded by: ${m.recordedBy}` : ""}\nA lesson, not a memory: ${LESSON_NOTE}\nPossible themes: ${m.themes}\nThe grown-up's words: "${m.transcript}"`
+        : `Memory ${i + 1}:${m.recordedBy ? `\nRecorded by: ${m.recordedBy}` : ""}${m.prompt ? `\nAnswering: ${m.prompt}` : ""}\nWhat happened: ${m.events}\nEmotions present: ${m.emotions}\nPossible themes: ${m.themes}\nOriginal account: "${m.transcript}"`
     )
     .join("\n\n");
 

@@ -83,6 +83,9 @@ model Household {
   guestToken     String?   @unique
   guestExpiresAt DateTime?
   guestInvite    String?
+  // The team's sample family (VSB-141): the only family whose chapters can be
+  // featured on the landing page. Only a family whose members are all admins.
+  isSample       Boolean   @default(false)
   createdAt   DateTime     @default(now())
 }
 
@@ -295,6 +298,7 @@ model Chapter {
   feedback    StoryFeedback[]
   flags       Flag[]
   shares      ChapterShare[]
+  featured    FeaturedStory?
   // Page generation (empty for chapters created before illustrated pages existed).
   ruleSetVersion     Int?
   generationSnapshot String? // JSON: rules, reading profile and AI instructions used
@@ -531,6 +535,22 @@ model ChapterShare {
   recipientIds   String // JSON: contributor ids
   message        String   @default("")
   createdAt      DateTime @default(now())
+}
+
+// A sample-family chapter shown on the landing page (VSB-141): its card, and
+// the public link anyone can read it at (/stories/<slug>).
+model FeaturedStory {
+  id        String   @id @default(cuid())
+  chapterId String   @unique
+  chapter   Chapter  @relation(fields: [chapterId], references: [id], onDelete: Cascade)
+  slug      String   @unique
+  title     String
+  blurb     String   @default("")
+  color     String   @default("yellow") // yellow | green | blue | purple
+  sortOrder Int      @default(0)
+  enabled   Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
 // One family member asking another to answer a card they've answered (VSB-131).

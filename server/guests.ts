@@ -14,6 +14,7 @@ import { acceptInvitation, invitationProblem } from "./familyRoutes";
 import { appUrl, renderMessage } from "./messageTemplates";
 import { sendText, textsMode } from "./texts";
 import { childLabel, defaultTitle } from "./beforeBirth";
+import { LESSON_PROMPT, lessonMemoryText } from "./lessons";
 
 // Try before you sign up (VSB-75). A visitor's first memory and story live in a
 // temporary family tied to this device's cookie: a household with a guest token,
@@ -322,7 +323,10 @@ async function replaceMemory(d: Draft) {
 router.post("/guest/memory", async (req, res) => {
   const d = await loadDraft(req);
   if (!d || !d.me) return res.status(404).json({ error: "Start again: this draft has expired." });
-  const text = String(req.body?.text ?? "").trim().slice(0, 4000);
+  // A lesson from the landing page (VSB-140) answers its own fixed question.
+  const lesson = req.body?.lesson === true;
+  const text = lesson ? lessonMemoryText(String(req.body?.text ?? "")) : String(req.body?.text ?? "").trim().slice(0, 4000);
+  if (lesson && text.replace(/^I want to teach( Baby)? Vambie\s*/i, "").replace(/\W/g, "").length < 2) return res.status(400).json({ error: "What do you want to teach Baby Vambie? A few words is plenty." });
   if (text.length < 10) return res.status(400).json({ error: "Write a little more: a sentence or two is plenty." });
   await replaceMemory(d);
   const memory = await prisma.memory.create({
@@ -332,7 +336,7 @@ router.post("/guest/memory", async (req, res) => {
       visibility: "contributor_only",
       storyUseConsent: true,
       status: "transcribed",
-      promptText: req.body?.promptText ? String(req.body.promptText).slice(0, 200) : null,
+      promptText: lesson ? LESSON_PROMPT : req.body?.promptText ? String(req.body.promptText).slice(0, 200) : null,
       transcripts: { create: { source: "typed", text } },
     },
   });

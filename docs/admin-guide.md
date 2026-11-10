@@ -99,6 +99,15 @@ The Vambie Character Library. Every chapter can include these characters, and AI
 - **Expressions in the book's style:** when the reference art is in the book's style, **Draw expressions in the book's style** draws nine moods from it (about three minutes, about $2). Each page then attaches the expression matching its mood in place of the reference art, so the character's face changes with the story. **Redraw the expressions** replaces the set.
 - Editing a card or changing the reference art creates a new version. Chapters keep the version they were made with.
 
+## Featured stories
+
+The landing page's "Stories from other families" (VSB-141). These are the team's own sample stories, never a real family's.
+
+- **Sample family:** only this family's chapters can be featured. It has to be a family whose members are all on the Vambie team (their numbers are in `ADMIN_PHONES`). To make one, start a storybook from your own account (Your storybooks, then "Start a storybook for another child"), record sample memories there, and choose it here. Choosing another sample family removes the stories featured now.
+- **Feature** a published chapter, then give its card a title, a one-line blurb and a color (yellow, green, blue or purple, to match the landing page). The order here is the order on the landing page. Untick **Shown** to hide one.
+- Each story has a public link (`/stories/<name>`) that anyone can read without signing in. The link follows the card's title. A hidden or removed story's link says "This story isn't available", with "Make your own story".
+- The landing page reads `/api/public/stories`: each story's title, blurb, color, cover picture and link. Its pictures are served only through that list and the story's link; every other page picture stays private.
+
 ## Visitors
 
 People trying Vambie before they sign up get a free three-page preview of their story. Under Admin → Settings → Visitors:

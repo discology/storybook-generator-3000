@@ -56,6 +56,53 @@ interface TryCard {
 }
 const KEEP_NOTE = "Saved on this device for 7 days. Verify your number to keep it.";
 
+// A lesson from the landing page (VSB-140): /try?lesson=…&name=…&birthday=…
+// It waits in this tab until there's a draft to add it to, then becomes the
+// draft's memory and the preview starts by itself.
+interface LessonLink {
+  lesson: string;
+  name: string;
+  birthday: string;
+}
+const LESSON_KEY = "vambie:lesson";
+const pendingLesson = (): LessonLink | null => {
+  try {
+    return JSON.parse(sessionStorage.getItem(LESSON_KEY) ?? "null");
+  } catch {
+    return null;
+  }
+};
+const keepLesson = (lesson: LessonLink | null) => {
+  try {
+    if (lesson) sessionStorage.setItem(LESSON_KEY, JSON.stringify(lesson));
+    else sessionStorage.removeItem(LESSON_KEY);
+  } catch {
+    // storage may be unavailable
+  }
+};
+const isBirthday = (d: string) => /^\d{4}-\d{2}-\d{2}$/.test(d) && !Number.isNaN(new Date(d).getTime()) && d <= new Date().toISOString().slice(0, 10);
+
+async function sendLesson() {
+  const pending = pendingLesson();
+  if (!pending) return;
+  keepLesson(null);
+  await apiSend("/api/guest/memory", "POST", { text: pending.lesson, lesson: true });
+}
+
+// With a name and birthday, straight to writing ("You are their…" is Parent).
+// Otherwise a fresh details step with what the link had, then the lesson.
+async function startLesson(link: LessonLink) {
+  keepLesson(link);
+  if (link.name.trim() && isBirthday(link.birthday)) {
+    const started = await apiSend("/api/guest/start", "POST", { childName: link.name.trim(), stage: "born", birthDate: link.birthday, relationship: "Parent" }).then(
+      () => true,
+      () => false
+    );
+    if (started) return sendLesson();
+  }
+  await apiSend("/api/guest", "DELETE").catch(() => undefined);
+}
+
 const pickMimeType = () => {
   const candidates = ["audio/webm;codecs=opus", "audio/webm", "audio/mp4", "audio/ogg"];
   return candidates.find((c) => typeof MediaRecorder !== "undefined" && MediaRecorder.isTypeSupported(c)) ?? "";
@@ -65,6 +112,8 @@ const clock = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2,
 export default function TryStory() {
   const [params] = useSearchParams();
   const invite = params.get("invite");
+  const lessonLink = params.get("lesson");
+  const lessonStarted = useRef(false);
   const [draft, setDraft] = useState<Draft | null | undefined>(undefined);
   const [error, setError] = useState<string | null>(null);
   const navigate = useNavigate();
@@ -79,13 +128,21 @@ export default function TryStory() {
   );
 
   // A relative's invite link starts (or resumes) a draft for that family's child.
+  // A lesson link from the landing page replaces an unsaved draft; afterwards
+  // the address goes back to /try, so reloading doesn't start it again.
   useEffect(() => {
     if (invite) {
       apiSend(`/api/guest/invite/${invite}`, "POST")
         .then(load)
         .catch((e: ApiError) => setError(e.status === 410 ? "This invitation has expired. Ask the family for a new link." : "This invitation link doesn't work."));
+    } else if (lessonLink !== null) {
+      if (lessonStarted.current) return;
+      lessonStarted.current = true;
+      startLesson({ lesson: lessonLink, name: params.get("name") ?? "", birthday: params.get("birthday") ?? "" })
+        .catch((e: ApiError) => setError(e.message))
+        .finally(() => navigate("/try", { replace: true }));
     } else void load();
-  }, [invite, load]);
+  }, [invite, lessonLink, params, navigate, load]);
 
   // While the memory or the story is being made, check again every few seconds.
   const busy = draft && (draft.memory?.status === "processing" || draft.preview.status === "writing" || (draft.preview.status === "ready" && draft.preview.drawing));
@@ -123,7 +180,16 @@ export default function TryStory() {
     );
   }
   if (draft === undefined) return <Loading />;
-  if (draft === null) return <Details onDone={load} />;
+  if (draft === null)
+    return (
+      <Details
+        onDone={() =>
+          void sendLesson()
+            .catch((e: ApiError) => setError(e.message))
+            .finally(load)
+        }
+      />
+    );
   if (!draft.memory || draft.memory.status === "failed") return <Memory draft={draft} onDone={load} failed={draft.memory?.status === "failed"} />;
   if (draft.memory.status === "processing") return <Working title={<>Listening<br />closely…</>} sub={`Getting ${possessive(draft.child.name)} memory ready.`} />;
 
@@ -317,9 +383,11 @@ function TextWhenReady({ draft, onSaved }: { draft: Draft; onSaved: () => void }
 // --- Step 1: only what the story needs ---
 
 function Details({ onDone }: { onDone: () => void }) {
-  const [childName, setChildName] = useState("");
+  // What a lesson link already gave us (VSB-140).
+  const [lesson] = useState(pendingLesson);
+  const [childName, setChildName] = useState(lesson?.name.trim().slice(0, 40) ?? "");
   const [stage, setStage] = useState<"born" | "expecting">("born");
-  const [birthDate, setBirthDate] = useState("");
+  const [birthDate, setBirthDate] = useState(lesson && /^\d{4}-\d{2}-\d{2}$/.test(lesson.birthday) ? lesson.birthday : "");
   const [dueDate, setDueDate] = useState("");
   const [relationship, setRelationship] = useState("Parent");
   const [error, setError] = useState<string | null>(null);
@@ -344,6 +412,11 @@ function Details({ onDone }: { onDone: () => void }) {
       <p className="t-body" style={{ marginTop: 0 }}>
         Just what the story needs. No account yet: you'll see a preview first.
       </p>
+      {lesson && (
+        <Note kind="ok" style={{ marginBottom: 14 }}>
+          Your lesson becomes the story: “{/^i want to teach/i.test(lesson.lesson.trim()) ? lesson.lesson.trim() : `I want to teach Baby Vambie ${lesson.lesson.trim()}`}”
+        </Note>
+      )}
       <form onSubmit={(e) => void submit(e)}>
         <Field
           label={stage === "expecting" ? "Their name or nickname (optional)" : "Their name or nickname"}
@@ -371,7 +444,7 @@ function Details({ onDone }: { onDone: () => void }) {
         </Field>
         {error && <p className="error-text">{error}</p>}
         <button className="btn btn--lime btn--caps" type="submit" style={{ marginTop: 20 }} disabled={busy || (!childName.trim() && stage === "born")}>
-          {busy ? "One moment…" : "Next: a memory"} <Chev />
+          {busy ? "One moment…" : lesson ? "Make my story" : "Next: a memory"} <Chev />
         </button>
       </form>
       <KeepNote />

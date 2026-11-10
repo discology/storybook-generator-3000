@@ -25,6 +25,7 @@ src/                  web app
   auth/               signed-in user context
   index.css           all styles: design tokens, components, screens
 server/               API: routes and the services behind them
+framer/               code components for the Framer landing page (pasted into Framer)
 server.ts             API entry point: routes, private folders, background jobs
 prisma/
   schema.prisma       data model
@@ -59,6 +60,8 @@ docs/                 these guides
 | `pageRules.ts` | Versioned page rules: reading profiles, art direction, the Shot list, image model and quality |
 | `beforeBirth.ts` | Chapters made while expecting: the Before you arrive wording, the pre-birth page limits, the page count that finishes a growing chapter, the arrival note for the first chapter after the birth, and the speaker's name for the reader's voice button |
 | `livingChapters.ts` | Before the birth, a page as soon as a message arrives (VSB-134): which growing chapter a message joins, one page per person, finishing a chapter (eight pages, a second message from someone in it, or the birthday), retries, and the "Your page is in the book" and new-chapter texts. `storyPages.ts` writes, draws, publishes and closes the pages |
+| `featuredStories.ts` | The landing page's sample stories (VSB-141): the sample family, Admin → Featured stories, and the public list, story and pictures under `/api/public/stories` (open to any site, read-only) |
+| `lessons.ts` | "Teach Baby Vambie a lesson" from the landing page (VSB-140): the lesson's fixed question, the note that travels with it to the AI, and the sentence it's saved as |
 | `childName.ts` | What to call the child before a name is given ("your baby" to a parent, "the baby" to others, "Baby on the way" in admin lists) and the default book title. Shared with the web app through `src/lib/format.ts` |
 | `shotRules.ts` | The Shot list: allowed shot types with their framing lines, shots that don't work, matching a planned shot, and grouping flagged shots for review |
 | `characters.ts`, `familyCharacters.ts` | Character cards, casting, reference art and render choice, design proposals |
@@ -74,9 +77,9 @@ docs/                 these guides
 
 The schema is in `prisma/schema.prisma`. Here are the models, grouped by what they're for:
 
-- **People and access:** `User`, `Session`, `OtpCode`, `Household` (a family), `Contributor` (a person's place in a family: owner or contributor; one per person per family, so someone in several families' storybooks has one place in each), `Invitation`.
+- **People and access:** `User`, `Session`, `OtpCode`, `Household` (a family; `isSample` marks the team's sample family, VSB-141), `Contributor` (a person's place in a family: owner or contributor; one per person per family, so someone in several families' storybooks has one place in each), `Invitation`.
 - **Storybooks and memories:** `Child`, `Storybook` (settings, reminder schedule, reading stage), `Memory`, `TranscriptVersion` (machine and corrected transcripts), `MemoryInterpretation`.
-- **Chapters:** `Chapter` (with its rules snapshot and the question for the grown-ups), `ChapterSource` (which memories it came from), `StoryPage`, `PageAsset` (every picture attempt for a page), `GuardianFinding`, `ChapterAccess` and `ChapterShare` (sharing), `ChapterMark` (bookmarks and reading progress), `StoryFeedback`.
+- **Chapters:** `Chapter` (with its rules snapshot and the question for the grown-ups), `ChapterSource` (which memories it came from), `StoryPage`, `PageAsset` (every picture attempt for a page), `GuardianFinding`, `ChapterAccess` and `ChapterShare` (sharing), `ChapterMark` (bookmarks and reading progress), `StoryFeedback`, `FeaturedStory` (a sample-family chapter on the landing page: its card and public link).
 - **Characters:** `Character` and `CharacterArt` (the Vambies), `FamilyCharacter`, `CharacterDesign` (versioned looks per age), `DesignProposal`, `PageAppearance` (which design of a family member is on a page, and what they're wearing).
 - **Visitors:** a visitor's draft is an ordinary `Household` with a guest token (and, for a relative recording before joining, the invitation it came from), holding a storybook with status `guest`. `GuestPreview` logs each free preview for the daily limits, and `AppSetting` holds the daily cap.
 - **Configuration:** `Prompt`, `PromptArtwork` (pictures generated or uploaded for prompt cards), `MessageTemplate`, `AiInstruction`, `GenerationRuleSet` (one row per page rules version), `ShotReview` (a flagged shot pattern the team accepted or blocked).
@@ -131,7 +134,7 @@ Runtime files live in `uploads/`, which isn't committed.
 | `uploads/memories/` | Voice recordings | Only through `/api/memories/:id/audio`, after an access check |
 | `uploads/exports/` | Export zips | Only through `/api/exports/:id/download`, to the person who asked for it |
 | `uploads/private/photos/` | Family members' reference photos | Only to family members, through an access-checked route |
-| `uploads/pages/` | Page pictures and chapter character sheets | Only to the family's members and admins |
+| `uploads/pages/` | Page pictures and chapter character sheets | Only to the family's members and admins. A featured sample story's pictures are also served to anyone through `/api/public/stories/<name>/pictures/<page>` |
 | `uploads/characters/family/` | Family members' design pictures | Only to the family's members and admins |
 | `uploads/characters/` (the rest) | Vambie art and renders | Public |
 | `uploads/prompts/` | Prompt card artwork: generated and uploaded pictures in the artwork library | Public |

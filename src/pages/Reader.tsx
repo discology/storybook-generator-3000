@@ -47,8 +47,38 @@ const paragraphs = (text: string) => text.split(/\n+/).filter((p) => p.trim());
 
 // Reading a chapter together: one page per screen on phones, a two-page
 // spread on tablets in landscape. Display settings never change the words.
-export default function Reader() {
+// A featured sample story (VSB-141) opens in the same reader, read-only and
+// without signing in: no bookmarks, reading marks or grown-ups page, and it
+// ends with "Make your own story".
+export function PublicStory() {
+  const { slug } = useParams();
+  return <Reader publicSlug={slug} />;
+}
+
+interface PublicStoryData {
+  slug: string;
+  title: string;
+  pages: ReaderChapter["pages"];
+}
+
+const asChapter = (s: PublicStoryData): ReaderChapter => ({
+  id: s.slug,
+  title: s.title,
+  sequence: 0,
+  status: "published",
+  content: "",
+  publishedAt: null,
+  pages: s.pages,
+  mark: null,
+  storybook: { id: "", title: "", childName: "" },
+  nextChapterId: null,
+  previousChapterId: null,
+  canShare: false,
+});
+
+export default function Reader({ publicSlug }: { publicSlug?: string }) {
   const { id, chapterId } = useParams();
+  const isPublic = Boolean(publicSlug);
   const navigate = useNavigate();
   const [chapter, setChapter] = useState<ReaderChapter | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "denied" | "missing">("loading");
@@ -82,6 +112,15 @@ export default function Reader() {
   useEffect(() => {
     setState("loading");
     setIndex(0);
+    if (publicSlug) {
+      apiGet(`/api/public/stories/${encodeURIComponent(publicSlug)}`)
+        .then((s: PublicStoryData) => {
+          setChapter(asChapter(s));
+          setState("ready");
+        })
+        .catch(() => setState("missing"));
+      return;
+    }
     apiGet(`/api/chapters/${chapterId}/read`)
       .then((c: ReaderChapter) => {
         setChapter(c);
@@ -93,7 +132,7 @@ export default function Reader() {
         if (err.status === 401) navigate(`/sign-in?next=${encodeURIComponent(window.location.pathname)}`);
         else setState(err.status === 403 ? "denied" : "missing");
       });
-  }, [chapterId, navigate]);
+  }, [chapterId, publicSlug, navigate]);
 
   useEffect(() => {
     try {
@@ -130,10 +169,11 @@ export default function Reader() {
       const clamped = Math.max(0, Math.min(grownUpsIndex ?? pages.length, next));
       setIndex(clamped);
       pageRef.current?.scrollTo({ top: 0 });
+      if (isPublic) return;
       if (clamped < pages.length) void apiSend(`/api/chapters/${chapter.id}/mark`, "PUT", { lastPage: clamped }).catch(() => undefined);
       else void apiSend(`/api/chapters/${chapter.id}/mark`, "PUT", { finished: true }).catch(() => undefined);
     },
-    [chapter, pages.length, grownUpsIndex]
+    [chapter, pages.length, grownUpsIndex, isPublic]
   );
 
   useEffect(() => {
@@ -154,6 +194,17 @@ export default function Reader() {
   };
 
   if (state === "denied") return <AccessDenied />;
+  if (state === "missing" && isPublic)
+    return (
+      <div className="page">
+        <p className="loading">This story isn't available.</p>
+        <p className="t-center">
+          <Link to="/try" className="btn btn--lime btn--caps" style={{ display: "inline-flex", width: "auto" }}>
+            Make your own story <IconChevronRight size={20} />
+          </Link>
+        </p>
+      </div>
+    );
   if (state === "missing")
     return (
       <div className="page">
@@ -179,7 +230,7 @@ export default function Reader() {
   const chapterHead = (
     <header className="reader__head">
       <span className="reader__chapter">
-        {chapterLabel(chapter.sequence)}
+        {isPublic ? "A Vambie story" : chapterLabel(chapter.sequence)}
         {chapter.beforeBirth ? " · Before you arrive" : ""}
         {chapter.growing ? " · Still being written" : ""}
       </span>
@@ -256,7 +307,7 @@ export default function Reader() {
   );
   const ending = (
     <div className="ending">
-      <span className="reader__chapter">{chapterLabel(chapter.sequence)}</span>
+      <span className="reader__chapter">{isPublic ? "A Vambie story" : chapterLabel(chapter.sequence)}</span>
       <h1 className="ending__line">{chapter.title}</h1>
       {endingPicture && (
         <div className="reader__pic reader__pic--inset" style={{ maxWidth: 360, margin: "0 auto" }}>
@@ -278,15 +329,26 @@ export default function Reader() {
           </p>
         </div>
       ) : (
-        <p className="ending__end">End of chapter {chapter.sequence}</p>
+        <p className="ending__end">{isPublic ? "The end" : `End of chapter ${chapter.sequence}`}</p>
       )}
-      <div className="stack" style={{ marginTop: 22, maxWidth: 380, marginLeft: "auto", marginRight: "auto" }}>
-        <button className="btn btn--purple" onClick={() => go(0)}>
-          Read again
-        </button>
-        {nextOrClose}
-      </div>
-      {grownUpsIndex !== null ? (
+      {isPublic ? (
+        <div className="stack" style={{ marginTop: 22, maxWidth: 380, marginLeft: "auto", marginRight: "auto" }}>
+          <Link className="btn btn--lime btn--caps" to="/try">
+            Make your own story <IconChevronRight size={20} />
+          </Link>
+          <button className="btn btn--outline" onClick={() => go(0)}>
+            Read again
+          </button>
+        </div>
+      ) : (
+        <div className="stack" style={{ marginTop: 22, maxWidth: 380, marginLeft: "auto", marginRight: "auto" }}>
+          <button className="btn btn--purple" onClick={() => go(0)}>
+            Read again
+          </button>
+          {nextOrClose}
+        </div>
+      )}
+      {isPublic ? null : grownUpsIndex !== null ? (
         <p style={{ marginTop: 18 }}>
           <button type="button" className="tlink" style={{ display: "inline-flex", gap: 6, alignItems: "center", fontSize: 17 }} onClick={() => go(grownUpsIndex)}>
             For the grown-ups <IconChevronRight size={18} />
@@ -332,7 +394,9 @@ export default function Reader() {
           header, which only shows on the first page, so voices on later pages never played. */}
       <audio ref={voiceRef} preload="none" onEnded={() => setPlaying(null)} />
       <div className="reader__top">
-        {ended ? (
+        {isPublic ? (
+          <span className="tbar__icon" aria-hidden="true" />
+        ) : ended ? (
           <Link to={base} className="tbar__icon" aria-label="Close the book">
             <IconClose size={28} />
           </Link>
@@ -341,16 +405,18 @@ export default function Reader() {
             <IconChevronLeft size={28} strokeWidth={2.4} />
           </Link>
         )}
-        <span className="tbar__title">{ended ? "" : capitalize(`${possessive(chapter.storybook.childName)} story`)}</span>
+        <span className="tbar__title">{ended || isPublic ? "" : capitalize(`${possessive(chapter.storybook.childName)} story`)}</span>
         <div className="tbar__right">
           {!ended && (
             <button className="tbar__icon" onClick={() => setControls(true)} aria-label="Reading settings">
               Aa
             </button>
           )}
-          <button className="tbar__icon" onClick={() => void toggleFavorite()} aria-pressed={favorite} aria-label={favorite ? "Remove bookmark" : "Bookmark this chapter"}>
-            <IconBookmark size={26} filled={favorite} />
-          </button>
+          {!isPublic && (
+            <button className="tbar__icon" onClick={() => void toggleFavorite()} aria-pressed={favorite} aria-label={favorite ? "Remove bookmark" : "Bookmark this chapter"}>
+              <IconBookmark size={26} filled={favorite} />
+            </button>
+          )}
         </div>
       </div>
 

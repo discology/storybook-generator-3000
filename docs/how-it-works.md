@@ -23,6 +23,14 @@ New visitors see the value before they sign up. "Start their story" on the splas
 - Each device and network gets one preview and one retry a day. There's also a daily cap across all visitors, set under Admin → Settings → Visitors (default 100). Past it, visitors can still record and save, and their story is made once they verify.
 - A relative who opens an invitation can record first too. Their memory joins the family's storybook once they verify their number.
 
+### From the landing page (VSB-139)
+
+The landing page is built in Framer. It shows two things from the app, and Vambie's database stays the one source for both.
+
+- **Teach Baby Vambie a lesson** (VSB-140). The lesson box and its modal are a Framer code component; its source is `framer/LessonBox.tsx`. The visitor types a lesson, then the child's name and birthday, and lands on `/try?lesson=…&name=…&birthday=…`. With all three, the app skips the details and memory steps: "You are their…" is Parent, the lesson is saved as a typed memory answering "What do you want to teach Baby Vambie?", and the preview starts by itself. If the name or birthday is missing or doesn't work, the details step opens with what the link had, and the lesson becomes the story once it's done. A lesson link replaces an unsaved draft on that device, and a saved story isn't touched.
+- **A lesson story.** There's no event to stay true to, so the planner makes up one small, ordinary scene where Baby Vambie finds the lesson out by doing, without a moral (the note in `server/lessons.ts` travels with the memory to Plan pages, Check pages and Revise page). Everything else, from the voice to the reading level and the shot list, applies as usual.
+- **Stories from other families** (VSB-141). These are the team's own sample stories, chosen under Admin → Featured stories. Anyone can read one at `/stories/<name>` without signing in, in the app's reader: no bookmarks, reading marks or grown-ups page, ending with "Make your own story". The landing page reads the list from `/api/public/stories`.
+
 ## 1. Recording a memory
 
 - Anyone in the family can record, for up to 15 minutes, usually in answer to a prompt card such as "What made you smile today?". Or they can **type it** instead (up to about 4,000 characters): a typed memory skips transcription, but otherwise goes through the same steps. Its words can be edited later.

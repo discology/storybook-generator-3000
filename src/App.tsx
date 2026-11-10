@@ -10,7 +10,7 @@ import Memories from "./pages/Memories";
 import MemoryDetail from "./pages/MemoryDetail";
 import MemoryDelete from "./pages/MemoryDelete";
 import Recorder from "./pages/Recorder";
-import Reader, { ReadLatest } from "./pages/Reader";
+import Reader, { PublicStory, ReadLatest } from "./pages/Reader";
 import StoryFeedback from "./pages/StoryFeedback";
 import Family from "./pages/Family";
 import AskQuestion from "./pages/AskQuestion";
@@ -46,6 +46,7 @@ import AdminCharacters from "./pages/admin/AdminCharacters";
 import AdminCharacterEdit from "./pages/admin/AdminCharacterEdit";
 import AdminOverview, { AdminFamilies, AdminSettings, AdminVisitors } from "./pages/admin/AdminOverview";
 import AdminCosts from "./pages/admin/AdminCosts";
+import AdminFeaturedStories from "./pages/admin/AdminFeaturedStories";
 
 export default function App() {
   return (
@@ -65,6 +66,7 @@ export default function App() {
           <Route path="ai/:key" element={<AdminAiInstructionEdit />} />
           <Route path="page-rules" element={<AdminPageRules />} />
           <Route path="characters" element={<AdminCharacters />} />
+          <Route path="featured" element={<AdminFeaturedStories />} />
           <Route path="characters/:id" element={<AdminCharacterEdit />} />
           <Route path="costs" element={<AdminCosts />} />
           <Route path="visitors" element={<AdminVisitors />} />
@@ -114,6 +116,7 @@ export default function App() {
                 <Route path="/storybooks" element={<YourStorybooks />} />
                 <Route path="/try" element={<TryStory />} />
                 <Route path="/try/save" element={<TrySave />} />
+                <Route path="/stories/:slug" element={<PublicStory />} />
                 <Route path="/t/:key" element={<SettingsTextsByLink />} />
               </Routes>
             </div>
