@@ -3,6 +3,7 @@ import express, { Router } from "express";
 import fs from "fs";
 import path from "path";
 import { prisma } from "./db";
+import { withLatestImage } from "./pageImages";
 import { canSeeChapter, isOwner, memberForMemory, requireMember } from "./access";
 import { appUrl, renderMessage } from "./messageTemplates";
 import { sendText } from "./texts";
@@ -51,18 +52,19 @@ export async function buildExport(exportId: string) {
   const options = parseOptions(request.options);
   try {
     const me = await prisma.contributor.findUniqueOrThrow({ where: { id: request.contributorId! } });
-    const storybook = await prisma.storybook.findUniqueOrThrow({
+    const loaded = await prisma.storybook.findUniqueOrThrow({
       where: { id: request.storybookId },
       include: {
         child: true,
         memories: { where: { contributorId: me.id }, include: { transcripts: { orderBy: { createdAt: "desc" }, take: 1 } }, orderBy: { recordedAt: "asc" } },
         chapters: {
           where: { status: "published" },
-          include: { access: true, pages: { orderBy: { pageNumber: "asc" }, include: { assets: { where: { status: "ready" }, orderBy: { version: "desc" }, take: 1 } } } },
+          include: { access: true, pages: { orderBy: { pageNumber: "asc" } } },
           orderBy: { sequence: "asc" },
         },
       },
     });
+    const storybook = { ...loaded, chapters: await withLatestImage(loaded.chapters) };
     const since = options.range === "all" ? 0 : Date.now() - Number(options.range) * 86400000;
     const memories = storybook.memories.filter((m) => (m.eventDate ?? m.recordedAt).getTime() >= since);
     const chapters = storybook.chapters.filter((c) => canSeeChapter(c, me) && (c.publishedAt ?? c.createdAt).getTime() >= since);
