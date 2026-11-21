@@ -40,6 +40,38 @@ interface SentInvite {
   texted: boolean; // the app texted it (the number had already verified here)
 }
 
+// A family's own referral link (GitHub #3): for another family to start a
+// storybook for their child. Relatives joining this one use an invite instead.
+function ReferralCard({ storybookId }: { storybookId: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  useEffect(() => {
+    apiGet(`/api/storybooks/${storybookId}/referral`)
+      .then((r) => setUrl(r.url))
+      .catch(() => setUrl(null));
+  }, [storybookId]);
+  if (!url) return null;
+  const share = async () => {
+    const text = `I've been making a storybook for our family with Vambie. Start one for yours: ${url}`;
+    if (canShare) return void (await navigator.share({ text }).catch(() => undefined));
+    await navigator.clipboard.writeText(text);
+    toast.success("Link copied");
+  };
+  return (
+    <Sheet style={{ marginTop: 18 }}>
+      <h2 className="h-title">Know another family?</h2>
+      <p className="t-small t-muted" style={{ marginTop: 6 }}>
+        Share your link with friends who'd like a storybook for their own child.
+      </p>
+      <div className="share-box" style={{ marginTop: 12 }}>
+        {url}
+      </div>
+      <button className="btn btn--outline" style={{ marginTop: 14 }} onClick={() => void share()}>
+        {canShare ? "Share your link" : "Copy your link"}
+      </button>
+    </Sheet>
+  );
+}
+
 export default function Family() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -242,6 +274,8 @@ export default function Family() {
           )}
         </Sheet>
       )}
+
+      <ReferralCard storybookId={id!} />
 
       <BottomSheet open={!!selected} onClose={() => setSelected(null)} label="Family member">
         {selected && (

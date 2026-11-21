@@ -465,6 +465,7 @@ export interface CreateChapterInput {
   castKeys?: string[]; // characters the parent picked for this chapter
   illustrate?: boolean; // false: the caller draws the pictures itself (a visitor's preview, guests.ts)
   noQuestions?: boolean; // a visitor's preview: no Who's who, unplaced people are drawn from the memory
+  maxPages?: number | null; // the household plan's page cap (entitlements.ts)
 }
 
 // Plans the pages, saves them with a rule snapshot, runs page checks and the
@@ -486,6 +487,10 @@ export async function createPagedChapter(input: CreateChapterInput) {
     snapshot = previousSnapshot;
   } else {
     snapshot = await newSnapshot(storybook, input.castKeys ?? [], existing?.id);
+    if (input.maxPages && !snapshot.beforeBirth) {
+      const p = snapshot.readingProfile;
+      snapshot.readingProfile = { ...p, pagesMax: Math.min(p.pagesMax, input.maxPages), pagesMin: Math.min(p.pagesMin, input.maxPages) };
+    }
     // A lesson story starts from a teacher's reply (VSB-147), kept with the chapter.
     const lesson = input.memories.find((m) => isLessonPrompt(m.prompt));
     if (lesson && !snapshot.beforeBirth) {

@@ -5,6 +5,8 @@ import { childLabel } from "./beforeBirth";
 import { placeWaitingMessages } from "./livingChapters";
 import { appUrl, renderMessage } from "./messageTemplates";
 import { sendText, storybookOwner } from "./texts";
+import { REFUSAL_MESSAGES, withChapterAdmission } from "./entitlements";
+import { randomUUID } from "crypto";
 
 // Each week's memories become one chapter, made at 6 AM (the family's time)
 // the morning after their weekly reminder, so memories recorded in answer to
@@ -101,9 +103,13 @@ export async function makeWeeklyChapter(storybookId: string) {
     } catch {
       castKeys = [];
     }
-    const chapter = await createPagedChapter({
+    // Paid for when it starts and refunded if it fails. A family past its plan
+    // is skipped until the next scheduled time; its memories wait for then.
+    const admitted = await withChapterAdmission(storybook.child.householdId, `weekly:${randomUUID()}`, (plan) =>
+      createPagedChapter({
       storybookId,
       castKeys,
+      maxPages: plan.maxPages,
       memories: memories.map((m) => ({
         id: m.id,
         transcript: m.transcripts[0]?.text ?? "",
@@ -113,7 +119,14 @@ export async function makeWeeklyChapter(storybookId: string) {
         recordedBy: recordedBy(m.contributor),
         prompt: m.promptText,
       })),
-    });
+      })
+    );
+    if (!admitted.ok) {
+      lastErrors.set(storybookId, REFUSAL_MESSAGES[admitted.why]);
+      await prisma.storybook.update({ where: { id: storybookId }, data: { lastBatchAt: new Date() } });
+      return null;
+    }
+    const chapter = admitted.value!;
     await prisma.memory.updateMany({ where: { id: { in: memories.map((m) => m.id) } }, data: { status: "ready" } });
     await prisma.storybook.update({ where: { id: storybookId }, data: { lastBatchAt: new Date(), pendingCastKeys: "[]" } });
     // No "ready for your review" text: the chapter goes into the book on its own (VSB-137).

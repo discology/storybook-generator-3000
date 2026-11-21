@@ -1,4 +1,5 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { apiGet } from "../lib/api";
 import { Link, Navigate, useParams, useSearchParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
 import BottomNav from "../components/BottomNav";
@@ -21,6 +22,23 @@ export default function Memories() {
   const [query, setQuery] = useState("");
   const [who, setWho] = useState("");
   const [month, setMonth] = useState("");
+  // Matches in the full words come from the server; the list itself only
+  // carries an excerpt of each memory.
+  const [wordMatches, setWordMatches] = useState<{ q: string; ids: Set<string> }>({ q: "", ids: new Set() });
+  useEffect(() => {
+    const q = query.trim();
+    if (!q || !id) return;
+    let live = true;
+    const timer = setTimeout(() => {
+      apiGet(`/api/storybooks/${id}/memories/search?q=${encodeURIComponent(q)}`)
+        .then((r: { ids: string[] }) => live && setWordMatches({ q, ids: new Set(r.ids) }))
+        .catch(() => undefined);
+    }, 200);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [id, query]);
 
   const people = useMemo(() => {
     const seen = new Map<string, string>();
@@ -38,9 +56,11 @@ export default function Memories() {
         (!who || m.contributor.id === who) &&
         (!month || monthKey(m.eventDate ?? m.recordedAt) === month) &&
         (!favorites || m.favorite) &&
-        (!q || [m.title, m.words, m.promptText, m.contributor.name].some((t) => t?.toLowerCase().includes(q)))
+        (!q ||
+          [m.title, m.excerpt, m.promptText, m.contributor.name].some((t) => t?.toLowerCase().includes(q)) ||
+          (wordMatches.q.toLowerCase() === q && wordMatches.ids.has(m.id)))
     );
-  }, [storybook, query, who, month, favorites]);
+  }, [storybook, query, who, month, favorites, wordMatches]);
 
   // The chapter list used to live here, behind a switch: an old link to it opens Book.
   if (params.get("tab") === "chapters") return <Navigate to={`/storybooks/${id}/book`} replace />;

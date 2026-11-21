@@ -10,6 +10,11 @@ export default defineConfig({
         target: "http://localhost:3002",
         changeOrigin: true,
       },
+      // A family's referral link (server/referrals.ts).
+      "^/r/": {
+        target: "http://localhost:3002",
+        changeOrigin: true,
+      },
       "/uploads": {
         target: "http://localhost:3002",
         changeOrigin: true,

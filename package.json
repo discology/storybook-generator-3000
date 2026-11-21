@@ -13,7 +13,10 @@
     "db:studio": "prisma studio",
     "characters:import-voot": "tsx prisma/importVootCharacters.ts",
     "characters:import-renders": "tsx prisma/importVambieRenders.ts",
-    "check:motion": "node scripts/check-motion.mjs"
+    "check:motion": "node scripts/check-motion.mjs",
+    "typecheck": "tsc --noEmit -p .",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "measure:home": "tsx scripts/measure-home.ts"
   },
   "dependencies": {
     "@google/genai": "^2.27.0",

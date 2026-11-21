@@ -9,6 +9,12 @@ interface Overview {
   recentFeedback: { id: string; chapterId: string; chapterTitle: string; reason: string; note: string; from: string; createdAt: string }[];
 }
 
+interface Referrals {
+  totals: { families: number; invitesSent: number; invitesAccepted: number; referralSignups: number; referralPaid: number };
+  kFactor: number;
+  families: { householdId: string; family: string; invitesSent: number; invitesAccepted: number; referralSignups: number; referralPaid: number }[];
+}
+
 const FEEDBACK_LABEL: Record<string, string> = {
   missed_meaning: "It missed what they meant",
   too_private: "Something feels too private",
@@ -18,8 +24,10 @@ const FEEDBACK_LABEL: Record<string, string> = {
 
 export default function AdminOverview() {
   const [data, setData] = useState<Overview | null>(null);
+  const [referrals, setReferrals] = useState<Referrals | null>(null);
   useEffect(() => {
     apiGet("/api/admin/overview").then(setData);
+    apiGet("/api/admin/referrals").then(setReferrals);
   }, []);
   if (!data) return <p>Loading…</p>;
   const c = data.counts;
@@ -52,6 +60,48 @@ export default function AdminOverview() {
         {stat(c.pendingInvites, "Invites waiting")}
         {stat(c.failedMemories, "Memories that couldn't be transcribed", undefined, true)}
       </div>
+
+      {referrals && (
+        <>
+          <h2 className="adm-section-title">Invites and referrals</h2>
+          <div className="stat-grid">
+            {stat(referrals.totals.invitesSent, "Invites sent")}
+            {stat(referrals.totals.invitesAccepted, "Relatives joined")}
+            {stat(referrals.totals.referralSignups, "New families from a referral")}
+            {stat(referrals.totals.referralPaid, "Referred families paying")}
+          </div>
+          <p className="t-small t-muted" style={{ marginTop: 8 }}>
+            {referrals.kFactor.toFixed(2)} new families per family so far. Relatives joining a storybook are invites; a referral is someone starting their own.
+          </p>
+          {referrals.families.some((f) => f.referralSignups > 0) && (
+            <table className="adm-table" style={{ marginTop: 12 }}>
+              <thead>
+                <tr>
+                  <th>Family</th>
+                  <th>Invites sent</th>
+                  <th>Joined</th>
+                  <th>New families</th>
+                  <th>Paying</th>
+                </tr>
+              </thead>
+              <tbody>
+                {referrals.families
+                  .filter((f) => f.referralSignups > 0)
+                  .slice(0, 10)
+                  .map((f) => (
+                    <tr key={f.householdId}>
+                      <td>{f.family}</td>
+                      <td>{f.invitesSent}</td>
+                      <td>{f.invitesAccepted}</td>
+                      <td>{f.referralSignups}</td>
+                      <td>{f.referralPaid}</td>
+                    </tr>
+                  ))}
+              </tbody>
+            </table>
+          )}
+        </>
+      )}
 
       {data.needsAttention.length > 0 && (
         <>
@@ -110,6 +160,9 @@ interface FamilyRow {
   stage: string;
   lastMemoryAt: string | null;
   createdAt: string;
+  householdId: string;
+  plan: string;
+  credits: number;
 }
 
 export function AdminFamilies() {
@@ -125,6 +178,12 @@ export function AdminFamilies() {
   }, [rows, query]);
   if (!rows) return <p>Loading…</p>;
   const date = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—");
+  const comp = async (r: FamilyRow) => {
+    const note = window.prompt(`Give ${r.childName}'s family one extra chapter. Why? (shown in the ledger)`);
+    if (note === null) return;
+    const { credits } = await apiSend(`/api/admin/households/${r.householdId}/credits`, "POST", { delta: 1, note, requestId: crypto.randomUUID() });
+    setRows((all) => (all ?? []).map((x) => (x.householdId === r.householdId ? { ...x, credits } : x)));
+  };
 
   return (
     <div>
@@ -146,6 +205,8 @@ export function AdminFamilies() {
             <th>Memories</th>
             <th>Chapters</th>
             <th>Last memory</th>
+            <th>Plan</th>
+            <th>Extra chapters</th>
           </tr>
         </thead>
         <tbody>
@@ -163,11 +224,18 @@ export function AdminFamilies() {
               <td>{r.memories}</td>
               <td>{r.chapters}</td>
               <td>{date(r.lastMemoryAt)}</td>
+              <td>{r.plan}</td>
+              <td>
+                {r.credits}{" "}
+                <button className="btn btn--ghost btn--sm" onClick={() => comp(r)}>
+                  Give one
+                </button>
+              </td>
             </tr>
           ))}
           {shown.length === 0 && (
             <tr>
-              <td colSpan={7} style={{ color: "var(--ink-3)", padding: "22px 16px" }}>
+              <td colSpan={9} style={{ color: "var(--ink-3)", padding: "22px 16px" }}>
                 No families match.
               </td>
             </tr>

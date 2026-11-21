@@ -21,6 +21,9 @@ import { usageFromRequest } from "./aiUsage";
 import { finishOpenChapter } from "./livingChapters";
 import { chapterLesson } from "./teachers";
 import { textNewChapter } from "./autoPublish";
+import { REFUSAL_MESSAGES, canGenerateChapter, entitlements, withChapterAdmission } from "./entitlements";
+import { randomUUID } from "crypto";
+import { attributeReferral } from "./referrals";
 
 const UPLOAD_DIR = path.join(process.cwd(), "uploads", "memories");
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -68,6 +71,7 @@ router.post("/storybooks", async (req, res) => {
   if (!phone) return res.status(400).json({ error: "Enter a full mobile number, like +1 555 123 4567. We text your reminder links there." });
 
   const household = await prisma.household.create({ data: { ownerUserId: user.id } });
+  await attributeReferral(req, household.id, user.id);
   const child = await prisma.child.create({
     data: {
       householdId: household.id,
@@ -196,7 +200,6 @@ router.get("/storybooks/:id", async (req, res) => {
       mine: m.contributorId === me.id,
       favorite: parseIds(favoritedBy).includes(me.id),
       excerpt: transcripts[0]?.text.slice(0, 220) ?? null,
-      words: transcripts[0]?.text ?? "",
       chapterIds: chapterSources.map((s) => s.chapterId),
     }));
 
@@ -222,7 +225,15 @@ router.get("/storybooks/:id", async (req, res) => {
     }));
 
   const { memories: _m, chapters: _c, pendingCastKeys, ...settings } = storybook;
+  // The owner sees whether the next chapter can be made (entitlements.ts).
+  let plan = null;
+  if (isOwner(me)) {
+    const e = await entitlements(storybook.child.householdId);
+    const next = await canGenerateChapter(storybook.child.householdId);
+    plan = { reason: e.reason, allowance: e.allowance, allowanceUsed: e.allowanceUsed, credits: e.credits, nextChapter: next.ok ? null : { why: next.why, message: REFUSAL_MESSAGES[next.why] } };
+  }
   res.json({
+    plan,
     ...settings,
     memories,
     chapters,
@@ -240,6 +251,22 @@ router.get("/storybooks/:id", async (req, res) => {
     defaultContributorId: me.id,
     myRole: me.role,
   });
+});
+
+// Memories whose words match, for the Memories search. The home response
+// carries only an excerpt of each, so full transcripts are searched here.
+router.get("/storybooks/:id/memories/search", async (req, res) => {
+  const member = await requireMember(req, res, req.params.id);
+  if (!member) return;
+  const q = String(req.query.q ?? "").trim().slice(0, 100);
+  if (!q) return res.json({ ids: [] });
+  const found = await prisma.memory.findMany({
+    where: { storybookId: member.storybook.id, transcripts: { some: { text: { contains: q } } } },
+    select: { id: true, contributorId: true, visibility: true, transcripts: { orderBy: { createdAt: "desc" }, take: 1, select: { text: true } } },
+  });
+  const needle = q.toLowerCase();
+  // Only the latest words count, and only memories this person may see.
+  res.json({ ids: found.filter((m) => canSeeMemory(m, member.me) && m.transcripts[0]?.text.toLowerCase().includes(needle)).map((m) => m.id) });
 });
 
 // --- This week's chapter ---
@@ -288,6 +315,8 @@ router.post("/storybooks/:id/chapters/weekly", async (req, res) => {
   if (isGenerating(member.storybook.id)) return res.status(202).json({ started: false, generating: true });
   const ready = await eligibleMemories(member.storybook.id);
   if (ready.length === 0) return res.status(400).json({ error: "No memories are ready for a chapter yet." });
+  const admission = await canGenerateChapter(member.storybook.child.householdId);
+  if (!admission.ok) return res.status(402).json({ error: REFUSAL_MESSAGES[admission.why], why: admission.why });
   void makeWeeklyChapter(member.storybook.id).catch(() => undefined);
   res.status(202).json({ started: true });
 });
@@ -314,9 +343,11 @@ router.post("/storybooks/:id/chapters", async (req, res) => {
   if (memories.some((m) => !m.storyUseConsent)) return res.status(400).json({ error: "All selected memories must be allowed in stories first." });
 
   try {
-    const chapter = await createPagedChapter({
+    const admitted = await withChapterAdmission(member.storybook.child.householdId, `manual:${randomUUID()}`, (plan) =>
+      createPagedChapter({
       storybookId: member.storybook.id,
       castKeys: Array.isArray(castKeys) ? castKeys.map(String) : [],
+      maxPages: plan.maxPages,
       memories: memories.map((m) => ({
         id: m.id,
         transcript: m.transcripts[0]?.text ?? "",
@@ -326,9 +357,11 @@ router.post("/storybooks/:id/chapters", async (req, res) => {
         recordedBy: recordedBy(m.contributor),
         prompt: m.promptText,
       })),
-    });
+      })
+    );
+    if (!admitted.ok) return res.status(402).json({ error: REFUSAL_MESSAGES[admitted.why], why: admitted.why });
     await prisma.memory.updateMany({ where: { id: { in: memoryIds } }, data: { status: "ready" } });
-    res.status(201).json(chapter);
+    res.status(201).json(admitted.value);
   } catch (error: any) {
     res.status(502).json({ error: `Couldn't write the chapter: ${error?.message ?? "unknown error"}` });
   }

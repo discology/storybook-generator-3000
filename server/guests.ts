@@ -15,6 +15,8 @@ import { appUrl, renderMessage } from "./messageTemplates";
 import { sendText, textsMode } from "./texts";
 import { childLabel, defaultTitle } from "./beforeBirth";
 import { LESSON_PROMPT, lessonMemoryText } from "./lessons";
+import { reserveChapter, withChapterAdmission } from "./entitlements";
+import { attributeReferral } from "./referrals";
 
 // Try before you sign up (VSB-75). A visitor's first memory and story live in a
 // temporary family tied to this device's cookie: a household with a guest token,
@@ -420,6 +422,8 @@ async function writePreview(d: Draft, memory: NonNullable<Draft["memory"]>) {
     await withUsage({ trigger: "visitor", householdId: id }, () => illustrateChapter(chapterId, { firstPages: PREVIEW_PAGES }));
     const saved = await prisma.household.findUnique({ where: { id }, select: { ownerUserId: true } });
     if (saved?.ownerUserId) {
+      // Saved while the preview was being written: this is their free first chapter.
+      await reserveChapter(id, `chapter:${chapterId}`);
       await notifyStoryReady(id);
       await withUsage({ trigger: "family", householdId: id }, () => illustrateChapter(chapterId, { missingOnly: true }));
     }
@@ -497,6 +501,10 @@ router.post("/guest/claim", async (req, res) => {
     prisma.storybook.update({ where: { id: d.storybook.id }, data: { status: "active" } }),
   ]);
   if (!keep) res.clearCookie(GUEST_COOKIE);
+  await attributeReferral(req, d.household.id, user.id);
+  // The saved preview is the family's free first chapter; it's already written,
+  // so this only records it. Keyed by chapter, so saving twice records it once.
+  if (d.chapter) await reserveChapter(d.household.id, `chapter:${d.chapter.id}`);
 
   // Previews skip the question for the grown-ups (VSB-126); a saved story gets
   // it now, under the lesson on a lesson story's grown-ups page (VSB-147).
@@ -512,9 +520,11 @@ router.post("/guest/claim", async (req, res) => {
   } else if (d.chapter) void illustrateChapter(d.chapter.id, { missingOnly: true });
   else if (d.memory && memoryState(d)?.status === "ready") {
     const memory = d.memory;
-    void createPagedChapter({
+    void withChapterAdmission(d.household.id, `claim:${d.storybook.id}`, (plan) =>
+      createPagedChapter({
       storybookId: d.storybook.id,
       castKeys: [],
+      maxPages: plan.maxPages,
       memories: [
         {
           id: memory.id,
@@ -526,7 +536,8 @@ router.post("/guest/claim", async (req, res) => {
           prompt: memory.promptText,
         },
       ],
-    }).catch((e) => console.error("Chapter after saving failed:", e?.message));
+      })
+    ).catch((e) => console.error("Chapter after saving failed:", e?.message));
   }
   res.json({ storybookId: d.storybook.id, chapterId: d.chapter?.id ?? null, joined: false });
 });
