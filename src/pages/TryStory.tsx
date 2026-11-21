@@ -8,6 +8,7 @@ import { IconMic, IconRefresh, IconSpinner } from "../components/icons";
 import { Chev, Field, Loading, Mascot, Masthead, Note, Segmented, Select, Sheet, Switch, type MascotName } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
 import { apiGet, apiSend, ApiError } from "../lib/api";
+import { pixel, track as trackFunnel } from "../lib/funnel";
 import { fillPrompt, promptValues } from "../lib/promptVariables";
 import { cardFitsChild } from "../lib/promptStages";
 import { capitalize, formatClock, possessive } from "../lib/format";
@@ -36,7 +37,7 @@ interface Draft {
   expiresAt: string;
   memory: { status: "processing" | "ready" | "failed"; kind: "audio" | "typed"; title: string | null; error: string | null } | null;
   preview: { status: "none" | "writing" | "ready" | "failed"; drawing?: boolean; title?: string; totalPages?: number; pages?: PreviewPage[]; error?: string };
-  limits: { canPreview: boolean; reason: "used" | "busy" | null; left: number };
+  limits: { canPreview: boolean; reason: "used" | "busy" | "spent" | null; left: number };
   saved: string | null; // saved from the wait screen: the storybook's id
   textWhenReady: boolean; // the app can text, so the wait screen offers it
 }
@@ -127,6 +128,9 @@ export default function TryStory() {
         .catch((e: ApiError) => (e.status === 404 ? setDraft(null) : setError("We couldn't reach Vambie. Check your connection."))),
     []
   );
+
+  // First tagged arrival on the app counts as the landing (GitHub #2).
+  useEffect(() => trackFunnel("landing_view"), []);
 
   // A relative's invite link starts (or resumes) a draft for that family's child.
   // A lesson link from the landing page replaces an unsaved draft; afterwards
@@ -229,11 +233,12 @@ export default function TryStory() {
     <Shell title={<>Save {possessive(draft.child.name)}<br />story.</>}>
       <p className="t-body">
         {p.status === "failed"
-          ? "We couldn't make the preview this time."
-          : draft.limits.reason === "busy"
-            ? "So many families are trying Vambie today that free previews are paused."
-            : "You've used today's free preview."}{" "}
-        Save your story and we'll make it right away.
+          ? "We couldn't make the preview this time. Save your story and we'll make it right away."
+          : draft.limits.reason === "spent"
+            ? "Vambie has drawn all the free stories it can today. Save yours and it'll be waiting for you tomorrow."
+            : draft.limits.reason === "busy"
+              ? "So many families are trying Vambie today that free previews are paused. Save your story and we'll make it right away."
+              : "You've used today's free preview. Save your story and we'll make it right away."}
       </p>
       {p.status === "failed" && draft.limits.canPreview && (
         <button className="btn btn--outline" style={{ marginTop: 16 }} onClick={() => void apiSend("/api/guest/preview", "POST").then(load)}>
@@ -317,6 +322,7 @@ function TextWhenReady({ draft, onSaved }: { draft: Draft; onSaved: () => void }
   const claim = (withName?: string) =>
     run(async () => {
       await apiSend("/api/guest/claim", "POST", { name: withName ?? "", keep: true });
+      pixel("CompleteRegistration");
       refresh();
       onSaved();
     });
@@ -657,6 +663,15 @@ function Preview({ draft, onSave, onRetry }: { draft: Draft; onSave: () => void;
   const track = useRef<HTMLDivElement | null>(null);
   const [index, setIndex] = useState(0);
 
+  useEffect(() => {
+    trackFunnel("preview_viewed");
+    pixel("ViewContent");
+  }, []);
+  // Three pages seen counts as finishing the preview (GitHub #2).
+  useEffect(() => {
+    if (index >= 2) trackFunnel("preview_completed");
+  }, [index]);
+
   const goTo = (i: number) => {
     const el = track.current;
     if (el) el.scrollTo({ left: Math.max(0, Math.min(slides - 1, i)) * el.clientWidth, behavior: "smooth" });
@@ -795,6 +810,7 @@ export function TrySave() {
         const draft: Draft = await apiGet("/api/guest");
         setChildName(draft.child.name);
         const r = await apiSend("/api/guest/claim", "POST", { name: withName ?? "" });
+        pixel("CompleteRegistration");
         refresh();
         const myName = (withName || user?.name || "").trim();
         const list = await apiGet(`/api/storybooks/${r.storybookId}/characters`).catch(() => null);

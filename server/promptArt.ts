@@ -6,6 +6,7 @@ import { getOpenAI } from "./openaiClient";
 import { withImageRateLimit } from "./imageQueue";
 import { recordImage } from "./aiUsage";
 import { fillPrompt, neutralPromptValues } from "./promptVariables";
+import { DEFAULT_IMAGE_MODEL } from "./models";
 
 // Prompt card artwork: the library admins pick from (Baby Vambie's card poses
 // and every picture made for a card), and new pictures drawn from a card's
@@ -15,7 +16,7 @@ export const PROMPT_ART_DIR = path.join("uploads", "prompts");
 const POSES_DIR = path.join("public", "art");
 // Baby Vambie's official 3D render: the reference every card pose was drawn from.
 const REFERENCE = path.join("server", "assets", "baby-vambie-render.png");
-const MODEL = "gpt-image-1.5"; // gpt-image-2 can't draw transparent backgrounds on this account
+const MODEL = DEFAULT_IMAGE_MODEL;
 export const PICTURES_PER_CLICK = 2;
 
 const CHARACTER =
@@ -110,7 +111,6 @@ export async function generatePromptArt(input: { question: string; supportingTex
       n: PICTURES_PER_CLICK,
       size: "1024x1024",
       quality: "high",
-      input_fidelity: "high",
       background: "transparent",
       output_format: "webp",
       output_compression: 90,

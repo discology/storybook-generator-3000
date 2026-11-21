@@ -8,6 +8,12 @@ The week at a glance: chapters held for review, open family feedback, memories a
 
 **Invites and referrals** counts invites sent, relatives who joined, new families that started from another family's referral link, and how many of those pay, with the new families per family so far. The table lists the families whose links brought someone.
 
+## Where families come from
+
+On Admin → Overview, under "Where families come from": the funnel from a visitor's first arrival to a paying family, for a date range you pick. Each step shows how many people reached it and what share of the step before that is. Underneath, the same counts broken down by source and campaign, so an ad or a newsletter can be read end to end: arrived, preview, signed up, first chapter in the book, paying.
+
+A visit counts from a tagged link: `utm_source`, `utm_medium`, `utm_campaign`, `utm_content`, `fbclid` or `gclid` in the address, or a family's `/r/<code>` referral link. The first tags a visitor arrives with win; untagged visits count as "direct". Each visitor gets a first-party cookie id, so their steps join up before and after they sign up. Nothing leaves the app: the counts come from the `FunnelEvent` table, not a third-party analytics service.
+
 ## Story Review
 
 Every chapter passes through here.

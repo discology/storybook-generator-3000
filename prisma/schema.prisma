@@ -690,6 +690,30 @@ model AiUsage {
 
 // Every free preview a visitor started, kept after their draft is deleted so
 // the daily limits hold (VSB-80). Device and network are stored hashed.
+// One step a visitor or family takes from a tagged link or referral to paying
+// (GitHub #2). visitorId is a first-party cookie set on first landing, so a
+// visitor's steps join up before and after they sign up. The utm_* fields and
+// the click id come from the same cookie; referral is the /r/<code> that
+// brought them. Never updated: a row is what happened, when it happened.
+model FunnelEvent {
+  id          String   @id @default(cuid())
+  visitorId   String
+  householdId String?
+  name        String
+  source      String?
+  medium      String?
+  campaign    String?
+  content     String?
+  clickId     String?
+  referral    String?
+  props       String?
+  createdAt   DateTime @default(now())
+
+  @@index([name, createdAt])
+  @@index([visitorId])
+  @@index([source, campaign, name])
+}
+
 model GuestPreview {
   id        String   @id @default(cuid())
   device    String

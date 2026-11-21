@@ -1,4 +1,6 @@
 import { prisma } from "./db";
+import { DEFAULT_IMAGE_MODEL, IMAGE_MODELS } from "./models";
+export { IMAGE_MODELS } from "./models";
 import { STAGE_KEYS, normalizeStage } from "./readingStages";
 import { BlockedShot, DEFAULT_BLOCKED_SHOTS, DEFAULT_SHOT_REVIEW_THRESHOLD, DEFAULT_SHOT_TYPES, SHOT_KEYS, ShotType } from "./shotRules";
 
@@ -56,7 +58,6 @@ export const EMBELLISHMENT_LEVELS: Record<EmbellishmentLevel, { label: string; r
   },
 };
 
-export const IMAGE_MODELS = ["gpt-image-2", "gpt-image-1.5", "gpt-image-1", "gpt-image-1-mini"];
 
 // The chosen art direction: classic ink line and watercolor wash, with the
 // Vambies' signature colors as the only bright notes.
@@ -128,7 +129,7 @@ export const DEFAULT_RULES: PageRules = {
   shotTypes: DEFAULT_SHOT_TYPES,
   blockedShots: DEFAULT_BLOCKED_SHOTS,
   shotReviewThreshold: DEFAULT_SHOT_REVIEW_THRESHOLD,
-  imageModel: "gpt-image-2",
+  imageModel: DEFAULT_IMAGE_MODEL,
   imageQuality: "medium",
 };
 

@@ -112,10 +112,19 @@ This replaces the server's database and every saved file. It's how the first cop
 
 ## Restoring a backup
 
+The database runs in WAL mode: recent changes sit in `/data/storybook.db-wal` until SQLite folds them into `storybook.db`. Copying `storybook.db` alone while the app runs can leave those changes out. A local test with an open connection lost the 2 newest of 5 rows this way. Use SQLite's own backup, which is safe while the app is running and gives one complete file.
+
 To get a copy of the database:
 
 ```bash
-fly ssh sftp get /data/storybook.db
+fly ssh console -C "sqlite3 /data/storybook.db \".backup '/data/backup.db'\""
+fly ssh sftp get /data/backup.db ./storybook-backup.db
+fly ssh console -C "rm -f /data/backup.db"
+sqlite3 ./storybook-backup.db "pragma integrity_check;"   # prints "ok"
 ```
+
+Uploads are separate files. To copy them too, use `fly ssh console -C "tar -czf /data/uploads.tgz -C /data uploads"` and fetch `/data/uploads.tgz` the same way.
+
+To put a database back, use the import in [Copying data to the server](#copying-data-to-the-server): pack the backup as `storybook.db` (with or without `uploads`), upload it as `/data/import.tgz`, and restart. The start script replaces the database and removes its old `-wal` and `-shm` files before the app opens it. Never copy a `.db` file over the live one while the app is running.
 
 To roll the whole disk back, restore a daily snapshot into a new volume and move the machine onto it, following Fly's guide to [volume snapshots](https://fly.io/docs/volumes/snapshots/). Snapshots are kept for 5 days, and `fly volumes snapshots list <volume id>` shows them.

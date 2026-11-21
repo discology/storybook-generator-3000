@@ -12,7 +12,7 @@ if [ -f /data/import.tgz ]; then
   mkdir -p /data/import
   tar -xzf /data/import.tgz -C /data/import
   if [ -f /data/import/storybook.db ]; then
-    rm -f /data/storybook.db /data/storybook.db-journal
+    rm -f /data/storybook.db /data/storybook.db-journal /data/storybook.db-wal /data/storybook.db-shm
     mv /data/import/storybook.db /data/storybook.db
   fi
   if [ -d /data/import/uploads ]; then

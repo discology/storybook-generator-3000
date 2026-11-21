@@ -3,6 +3,111 @@ import { Link, useSearchParams } from "react-router-dom";
 import { apiGet, apiSend } from "../../lib/api";
 import { IconChat, IconChevronRight, IconFileText, IconSearch, IconSettings } from "../../components/icons";
 
+interface Funnel {
+  from: string;
+  to: string;
+  steps: { name: string; events: number; visitors: number }[];
+  sources: { source: string; campaign: string | null; landing: number; preview: number; signup: number; chapter: number; paying: number }[];
+}
+
+const STEP_LABELS: Record<string, string> = {
+  landing_view: "Arrived",
+  lesson_submitted: "Taught a lesson",
+  preview_started: "Preview started",
+  preview_viewed: "Preview opened",
+  preview_completed: "Preview seen through",
+  signup_verified: "Signed up",
+  first_memory_saved: "First memory",
+  first_chapter_published: "First chapter in the book",
+  invite_sent: "Invites sent",
+  invite_accepted: "Invites accepted",
+  subscribed: "Paying",
+  canceled: "Canceled",
+};
+
+// The funnel from a tagged link to a paying family, for a date range (#2).
+function FunnelPanel() {
+  const day = 24 * 60 * 60 * 1000;
+  const [from, setFrom] = useState(() => new Date(Date.now() - 30 * day).toISOString().slice(0, 10));
+  const [to, setTo] = useState(() => new Date().toISOString().slice(0, 10));
+  const [funnel, setFunnel] = useState<Funnel | null>(null);
+  useEffect(() => {
+    apiGet(`/api/admin/funnel?from=${from}&to=${to}`).then(setFunnel).catch(() => setFunnel(null));
+  }, [from, to]);
+
+  return (
+    <>
+      <h2 className="adm-section-title">Where families come from</h2>
+      <div className="adm-panel" style={{ padding: "14px 18px" }}>
+        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <label className="t-small t-muted">
+            From <input type="date" className="input" style={{ maxWidth: 150 }} value={from} max={to} onChange={(e) => e.target.value && setFrom(e.target.value)} />
+          </label>
+          <label className="t-small t-muted">
+            To <input type="date" className="input" style={{ maxWidth: 150 }} value={to} min={from} onChange={(e) => e.target.value && setTo(e.target.value)} />
+          </label>
+        </div>
+        {!funnel || funnel.steps.every((s) => s.events === 0) ? (
+          <p className="t-small t-muted" style={{ margin: "12px 0 2px" }}>Nothing counted in this range yet. A visit from a tagged link (utm_source, fbclid, gclid or a family's referral link) starts the count.</p>
+        ) : (
+          <>
+            <table className="adm-table" style={{ marginTop: 12 }}>
+              <thead>
+                <tr>
+                  <th>Step</th>
+                  <th>People</th>
+                  <th>Of the step before</th>
+                </tr>
+              </thead>
+              <tbody>
+                {funnel.steps.map((s, i) => {
+                  const before = funnel.steps[i - 1];
+                  const share = before && before.visitors > 0 ? Math.round((s.visitors / before.visitors) * 100) : null;
+                  return (
+                    <tr key={s.name}>
+                      <td>{STEP_LABELS[s.name] ?? s.name}</td>
+                      <td>{s.visitors}</td>
+                      <td>{i === 0 || share === null ? "—" : `${share}%`}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+            {funnel.sources.length > 0 && (
+              <table className="adm-table" style={{ marginTop: 16 }}>
+                <thead>
+                  <tr>
+                    <th>Source</th>
+                    <th>Campaign</th>
+                    <th>Arrived</th>
+                    <th>Preview</th>
+                    <th>Signed up</th>
+                    <th>First chapter</th>
+                    <th>Paying</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {funnel.sources.map((s) => (
+                    <tr key={`${s.source} ${s.campaign ?? ""}`}>
+                      <td>{s.source}</td>
+                      <td>{s.campaign ?? "—"}</td>
+                      <td>{s.landing}</td>
+                      <td>{s.preview}</td>
+                      <td>{s.signup}</td>
+                      <td>{s.chapter}</td>
+                      <td>{s.paying}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
+          </>
+        )}
+      </div>
+    </>
+  );
+}
+
 interface Overview {
   counts: { families: number; memoriesThisWeek: number; chaptersThisWeek: number; held: number; openFeedback: number; failedMemories: number; pendingInvites: number };
   needsAttention: { id: string; title: string; childName: string }[];
@@ -102,6 +207,8 @@ export default function AdminOverview() {
           )}
         </>
       )}
+
+      <FunnelPanel />
 
       {data.needsAttention.length > 0 && (
         <>

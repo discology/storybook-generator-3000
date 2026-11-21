@@ -1,4 +1,5 @@
 import express, { Router } from "express";
+import { recordEvent, recordFirstChapterPublished } from "./funnel";
 import fs from "fs";
 import multer from "multer";
 import path from "path";
@@ -21,7 +22,7 @@ import { usageFromRequest } from "./aiUsage";
 import { finishOpenChapter } from "./livingChapters";
 import { chapterLesson } from "./teachers";
 import { textNewChapter } from "./autoPublish";
-import { REFUSAL_MESSAGES, canGenerateChapter, entitlements, withChapterAdmission } from "./entitlements";
+import { REFUSAL_MESSAGES, canGenerateChapter, entitlements, refusalStatus, withChapterAdmission } from "./entitlements";
 import { randomUUID } from "crypto";
 import { attributeReferral } from "./referrals";
 
@@ -316,7 +317,7 @@ router.post("/storybooks/:id/chapters/weekly", async (req, res) => {
   const ready = await eligibleMemories(member.storybook.id);
   if (ready.length === 0) return res.status(400).json({ error: "No memories are ready for a chapter yet." });
   const admission = await canGenerateChapter(member.storybook.child.householdId);
-  if (!admission.ok) return res.status(402).json({ error: REFUSAL_MESSAGES[admission.why], why: admission.why });
+  if (!admission.ok) return res.status(refusalStatus(admission.why)).json({ error: REFUSAL_MESSAGES[admission.why], why: admission.why });
   void makeWeeklyChapter(member.storybook.id).catch(() => undefined);
   res.status(202).json({ started: true });
 });
@@ -359,7 +360,7 @@ router.post("/storybooks/:id/chapters", async (req, res) => {
       })),
       })
     );
-    if (!admitted.ok) return res.status(402).json({ error: REFUSAL_MESSAGES[admitted.why], why: admitted.why });
+    if (!admitted.ok) return res.status(refusalStatus(admitted.why)).json({ error: REFUSAL_MESSAGES[admitted.why], why: admitted.why });
     await prisma.memory.updateMany({ where: { id: { in: memoryIds } }, data: { status: "ready" } });
     res.status(201).json(admitted.value);
   } catch (error: any) {
@@ -391,6 +392,8 @@ router.post("/storybooks/:id/memories", async (req, res) => {
     },
   });
   if (text) void interpret(memory.id, text, true).catch((e) => console.error(`Interpreting typed memory ${memory.id} failed:`, e?.message));
+  const householdId = storybook.child.householdId;
+  if ((await prisma.memory.count({ where: { storybook: { child: { householdId } }, id: { not: memory.id } } })) === 0) void recordEvent(req, "first_memory_saved", { householdId });
   res.status(201).json(memory);
 });
 
@@ -570,17 +573,27 @@ router.put("/chapters/:id/mark", async (req, res) => {
   if (!member) return;
   const b = req.body ?? {};
   const where = { chapterId_contributorId: { chapterId: member.chapter.id, contributorId: member.me.id } };
-  const existing = await prisma.chapterMark.findUnique({ where });
   const data = {
     ...(typeof b.favorite === "boolean" ? { favorite: b.favorite } : {}),
     ...(Number.isInteger(b.lastPage) ? { lastPage: b.lastPage } : {}),
-    ...(b.opened && !existing?.readAt ? { readAt: new Date() } : {}),
     ...(b.finished ? { finishedAt: new Date() } : {}),
   };
-  const mark = existing
-    ? await prisma.chapterMark.update({ where, data })
-    : await prisma.chapterMark.create({ data: { chapterId: member.chapter.id, contributorId: member.me.id, ...data } });
-  res.json(mark);
+  const mine = { chapterId: member.chapter.id, contributorId: member.me.id };
+  // The reader opens a chapter and reports its page at the same time, so several
+  // marks for one reader can arrive at once. Each step below is a single
+  // statement: an interactive transaction here serializes the writes until
+  // SQLite's connection pool times out.
+  try {
+    await prisma.chapterMark.upsert({ where, create: { ...mine, ...data }, update: data });
+  } catch (error: any) {
+    // Two requests both found no mark and both tried to create it.
+    if (error?.code !== "P2002") throw error;
+    await prisma.chapterMark.update({ where, data });
+  }
+  // readAt is when this reader first opened the chapter, so only the request
+  // that finds it empty sets it.
+  if (b.opened) await prisma.chapterMark.updateMany({ where: { ...mine, readAt: null }, data: { readAt: new Date() } });
+  res.json(await prisma.chapterMark.findUniqueOrThrow({ where }));
 });
 
 const FEEDBACK_REASONS = ["missed_meaning", "too_private", "reading_level", "wrong_detail"];
@@ -606,6 +619,7 @@ router.put("/chapters/:id/publish", async (req, res) => {
   const unapproved = await prisma.storyPage.count({ where: { chapterId: chapter.id, approvedAt: null } });
   if (unapproved > 0) return res.status(400).json({ error: `Approve every page first (${unapproved} still need approval).` });
   const updated = await prisma.chapter.update({ where: { id: chapter.id }, data: { status: "published", publishedAt: new Date() } });
+  void recordFirstChapterPublished(updated.id);
   void textNewChapter(updated.id, member.me.id).catch((e) => console.error("New chapter texts:", e?.message));
   res.json(updated);
 });

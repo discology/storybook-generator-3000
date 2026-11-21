@@ -1,3 +1,4 @@
+import { currentModel } from "./models";
 import fs from "fs";
 import path from "path";
 import { toFile } from "openai";
@@ -210,7 +211,7 @@ export async function generateProposal(designId: string) {
     .filter(Boolean)
     .join("\n\n");
 
-  const common = { model: rules.imageModel, prompt, size: "1024x1024", quality: "high" as const, output_format: "png" as const };
+  const common = { model: currentModel(rules.imageModel), prompt, size: "1024x1024", quality: "high" as const, output_format: "png" as const };
   const response = await withImageRateLimit(references.length, async () =>
     references.length ? client.images.edit({ ...common, image: await Promise.all(references.map((r) => toUpload(r.path))) }) : client.images.generate(common)
   );
@@ -292,7 +293,7 @@ export async function generateReferenceSheet(designId: string) {
   try {
     const portrait = design.portraitPath;
     const response = await withImageRateLimit(1, async () => client.images.edit({
-      model: rules.imageModel,
+      model: currentModel(rules.imageModel),
       image: [await toUpload(portrait)],
       prompt: [
         `The attached image is ${name}'s approved character design for a children's picture book.`,
@@ -306,7 +307,7 @@ export async function generateReferenceSheet(designId: string) {
       quality: "high",
       output_format: "png",
     }));
-    await recordImage("reference_sheet", rules.imageModel, response, { size: "1536x1024", quality: "high" }, { householdId: design.familyCharacter.householdId });
+    await recordImage("reference_sheet", currentModel(rules.imageModel), response, { size: "1536x1024", quality: "high" }, { householdId: design.familyCharacter.householdId });
     const b64 = response.data?.[0]?.b64_json;
     if (!b64) throw new Error("The image service returned no image.");
     const sheetPath = saveFile(DESIGNS_DIR, `${design.id}-sheet-${Date.now()}.png`, Buffer.from(b64, "base64"));

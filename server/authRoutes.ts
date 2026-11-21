@@ -1,5 +1,6 @@
 import express, { Router } from "express";
 import { prisma } from "./db";
+import { recordEvent } from "./funnel";
 import { SESSION_COOKIE, generateOtp, generateToken, getCurrentUser } from "./session";
 import { adminIsOpen, canStartStorybook, isAdmin } from "./admin";
 import { isSmsConfigured, normalizePhone, sendVerificationCode, checkVerificationCode } from "./sms";
@@ -50,6 +51,7 @@ router.post("/auth/verify", async (req, res) => {
   }
 
   let user = await prisma.user.findUnique({ where: { phone } });
+  const isNew = !user;
   if (!user) user = await prisma.user.create({ data: { phone } });
 
   // The consent note and Terms were shown where the number was entered.
@@ -65,6 +67,8 @@ router.post("/auth/verify", async (req, res) => {
   const token = generateToken();
   const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
   await prisma.session.create({ data: { userId: user.id, token, expiresAt } });
+  // A verified number for someone new: the funnel's signup (GitHub #2).
+  if (isNew) void recordEvent(req, "signup_verified");
 
   res.cookie(SESSION_COOKIE, token, { httpOnly: true, expires: expiresAt, sameSite: "lax", secure: production });
   res.json({ user });

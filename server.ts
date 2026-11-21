@@ -38,6 +38,8 @@ import { startHeldTexts, startTextCleanup } from "./server/texts";
 import { startReminders } from "./server/reminders";
 import planRoutes from "./server/planRoutes";
 import referralRoutes, { captureReferral, referralLanding } from "./server/referrals";
+import funnelRoutes, { captureAttribution } from "./server/funnel";
+import { checkModels } from "./server/modelCheck";
 
 const production = process.env.NODE_ENV === "production";
 
@@ -60,6 +62,7 @@ app.use("/api/twilio", express.urlencoded({ extended: false }));
 app.use(cookieParser());
 app.get("/r/:code", referralLanding);
 app.use(captureReferral);
+app.use(captureAttribution);
 
 // Fly restarts a machine that fails this check, so it asks the database too:
 // a wedged query path shouldn't look healthy. It reads a real table, because
@@ -130,6 +133,7 @@ app.use("/api", promptAnswerRoutes);
 app.use("/api", featuredStoryRoutes);
 app.use("/api", teacherRoutes);
 app.use("/api", referralRoutes);
+app.use("/api", funnelRoutes);
 app.use("/api", planRoutes);
 
 // In production this server also serves the built web app (npm run build);
@@ -148,6 +152,7 @@ process.on("unhandledRejection", (error) => console.error("Unhandled error:", er
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3002;
 await useWriteAheadLog();
+await checkModels();
 app.listen(PORT, () => {
   console.log(`Storybook Generator 3000 backend listening on http://localhost:${PORT}`);
   void failInterruptedIllustrations();

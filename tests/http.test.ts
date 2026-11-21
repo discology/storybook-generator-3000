@@ -19,6 +19,24 @@ const get = (path: string, cookie = "") => fetch(server.base + path, { headers: 
 const send = (path: string, method: string, body: unknown, cookie = "") =>
   fetch(server.base + path, { method, headers: { cookie, "content-type": "application/json" }, body: JSON.stringify(body), redirect: "manual" });
 
+test("simultaneous first reader marks all succeed and preserve independent fields", async () => {
+  const f = await family();
+  const chapter = await prisma.chapter.create({ data: { storybookId: f.storybook.id, sequence: 1, title: "Park", content: "Words.", status: "published", publishedAt: new Date() } });
+  const mark = (body: unknown) => send(`/api/chapters/${chapter.id}/mark`, "PUT", body, f.owner.cookie);
+  const responses = await Promise.all(Array.from({ length: 24 }, (_, i) => mark(i % 2 ? { favorite: true } : { opened: true, lastPage: 2 })));
+  for (const res of responses) assert.equal(res.status, 200, await res.text());
+  const where = { chapterId_contributorId: { chapterId: chapter.id, contributorId: f.me.id } };
+  const first = await prisma.chapterMark.findUniqueOrThrow({ where });
+  assert.equal(first.favorite, true);
+  assert.equal(first.lastPage, 2);
+  assert.ok(first.readAt);
+  await mark({ opened: true, finished: true });
+  const last = await prisma.chapterMark.findUniqueOrThrow({ where });
+  assert.equal(last.readAt?.getTime(), first.readAt?.getTime());
+  assert.ok(last.finishedAt);
+  assert.equal(await prisma.chapterMark.count({ where: { chapterId: chapter.id } }), 1);
+});
+
 // The family that couldn't open its home screen (GitHub #22), and the 2.4 MB
 // response (#29): 150 chapters of 10 pages and 1,000 memories.
 test("a long-running family's home loads, without every transcript", async () => {

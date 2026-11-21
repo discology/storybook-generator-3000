@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import express, { Router } from "express";
 import { prisma } from "./db";
+import { recordEvent } from "./funnel";
 import type { Invitation } from "../src/generated/prisma/client";
 import { getCurrentUser } from "./session";
 import { renderMessage, appUrl, forHandSending } from "./messageTemplates";
@@ -93,6 +94,7 @@ router.post("/storybooks/:id/family/invite", async (req, res) => {
   const invitation = await prisma.invitation.create({
     data: { householdId: storybook.child.householdId, contributorId: contributor.id, invitedByName: me.name, contact, relationship, token },
   });
+  void recordEvent(req, "invite_sent", { householdId: storybook.child.householdId });
   const message = await inviteMessage(me.name, storybook.child.displayName, storybook.title, relationship, token);
   const texted = await textInvite(contact, message, storybook.child.householdId).catch(() => false);
   res.status(201).json({ contributor, invitation, inviteLink: appUrl(`/invitations/${token}`), inviteMessage: message && forHandSending(message), devMode: !texted, texted });
@@ -203,6 +205,7 @@ router.post("/invitations/:token/accept", async (req, res) => {
   const name = String(req.body?.name ?? "").trim() || user.name || "";
   if (!name) return res.status(400).json({ error: "Add your name so the family knows who's sharing." });
   const { storybook } = await acceptInvitation(invitation!, user, name);
+  void recordEvent(req, "invite_accepted", { householdId: invitation!.householdId });
   res.json({ ok: true, storybookId: storybook?.id ?? null });
 });
 

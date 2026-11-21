@@ -6,11 +6,12 @@ import { findUnknownVariables } from "./messageTemplates";
 import { runAiStep } from "./aiService";
 import { withUsage } from "./aiUsage";
 import { characterVariables } from "./characters";
+import { TEXT_MODELS, DEFAULT_TEXT_MODEL, currentModel } from "./models";
 
 const router: Router = express.Router();
 
 // Models offered in the editor; null means the OPENAI_MODEL default.
-export const AI_MODELS = ["gpt-5.5", "gpt-5.4", "gpt-5.4-mini", "gpt-4.1"];
+export const AI_MODELS = TEXT_MODELS;
 
 router.use("/admin/ai-instructions", async (req, res, next) => {
   if (!(await getCurrentUser(req))) return res.status(401).json({ error: "Sign in first" });
@@ -20,7 +21,7 @@ router.use("/admin/ai-instructions", async (req, res, next) => {
 const withModels = async (key: string) => ({
   ...(await getAiInstruction(key)),
   models: AI_MODELS,
-  defaultModel: process.env.OPENAI_MODEL || "gpt-5.5",
+  defaultModel: currentModel(process.env.OPENAI_MODEL || DEFAULT_TEXT_MODEL),
   // Every Character Library character can be referenced as <key> in any step.
   characterVariables: await characterVariables(),
 });
