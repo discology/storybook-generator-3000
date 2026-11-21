@@ -111,6 +111,7 @@ model Contributor {
 
   // One place per person per family (pending invites have no user yet).
   @@unique([householdId, userId])
+  @@index([userId])
 }
 
 model Invitation {
@@ -199,6 +200,7 @@ model Child {
   dueDate     DateTime?
   storybooks  Storybook[]
   createdAt   DateTime  @default(now())
+  @@index([householdId])
 }
 
 model Storybook {
@@ -230,6 +232,7 @@ model Storybook {
   promptAsks    PromptAsk[]
   exportRequests ExportRequest[]
   createdAt     DateTime  @default(now())
+  @@index([childId])
 }
 
 model Memory {
@@ -254,6 +257,7 @@ model Memory {
   interpretation   MemoryInterpretation?
   chapterSources   ChapterSource[]
   createdAt        DateTime  @default(now())
+  @@index([storybookId])
 }
 
 model TranscriptVersion {
@@ -309,6 +313,7 @@ model Chapter {
   reflection         String? // VSB-126: the question for the grown-ups after the last page (chapters after the birth)
   growing            Boolean  @default(false) // VSB-134: a pre-birth chapter still taking pages, one per message
   createdAt   DateTime @default(now())
+  @@index([storybookId])
 }
 
 model ChapterSource {
@@ -392,6 +397,8 @@ model PageAsset {
   checkNote   String?
   fixNote     String? // set when this version was drawn to correct a character who didn't match
   createdAt   DateTime  @default(now())
+  @@index([pageId, status, version])
+  @@index([imagePath])
 }
 
 // Recurring characters (the Vambies) shared by every storybook. AI instructions

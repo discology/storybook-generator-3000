@@ -3,6 +3,7 @@ import fs from "fs";
 import multer from "multer";
 import path from "path";
 import { prisma } from "./db";
+import { withLatestImage } from "./pageImages";
 import { createPagedChapter, isLiving, recordedBy } from "./storyPages";
 import { getCurrentUser } from "./session";
 import { normalizePhone } from "./sms";
@@ -151,7 +152,7 @@ router.get("/storybooks/:id", async (req, res) => {
   if (!member) return;
   const { me } = member;
 
-  const storybook = await prisma.storybook.findUniqueOrThrow({
+  const loaded = await prisma.storybook.findUniqueOrThrow({
     where: { id: req.params.id },
     include: {
       child: true,
@@ -162,13 +163,14 @@ router.get("/storybooks/:id", async (req, res) => {
           marks: { where: { contributorId: me.id } },
           pages: {
             orderBy: { pageNumber: "asc" },
-            select: { approvedAt: true, sourceMemoryId: true, assets: { where: { status: "ready" }, orderBy: { version: "desc" }, take: 1, select: { imagePath: true } } },
+            select: { id: true, approvedAt: true, sourceMemoryId: true },
           },
         },
         orderBy: { sequence: "asc" },
       },
     },
   });
+  const storybook = { ...loaded, chapters: await withLatestImage(loaded.chapters) };
 
   // Each person's Vambie look for the Memories list (VSB-135): the family
   // character saved under their name, as "You, in the pictures" saves it.
