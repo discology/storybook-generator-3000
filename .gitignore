@@ -13,3 +13,4 @@ uploads/
 # Data copies made for importing into the hosted app (docs/deployment.md)
 storybook.db
 import.tgz
+prisma/dev.db-*

@@ -1,6 +1,7 @@
 import crypto from "crypto";
 import { Router } from "express";
 import { prisma } from "./db";
+import { recordEvent } from "./funnel";
 import { entitlements, grantCredits } from "./entitlements";
 
 // Admin: a household's plan, ledger and comps. Stripe will write subscriptions
@@ -53,6 +54,8 @@ router.put("/admin/households/:id/subscription", async (req, res) => {
     create: { householdId: req.params.id, planId, status, pastDueSince, canceledAt },
     update: { planId, status, pastDueSince, canceledAt },
   });
+  if (status === "active" && existing?.status !== "active") void recordEvent(null, "subscribed", { householdId: req.params.id });
+  if (status === "canceled" && existing?.status !== "canceled") void recordEvent(null, "canceled", { householdId: req.params.id });
   res.json({ plan: await entitlements(req.params.id) });
 });
 

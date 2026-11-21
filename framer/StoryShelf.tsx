@@ -48,6 +48,20 @@ const CARD_COLORS: Record<string, { paper: string; ink: string }> = {
 
 const appBase = (url: string) => url.replace(/\/+$/, "");
 
+// The ad or referral tags on the landing page go with the visitor to the app,
+// so their visit can be counted there (GitHub #2). Kept in each component:
+// Framer code components can't import one another.
+function attributionParams() {
+  const keep = new URLSearchParams();
+  if (typeof window === "undefined") return keep;
+  const params = new URLSearchParams(window.location.search);
+  for (const k of ["utm_source", "utm_medium", "utm_campaign", "utm_content", "fbclid", "gclid", "ref"]) {
+    const v = params.get(k);
+    if (v) keep.set(k, v);
+  }
+  return keep;
+}
+
 /**
  * @framerSupportedLayoutWidth any
  * @framerSupportedLayoutHeight auto
@@ -177,7 +191,8 @@ function StoryModal(props: Props & { story: Story; onClose: () => void }) {
     onClose();
     const event = new CustomEvent("vambie:open-lesson", { detail: { handled: false } });
     window.dispatchEvent(event);
-    if (!event.detail.handled) window.location.href = `${appBase(appUrl)}/try`;
+    const tags = attributionParams().toString();
+    if (!event.detail.handled) window.location.href = `${appBase(appUrl)}/try${tags ? `?${tags}` : ""}`;
   };
 
   const page = Array.isArray(pages) ? pages[index] : undefined;

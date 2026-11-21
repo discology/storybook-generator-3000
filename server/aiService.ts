@@ -8,10 +8,11 @@ import { characterCardValues } from "./characters";
 import { stageInfo } from "./readingStages";
 import { GUARDIAN_READER_LEVEL } from "./beforeBirth";
 import { geminiTextUsage, openAiTextUsage, recordText, recordUsage, recordVoice, type TextUsage, type UsageTags } from "./aiUsage";
+import { DEFAULT_TEXT_MODEL, DEFAULT_VOICE_MODEL, currentModel } from "./models";
 
 const GEMINI_MODEL = "gemini-2.5-flash";
-const OPENAI_MODEL = process.env.OPENAI_MODEL || "gpt-5.5";
-const OPENAI_TRANSCRIBE_MODEL = process.env.OPENAI_TRANSCRIBE_MODEL || "gpt-4o-transcribe";
+const OPENAI_MODEL = currentModel(process.env.OPENAI_MODEL || DEFAULT_TEXT_MODEL);
+const OPENAI_TRANSCRIBE_MODEL = currentModel(process.env.OPENAI_TRANSCRIBE_MODEL || DEFAULT_VOICE_MODEL);
 
 // OpenAI wins if both keys are set; with neither, every step falls back to mock output.
 type Provider = { kind: "openai"; client: OpenAI } | { kind: "gemini"; client: GoogleGenAI };
@@ -105,7 +106,7 @@ export async function runAiStep(key: string, values: Record<string, string>, ove
   if (!provider) throw new Error("No AI provider configured");
   const instruction = await getAiInstruction(key);
   const body = override?.body ?? instruction.body;
-  const model = (override && "model" in override ? override.model : instruction.model) || OPENAI_MODEL;
+  const model = currentModel((override && "model" in override ? override.model : instruction.model) || OPENAI_MODEL);
   // <world> is the shared "The Vambie world" block. Chapters pass the copy from
   // their snapshot; everything else (and older chapters) reads the current text.
   const world = values.world || (key === WORLD_KEY ? "" : (await getAiInstruction(WORLD_KEY)).body);

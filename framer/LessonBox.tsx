@@ -28,8 +28,22 @@ interface Props {
 
 const today = () => new Date().toISOString().slice(0, 10);
 
+// The ad or referral tags on the landing page go with the visitor to the app,
+// so their visit can be counted there (GitHub #2).
+function attributionParams() {
+  const keep = new URLSearchParams();
+  if (typeof window === "undefined") return keep;
+  const params = new URLSearchParams(window.location.search);
+  for (const k of ["utm_source", "utm_medium", "utm_campaign", "utm_content", "fbclid", "gclid", "ref"]) {
+    const v = params.get(k);
+    if (v) keep.set(k, v);
+  }
+  return keep;
+}
+
 function lessonUrl(appUrl: string, lesson: string, name: string, birthday: string) {
   const params = new URLSearchParams({ lesson: lesson.trim(), name: name.trim(), birthday });
+  for (const [k, v] of attributionParams()) params.set(k, v);
   return `${appUrl.replace(/\/+$/, "")}/try?${params.toString()}`;
 }
 

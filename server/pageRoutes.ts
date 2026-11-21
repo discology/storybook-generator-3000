@@ -21,6 +21,7 @@ import { familyPageFlag } from "./feedbackRoutes";
 import { PARENT_REASONS } from "./flagCategories";
 import { DEFAULT_RULES, EMBELLISHMENT_LEVELS, IMAGE_MODELS, getActiveRules, saveRules, validateRules } from "./pageRules";
 import { afterParentApproved } from "./livingChapters";
+import { redrawRefusal } from "./spendCaps";
 
 const router: Router = express.Router();
 
@@ -56,6 +57,15 @@ async function pageForRequest(req: Request, res: Response) {
 }
 
 const fail = (res: Response, error: any) => res.status(502).json({ error: error?.message ?? "Something went wrong. Try again." });
+
+// Redraws and rewrites are the easiest way for one family to spend a lot (#13),
+// so they're limited per chapter and per week. Answers 429 with what to say.
+async function overRedrawCap(res: Response, chapterId: string) {
+  const { storybook } = await prisma.chapter.findUniqueOrThrow({ where: { id: chapterId }, select: { storybook: { select: { child: { select: { householdId: true } } } } } });
+  const refusal = await redrawRefusal(storybook.child.householdId, chapterId);
+  if (refusal) res.status(429).json({ error: refusal });
+  return Boolean(refusal);
+}
 
 export async function chapterWithPages(chapterId: string) {
   const chapter = await prisma.chapter.findUniqueOrThrow({
@@ -137,6 +147,7 @@ router.post("/pages/:pageId/illustration", async (req, res) => {
   // A parent redrawing a finished picture is a judgment on it: recorded for the
   // team with the picture as it was (VSB-107). Automatic redraws don't count.
   if (!fixCharacterIds) {
+    if (await overRedrawCap(res, page.chapterId)) return;
     const user = await getCurrentUser(req);
     if (user) await familyPageFlag(page.id, user.id, { target: "picture", categories: ["redraw_requested"], note: "Asked for a redraw." }).catch((e) => console.error("Redraw flag:", e?.message));
   }
@@ -152,6 +163,7 @@ router.post("/pages/:pageId/revise", async (req, res) => {
   if (!page) return;
   const request = String(req.body?.instructions ?? "").trim();
   if (!request) return res.status(400).json({ error: "Say what should change on this page." });
+  if (await overRedrawCap(res, page.chapterId)) return;
   try {
     const user = await getCurrentUser(req);
     if (user) await familyPageFlag(page.id, user.id, { target: "both", categories: ["change_requested"], note: request }).catch((e) => console.error("Change flag:", e?.message));

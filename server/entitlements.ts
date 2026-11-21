@@ -1,5 +1,7 @@
 import { prisma } from "./db";
 import { Prisma } from "../src/generated/prisma/client";
+import { currentTrigger } from "./aiUsage";
+import { overSpendCap } from "./spendCaps";
 
 // What a household may make, and the one place a chapter is admitted. Plans are
 // rows (prisma Plan); credits are an append-only ledger (CreditEntry). A chapter
@@ -13,7 +15,7 @@ const GENERATION = "Generation";
 type Db = Prisma.TransactionClient | typeof prisma;
 
 export type Pool = "allowance" | "credits";
-export type Refusal = "paywall" | "quota" | "past_due";
+export type Refusal = "paywall" | "quota" | "past_due" | "capped";
 export type EntitlementReason = "grandfathered" | "sample" | "free" | "plan" | "past_due_grace" | "credits_only";
 
 export type Entitlements = {
@@ -108,6 +110,10 @@ async function resolve(db: Db, householdId: string, now: Date): Promise<Entitlem
 
 export const entitlements = (householdId: string, now = new Date()) => resolve(prisma, householdId, now);
 
+// A refusal by plan is the family's to settle by paying; a spend cap is ours,
+// and it lifts by itself, so it isn't "payment required".
+export const refusalStatus = (why: Refusal) => (why === "capped" ? 503 : 402);
+
 function refusal(e: Entitlements): Refusal {
   if (e.reason === "credits_only") return "past_due";
   return e.reason === "free" ? "paywall" : "quota";
@@ -121,6 +127,9 @@ function decide(e: Entitlements, spending: 0 | 1): Admission {
 }
 
 export async function canGenerateChapter(householdId: string, now = new Date()): Promise<Admission> {
+  // The cap on what this kind of work may spend comes first: no plan, however
+  // generous, spends past it (server/spendCaps.ts).
+  if (await overSpendCap(currentTrigger(), now)) return { ok: false, why: "capped" };
   return decide(await entitlements(householdId, now), 0);
 }
 
@@ -218,6 +227,7 @@ export async function withChapterAdmission<T>(
   key: string,
   make: (e: Entitlements) => Promise<T | null>
 ): Promise<{ ok: true; value: T | null } | { ok: false; why: Refusal }> {
+  if (await overSpendCap(currentTrigger())) return { ok: false, why: "capped" };
   const admission = await reserveChapter(householdId, key);
   if (!admission.ok) return admission;
   try {
@@ -234,4 +244,5 @@ export const REFUSAL_MESSAGES: Record<Refusal, string> = {
   paywall: "Your free chapter is in the book. More chapters come with the Family plan.",
   quota: "This month's chapters are all made. The next one comes after the 1st.",
   past_due: "The Family plan's payment is overdue, so new chapters are paused until it's paid.",
+  capped: "Vambie has made all the stories it can for now. This starts again shortly, and nothing you've asked for is lost.",
 };

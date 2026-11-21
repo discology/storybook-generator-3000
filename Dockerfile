@@ -2,9 +2,9 @@
 # web app. The database and every saved file live on a volume at /data.
 FROM node:24-bookworm-slim
 
-# Prisma needs OpenSSL.
+# Prisma needs OpenSSL; sqlite3 makes safe database backups (docs/deployment.md).
 RUN apt-get update \
-  && apt-get install -y --no-install-recommends openssl ca-certificates \
+  && apt-get install -y --no-install-recommends openssl ca-certificates sqlite3 \
   && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app

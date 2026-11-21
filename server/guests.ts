@@ -11,11 +11,13 @@ import { interpret, processMemory } from "./memoryPipeline";
 import { createPagedChapter, illustrateChapter, recordedBy, writeReflection } from "./storyPages";
 import { withUsage } from "./aiUsage";
 import { acceptInvitation, invitationProblem } from "./familyRoutes";
+import { recordEvent } from "./funnel";
 import { appUrl, renderMessage } from "./messageTemplates";
 import { sendText, textsMode } from "./texts";
 import { childLabel, defaultTitle } from "./beforeBirth";
 import { LESSON_PROMPT, lessonMemoryText } from "./lessons";
 import { reserveChapter, withChapterAdmission } from "./entitlements";
+import { overSpendCap } from "./spendCaps";
 import { attributeReferral } from "./referrals";
 
 // Try before you sign up (VSB-75). A visitor's first memory and story live in a
@@ -127,13 +129,17 @@ async function allowance(req: Request) {
   const device = hash(`dev:${req.cookies?.[GUEST_COOKIE] ?? ""}`);
   const network = networkOf(req);
   const since = new Date(Date.now() - DAY);
-  const [byDevice, byNetwork, today, cap] = await Promise.all([
+  const [byDevice, byNetwork, today, cap, overSpent] = await Promise.all([
     prisma.guestPreview.count({ where: { device, createdAt: { gte: since } } }),
     prisma.guestPreview.count({ where: { network, createdAt: { gte: since } } }),
     prisma.guestPreview.count({ where: { createdAt: { gte: since } } }),
     dailyCap(),
+    // A preview's cost varies, so counting previews only guesses at the bill.
+    // The spend cap is the real limit (#13).
+    overSpendCap("visitor"),
   ]);
   const used = Math.max(byDevice, byNetwork);
+  if (overSpent) return { ok: false as const, reason: "spent" as const, device, network, left: 0 };
   if (today >= cap) return { ok: false as const, reason: "busy" as const, device, network, left: 0 };
   if (used >= PREVIEWS_PER_DAY) return { ok: false as const, reason: "used" as const, device, network, left: 0 };
   return { ok: true as const, reason: null, device, network, left: PREVIEWS_PER_DAY - used };
@@ -343,6 +349,7 @@ router.post("/guest/memory", async (req, res) => {
     },
   });
   void withUsage({ trigger: "visitor" }, () => interpret(memory.id, text, true)).catch((e) => console.error("Guest interpret failed:", e?.message));
+  if (lesson) void recordEvent(req, "lesson_submitted", { householdId: d.household.id });
   res.status(201).json({ ok: true });
 });
 
@@ -444,11 +451,17 @@ router.post("/guest/preview", async (req, res) => {
   const limit = await allowance(req);
   if (!limit.ok) {
     return res.status(429).json({
-      error: limit.reason === "busy" ? "So many families are trying Vambie today that free previews are paused. Save your story and we'll make it right away." : "You've used today's free preview. Save your story to see it when it's ready.",
+      error:
+        limit.reason === "spent"
+          ? "Vambie has drawn all the free stories it can today. Save yours and it'll be waiting for you tomorrow."
+          : limit.reason === "busy"
+            ? "So many families are trying Vambie today that free previews are paused. Save your story and we'll make it right away."
+            : "You've used today's free preview. Save your story to see it when it's ready.",
       reason: limit.reason,
     });
   }
   await prisma.guestPreview.create({ data: { device: limit.device, network: limit.network } });
+  void recordEvent(req, "preview_started", { householdId: d.household.id });
   void writePreview(d, memory);
   res.status(202).json({ ok: true });
 });
@@ -471,6 +484,7 @@ router.post("/guest/claim", async (req, res) => {
     if (problem) return res.status(410).json({ error: "This invitation has expired. Ask the family for a new link." });
     const { place, storybook } = await acceptInvitation(invitation!, user, name);
     if (!storybook) return res.status(404).json({ error: "This family's storybook isn't there any more." });
+    void recordEvent(req, "invite_accepted", { householdId: invitation!.householdId });
     if (d.memory) {
       // The memory moves into the family's book, as theirs; their recording and words come with it.
       await prisma.memory.update({
@@ -502,6 +516,8 @@ router.post("/guest/claim", async (req, res) => {
   ]);
   if (!keep) res.clearCookie(GUEST_COOKIE);
   await attributeReferral(req, d.household.id, user.id);
+  // The memory they tried Vambie with is the family's first.
+  if (d.memory) void recordEvent(req, "first_memory_saved", { householdId: d.household.id });
   // The saved preview is the family's free first chapter; it's already written,
   // so this only records it. Keyed by chapter, so saving twice records it once.
   if (d.chapter) await reserveChapter(d.household.id, `chapter:${d.chapter.id}`);

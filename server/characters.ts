@@ -1,3 +1,4 @@
+import { currentModel } from "./models";
 import fs from "fs";
 import path from "path";
 import { prisma } from "./db";
@@ -293,9 +294,9 @@ export async function generateCharacterArt(characterId: string) {
     .filter(Boolean)
     .join("\n\n");
   const response = await withImageRateLimit(0, () =>
-    client.images.generate({ model: rules.imageModel, prompt, size: "1024x1024", quality: "high", output_format: "png" })
+    client.images.generate({ model: currentModel(rules.imageModel), prompt, size: "1024x1024", quality: "high", output_format: "png" })
   );
-  await recordImage("library_art", rules.imageModel, response, { size: "1024x1024", quality: "high" });
+  await recordImage("library_art", currentModel(rules.imageModel), response, { size: "1024x1024", quality: "high" });
   const b64 = response.data?.[0]?.b64_json;
   if (!b64) throw new Error("The image service returned no image.");
   const imagePath = saveCharacterImage(Buffer.from(b64, "base64"), `${character.key}-${Date.now()}.png`);
@@ -324,7 +325,7 @@ export async function restyleCharacterArt(characterId: string) {
     .join("\n\n");
   const response = await withImageRateLimit(1, async () =>
     client.images.edit({
-      model: rules.imageModel,
+      model: currentModel(rules.imageModel),
       prompt,
       image: [await toFile(fs.createReadStream(path.join(process.cwd(), reference)), path.basename(reference), { type: reference.endsWith(".png") ? "image/png" : "image/jpeg" })],
       size: "1024x1024",
@@ -332,7 +333,7 @@ export async function restyleCharacterArt(characterId: string) {
       output_format: "png",
     })
   );
-  await recordImage("library_art", rules.imageModel, response, { size: "1024x1024", quality: "high" });
+  await recordImage("library_art", currentModel(rules.imageModel), response, { size: "1024x1024", quality: "high" });
   const b64 = response.data?.[0]?.b64_json;
   if (!b64) throw new Error("The image service returned no image.");
   const imagePath = saveCharacterImage(Buffer.from(b64, "base64"), `${character.key}-book-style-${Date.now()}.png`);
@@ -364,7 +365,7 @@ export async function drawBookExpressions(characterId: string) {
         .join("\n\n");
       const response = await withImageRateLimit(1, async () =>
         client.images.edit({
-          model: rules.imageModel,
+          model: currentModel(rules.imageModel),
           prompt,
           image: [await toFile(fs.createReadStream(path.join(process.cwd(), reference)), path.basename(reference), { type: reference.endsWith(".png") ? "image/png" : "image/jpeg" })],
           size: "1024x1024",
@@ -372,7 +373,7 @@ export async function drawBookExpressions(characterId: string) {
           output_format: "png",
         })
       );
-      await recordImage("library_art", rules.imageModel, response, { size: "1024x1024", quality: "high" });
+      await recordImage("library_art", currentModel(rules.imageModel), response, { size: "1024x1024", quality: "high" });
       const b64 = response.data?.[0]?.b64_json;
       if (!b64) throw new Error("The image service returned no image.");
       const imagePath = saveCharacterImage(Buffer.from(b64, "base64"), `${character.key}-book-${expression}-${Date.now()}.png`);

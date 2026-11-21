@@ -1,4 +1,5 @@
 import { prisma } from "./db";
+import { recordFirstChapterPublished } from "./funnel";
 import { canSeeChapter } from "./access";
 import { childLabel } from "./beforeBirth";
 import { appUrl, renderMessage } from "./messageTemplates";
@@ -30,6 +31,7 @@ export async function autoPublish(chapterId: string, options: { quiet?: boolean 
   // Only one caller wins if two finish at once, so the family is texted once.
   const done = await prisma.chapter.updateMany({ where: { id: chapterId, status: { not: "published" } }, data: { status: "published", publishedAt: now } });
   if (done.count === 0) return false;
+  void recordFirstChapterPublished(chapterId);
   if (!options.quiet) await textNewChapter(chapterId, null).catch((e) => console.error("New chapter texts:", e?.message));
   return true;
 }

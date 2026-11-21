@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from "async_hooks";
 import type { NextFunction, Request, Response } from "express";
 import { prisma } from "./db";
 import { SESSION_COOKIE } from "./session";
+import { noteSpend } from "./spendCaps";
 
 // What every AI call costs. Each call records the usage the API reports, priced
 // with the table below, and is tagged with the family, chapter or memory it was
@@ -16,14 +17,19 @@ export type Trigger = "family" | "weekly" | "admin" | "visitor" | "system";
 // Standard prices, US dollars per 1M tokens, from https://developers.openai.com/api/docs/pricing.
 // Update these when prices change; each call's cost is stored when it's made, so
 // older rows keep the price they were charged.
-export const PRICES_CHECKED = "2026-10-06";
+export const PRICES_CHECKED = "2026-11-21";
 interface Price {
   input: number;
   cached?: number;
   imageInput?: number;
   output: number;
+  perMinute?: number;
 }
 export const PRICES: Record<string, Price> = {
+  "gpt-image-2.6-sunburst": { input: 5, cached: 1.25, imageInput: 8, output: 30 },
+  "gpt-image-2.6-flare": { input: 5, cached: 1.25, imageInput: 8, output: 30 },
+  "gpt-6-luna": { input: 0.05, cached: 0.005, output: 0.25 },
+  "gpt-transcribe": { input: 0, output: 0, perMinute: 0.0045 },
   "gpt-5.5": { input: 5, cached: 0.5, output: 30 },
   "gpt-5.4": { input: 2.5, cached: 0.25, output: 15 },
   "gpt-5.4-mini": { input: 0.75, cached: 0.075, output: 4.5 },
@@ -38,9 +44,9 @@ export const PRICES: Record<string, Price> = {
 };
 // A model missing from the table is priced like the app's default for its kind,
 // and its rows are marked as estimates.
-const FALLBACK: Record<UsageKind, string> = { text: "gpt-5.5", image: "gpt-image-2", voice: "gpt-4o-transcribe" };
+const FALLBACK: Record<UsageKind, string> = { text: "gpt-5.5", image: "gpt-image-2.6-sunburst", voice: "gpt-transcribe" };
 
-const priceFor = (model: string, kind: UsageKind) => {
+export const priceFor = (model: string, kind: UsageKind) => {
   const key = Object.keys(PRICES)
     .filter((k) => model === k || model.startsWith(`${k}-20`))
     .sort((a, b) => b.length - a.length)[0];
@@ -91,6 +97,9 @@ export function withUsage<T>(tags: UsageTags, fn: () => T): T {
   return context.run({ ...context.getStore(), ...tags }, fn);
 }
 
+// What started the work being done right now, for the spend caps (#13).
+export const currentTrigger = (): Trigger => context.getStore()?.trigger ?? "system";
+
 // Express middleware: calls made while handling a request record who asked.
 // Placed after any body parsing (multer included), which can lose the context.
 export const usageFromRequest = (trigger: Trigger) => (req: Request, _res: Response, next: NextFunction) =>
@@ -105,6 +114,7 @@ interface UsageRecord {
   imageTokens?: number;
   outputTokens?: number;
   estimated?: boolean;
+  audioSeconds?: number;
   tags?: UsageTags;
 }
 
@@ -132,7 +142,7 @@ export async function recordUsage(r: UsageRecord): Promise<string | null> {
         n(r.cachedTokens) * (price.cached ?? price.input) +
         n(r.imageTokens) * (price.imageInput ?? price.input) +
         n(r.outputTokens) * price.output) /
-      1_000_000;
+      1_000_000 + (Math.max(0, r.audioSeconds ?? 0) / 60) * (price.perMinute ?? 0);
     const userId = tags.userId ?? (tags.session ? ((await prisma.session.findUnique({ where: { token: tags.session } }))?.userId ?? null) : null);
     const row = await prisma.aiUsage.create({
       data: {
@@ -152,6 +162,7 @@ export async function recordUsage(r: UsageRecord): Promise<string | null> {
         userId,
       },
     });
+    noteSpend(row.trigger as Trigger);
     return row.id;
   } catch (error: any) {
     console.error("Couldn't record AI usage:", error?.message);
@@ -205,6 +216,10 @@ export function recordImage(step: string, model: string, response: any, request:
 
 // Transcriptions report tokens, or for some models only the audio's length.
 export function recordVoice(model: string, usage: any, audioSeconds: number | null, tags?: UsageTags) {
+  if (priceFor(model, "voice").price.perMinute) {
+    const seconds = usage?.seconds ?? audioSeconds;
+    return recordUsage({ kind: "voice", step: "transcribe", model, audioSeconds: seconds ?? 60, estimated: seconds == null, tags });
+  }
   if (usage?.type === "tokens") {
     return recordUsage({ kind: "voice", step: "transcribe", model, inputTokens: usage.input_tokens, outputTokens: usage.output_tokens, tags });
   }

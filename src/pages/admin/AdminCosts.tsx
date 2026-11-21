@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { apiGet } from "../../lib/api";
+import { apiGet, apiSend } from "../../lib/api";
 import { Field, Select } from "../../components/ui";
 import { IconDownload, IconInfo, IconSort } from "../../components/icons";
 
@@ -43,10 +43,21 @@ interface CostFamily {
   monthly: number | null;
 }
 
+interface CapStatus {
+  trigger: string;
+  spent: { daily: number; monthly: number };
+  caps: { daily: number | null; monthly: number | null };
+  reached: "daily" | "monthly" | null;
+  share: number | null;
+}
+
 interface CostData {
   trackingSince: string | null;
   pricesChecked: string;
   prices: Record<string, { input: number; cached?: number; imageInput?: number; output: number }>;
+  unknownModels: { model: string; kind: string; calls: number; spend: number }[];
+  caps: CapStatus[];
+  redraws: { perChapter: number; perWeek: number };
   period: { from: string | null; to: string };
   options: { families: { id: string; name: string; owner: string | null }[]; stages: { key: string; label: string }[] };
   totals: {
@@ -334,6 +345,19 @@ export default function AdminCosts() {
             <Stat value={t.redrawShare === null ? "—" : `${Math.round(t.redrawShare * 100)}%`} label="Of picture spend on redraws" sub="Automatic fixes plus redraws people asked for" />
           </div>
 
+          {data.unknownModels.length > 0 && (
+            <div className="cost-note" style={{ borderColor: "var(--red)" }} role="alert">
+              <IconInfo size={20} />
+              <span>
+                {data.unknownModels.map((m) => `${m.model} (${m.calls} ${m.calls === 1 ? "call" : "calls"})`).join(", ")} {data.unknownModels.length === 1 ? "has" : "have"} no price in
+                server/aiUsage.ts, so {usd(data.unknownModels.reduce((a, m) => a + m.spend, 0))} here is guessed at the default model's price. Add the real price to trust these margins.
+              </span>
+            </div>
+          )}
+
+          <h2 className="adm-section-title">Spend caps</h2>
+          <SpendCaps data={data} onSaved={() => set("period", period)} />
+
           <h2 className="adm-section-title">Week by week</h2>
           <div className="adm-panel">
             <WeeklyChart weeks={data.weeks} />
@@ -572,6 +596,98 @@ export default function AdminCosts() {
           </details>
         </div>
       )}
+    </div>
+  );
+}
+
+// Spend caps by what started the work, and the limit on redraws a family asks
+// for (#13). Saving takes effect on the next call, without a restart.
+function SpendCaps({ data, onSaved }: { data: CostData; onSaved: () => void }) {
+  const [caps, setCaps] = useState<Record<string, { daily: string; monthly: string }>>(
+    Object.fromEntries(data.caps.map((c) => [c.trigger, { daily: c.caps.daily === null ? "" : String(c.caps.daily), monthly: c.caps.monthly === null ? "" : String(c.caps.monthly) }]))
+  );
+  const [redraws, setRedraws] = useState({ perChapter: String(data.redraws.perChapter), perWeek: String(data.redraws.perWeek) });
+  const [saving, setSaving] = useState(false);
+  const [note, setNote] = useState("");
+
+  const save = () => {
+    setSaving(true);
+    setNote("");
+    apiSend("/api/admin/spend-caps", "PUT", { caps, redraws })
+      .then(() => {
+        setNote("Saved.");
+        onSaved();
+      })
+      .catch((e) => setNote(e.message || "Couldn't save the caps."))
+      .finally(() => setSaving(false));
+  };
+
+  return (
+    <div className="adm-panel">
+      <p className="t-small t-muted" style={{ marginTop: 0 }}>
+        When a cap is reached, that kind of work stops until the next day or the 1st: visitors see a come-back-tomorrow screen, and families are told their chapter is paused. Leave a cap empty for no
+        limit. Admins get a text at 50%, 80% and 100%.
+      </p>
+      <div className="adm-scroll">
+        <table className="adm-table">
+          <thead>
+            <tr>
+              <th>Started by</th>
+              <th className="num">Today</th>
+              <th className="num">Daily cap ($)</th>
+              <th className="num">This month</th>
+              <th className="num">Monthly cap ($)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {data.caps.map((c) => (
+              <tr key={c.trigger}>
+                <td>
+                  {MADE_BY[c.trigger] ?? c.trigger}
+                  {c.reached && <span className="t-xs" style={{ display: "block", color: "var(--red)" }}>Paused: the {c.reached} cap is used up</span>}
+                </td>
+                <td className="num">{usd(c.spent.daily)}</td>
+                <td className="num">
+                  <input
+                    className="input"
+                    style={{ maxWidth: 110, textAlign: "right" }}
+                    inputMode="decimal"
+                    placeholder="No cap"
+                    value={caps[c.trigger]?.daily ?? ""}
+                    onChange={(e) => setCaps((p) => ({ ...p, [c.trigger]: { ...p[c.trigger], daily: e.target.value } }))}
+                  />
+                </td>
+                <td className="num">{usd(c.spent.monthly)}</td>
+                <td className="num">
+                  <input
+                    className="input"
+                    style={{ maxWidth: 110, textAlign: "right" }}
+                    inputMode="decimal"
+                    placeholder="No cap"
+                    value={caps[c.trigger]?.monthly ?? ""}
+                    onChange={(e) => setCaps((p) => ({ ...p, [c.trigger]: { ...p[c.trigger], monthly: e.target.value } }))}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <div className="cost-filters" style={{ marginTop: 14 }}>
+        <Field label="Redraws per chapter" htmlFor="cap-redraws-chapter">
+          <input id="cap-redraws-chapter" className="input" inputMode="numeric" value={redraws.perChapter} onChange={(e) => setRedraws((p) => ({ ...p, perChapter: e.target.value }))} />
+        </Field>
+        <Field label="Redraws per family a week" htmlFor="cap-redraws-week">
+          <input id="cap-redraws-week" className="input" inputMode="numeric" value={redraws.perWeek} onChange={(e) => setRedraws((p) => ({ ...p, perWeek: e.target.value }))} />
+        </Field>
+      </div>
+      <p className="t-xs t-muted">Redraws and rewrites a family asks for. Automatic character fixes aren't counted against them.</p>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 10 }}>
+        <button className="btn btn--outline btn--xs btn--auto" onClick={save} disabled={saving}>
+          {saving ? "Saving…" : "Save caps"}
+        </button>
+        {note && <span className="t-small t-muted">{note}</span>}
+      </div>
     </div>
   );
 }

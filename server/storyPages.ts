@@ -1,3 +1,5 @@
+import { currentModel } from "./models";
+import { recordFirstChapterPublished } from "./funnel";
 import fs from "fs";
 import path from "path";
 import { toFile } from "openai";
@@ -832,6 +834,7 @@ export async function publishLivingChapter(chapterId: string) {
   const chapter = await prisma.chapter.findUniqueOrThrow({ where: { id: chapterId } });
   if (chapter.status === "published" || !isLiving(chapter.generationSnapshot)) return false;
   await prisma.chapter.update({ where: { id: chapterId }, data: { status: "published", publishedAt: new Date() } });
+  void recordFirstChapterPublished(chapterId);
   return true;
 }
 
@@ -1477,7 +1480,7 @@ export async function generateCharacterSheet(chapterId: string): Promise<string 
   ].slice(0, MAX_REFERENCE_IMAGES);
   try {
     const common = {
-      model: snapshot.rules.imageModel,
+      model: currentModel(snapshot.rules.imageModel),
       prompt: buildCharacterSheetPrompt({ rules: snapshot.rules, cast, family: snapshot.family ?? [], people: characterSheet, appearances, beforeBirth: snapshot.beforeBirth }, references),
       size: "1536x1024",
       quality: snapshot.rules.imageQuality,
@@ -1570,7 +1573,7 @@ export async function generateIllustration(pageId: string, options: Illustration
 
   const last = await prisma.pageAsset.findFirst({ where: { pageId }, orderBy: { version: "desc" } });
   const asset = await prisma.pageAsset.create({
-    data: { pageId, version: (last?.version ?? 0) + 1, status: "generating", prompt, model: rules?.imageModel, fixNote },
+    data: { pageId, version: (last?.version ?? 0) + 1, status: "generating", prompt, model: rules ? currentModel(rules.imageModel) : undefined, fixNote },
   });
 
   const fail = (error: string) => prisma.pageAsset.update({ where: { id: asset.id }, data: { status: "failed", error } });
@@ -1580,7 +1583,7 @@ export async function generateIllustration(pageId: string, options: Illustration
 
   let mismatched: string[] = [];
   try {
-    const common = { model: rules.imageModel, prompt, size: pictureFormat(page).size, quality: rules.imageQuality, output_format: "jpeg" as const };
+    const common = { model: currentModel(rules.imageModel), prompt, size: pictureFormat(page).size, quality: rules.imageQuality, output_format: "jpeg" as const };
     const response = await withImageRateLimit(references.length, async () =>
       references.length
         ? client.images.edit({ ...common, image: await Promise.all(references.map((r) => toUpload(r.path))) })
@@ -1620,7 +1623,7 @@ export async function drawComparison(pageId: string, fileName: string, testRules
   const cast = await currentCast(snapshot?.cast ?? []);
   const drawn = shotOverride ? { ...page, shot: JSON.stringify(shotOverride) } : page;
   const { references, prompt } = await composePagePicture(drawn, chapter, { rules, cast, family: snapshot?.family ?? [], people: characterSheet });
-  const common = { model: rules.imageModel, prompt, size: pictureFormat(page).size, quality: rules.imageQuality, output_format: "jpeg" as const };
+  const common = { model: currentModel(rules.imageModel), prompt, size: pictureFormat(page).size, quality: rules.imageQuality, output_format: "jpeg" as const };
   const response = await withImageRateLimit(references.length, async () =>
     references.length
       ? client.images.edit({ ...common, image: await Promise.all(references.map((r) => toUpload(r.path))) })
@@ -1633,7 +1636,7 @@ export async function drawComparison(pageId: string, fileName: string, testRules
   fs.mkdirSync(FEEDBACK_DIR, { recursive: true });
   const imagePath = path.join("uploads", "feedback", fileName);
   fs.writeFileSync(path.join(process.cwd(), imagePath), Buffer.from(b64, "base64"));
-  return { imagePath, prompt, model: rules.imageModel, ruleSetVersion: version };
+  return { imagePath, prompt, model: currentModel(rules.imageModel), ruleSetVersion: version };
 }
 
 // Returns the IDs of family characters who don't match their approved design.

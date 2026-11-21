@@ -1,6 +1,7 @@
 import express, { Router } from "express";
 import { prisma } from "./db";
-import { PRICES, PRICES_CHECKED, STEP_LABELS, type UsageKind } from "./aiUsage";
+import { PRICES, PRICES_CHECKED, STEP_LABELS, priceFor, type UsageKind } from "./aiUsage";
+import { CAP_PERIODS, CAP_TRIGGERS, redrawCaps, setRedrawCaps, setSpendCap, spendReport } from "./spendCaps";
 import { READING_STAGES, effectiveStage, normalizeStage, stageInfo } from "./readingStages";
 import { adminChildLabel } from "./beforeBirth";
 
@@ -258,10 +259,24 @@ router.get("/admin/costs", async (req, res) => {
     .filter((f) => f.chapters || f.spend || filters.family)
     .sort((a, b) => b.spend - a.spend || b.chapters - a.chapters);
 
+  // Calls recorded with a model that has no price are costed at the default
+  // model's price and marked as estimates, which quietly skews margin (#13).
+  const unknownModels = Object.values(
+    rows
+      .filter((r) => !priceFor(r.model, r.kind as UsageKind).known)
+      .reduce<Record<string, { model: string; kind: string; calls: number; spend: number }>>((acc, r) => {
+        const seen = acc[r.model] ?? { model: r.model, kind: r.kind, calls: 0, spend: 0 };
+        return { ...acc, [r.model]: { ...seen, calls: seen.calls + 1, spend: seen.spend + r.costUsd } };
+      }, {})
+  ).sort((a, b) => b.spend - a.spend);
+
   res.json({
     trackingSince,
     pricesChecked: PRICES_CHECKED,
     prices: PRICES,
+    unknownModels,
+    caps: await spendReport(),
+    redraws: await redrawCaps(),
     period: { from: from ?? (families[0]?.createdAt ?? null), to: new Date(end) },
     options: {
       families: [...familyInfo.values()].map((f) => ({ id: f.id, name: f.name, owner: f.owner })),
@@ -277,6 +292,39 @@ router.get("/admin/costs", async (req, res) => {
     moreChapters: Math.max(0, chapters.length - MAX_CHAPTERS),
     unattributedSpend: sum(rows.filter((r) => !r.householdId).map((r) => r.costUsd)),
   });
+});
+
+// The spend caps and redraw limits (Admin → Costs). A cap of null is no cap.
+router.put("/admin/spend-caps", async (req, res) => {
+  const caps = req.body?.caps ?? {};
+  const redraws = req.body?.redraws ?? {};
+  const money = (v: unknown) => {
+    if (v === null || v === undefined || v === "") return { ok: true as const, value: null };
+    const n = Number(v);
+    return Number.isFinite(n) && n >= 0 && n <= 100_000 ? { ok: true as const, value: Math.round(n * 100) / 100 } : { ok: false as const, value: null };
+  };
+  const count = (v: unknown, fallback: number) => {
+    if (v === null || v === undefined || v === "") return { ok: true as const, value: fallback };
+    const n = Number(v);
+    return Number.isInteger(n) && n >= 0 && n <= 10_000 ? { ok: true as const, value: n } : { ok: false as const, value: fallback };
+  };
+  for (const trigger of CAP_TRIGGERS) {
+    if (!(trigger in caps)) continue;
+    for (const period of CAP_PERIODS) {
+      if (!money(caps[trigger]?.[period]).ok) return res.status(400).json({ error: "A cap is a dollar amount from 0 to 100,000, or empty for no cap." });
+    }
+  }
+  const current = await redrawCaps();
+  const perChapter = count(redraws.perChapter, current.perChapter);
+  const perWeek = count(redraws.perWeek, current.perWeek);
+  if (!perChapter.ok || !perWeek.ok) return res.status(400).json({ error: "Redraw limits are whole numbers from 0 to 10,000." });
+
+  for (const trigger of CAP_TRIGGERS) {
+    if (!(trigger in caps)) continue;
+    for (const period of CAP_PERIODS) await setSpendCap(trigger, period, money(caps[trigger]?.[period]).value);
+  }
+  await setRedrawCaps(perChapter.value, perWeek.value);
+  res.json({ caps: await spendReport(), redraws: await redrawCaps() });
 });
 
 export default router;

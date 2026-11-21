@@ -183,6 +183,12 @@ Changes save as they're made. If the person replied STOP, the page says their ph
 
 **The link in texts.** The `<subscription_preferences>` variable, available in every message, becomes a link to that person's own Text messages page (`/t/<key>`). It opens without signing in and shows only their text settings. The memory reminder and new chapter texts end with "Change your texts: <link>" by default. When a parent copies a message to send by hand (an invite, a chapter, a question), the link and its label are left out, since the link belongs to whoever the app texts.
 
+## Measuring the funnel
+
+So ads and referrals can be read in numbers (GitHub #2): a tagged link's first landing drops two first-party cookies, `sb_vid` (a visitor id, 400 days) and `sb_attr` (the utm tags and click id, 180 days), and each step a visitor or family takes is a row in `FunnelEvent`: arriving, teaching a lesson, starting and watching a preview, signing up, the first memory, the first chapter in the book, invites sent and accepted, subscribing, canceling. Steps the server can't see (the arrival, watching the preview pages) are reported by the browser, once per visitor; the rest are recorded where they happen. Steps with no visitor request of their own, like a chapter that publishes itself or a subscription set by an admin, borrow the family's attribution from their earliest recorded step. Admin → Overview reads the table back as the funnel, overall and by source and campaign. The Framer landing page's code components (framer/LessonBox.tsx, framer/StoryShelf.tsx) pass the page's tags through to /try, so a visitor keeps their campaign across the two sites.
+
+For ad platforms: if a Meta pixel is loaded on the page, the app fires `ViewContent` when a preview starts, `CompleteRegistration` when a story is saved, and has `Subscribe` ready for when checkout exists (src/lib/funnel.ts). Nothing is sent anywhere without the pixel present.
+
 ## Running costs
 
 These are estimates from measured token usage at OpenAI's prices in October 2026, for gpt-image-2 at medium quality with GPT-5.5 for every text step.
