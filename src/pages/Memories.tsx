@@ -8,9 +8,7 @@ import { IconChevronRight, IconClose, IconMic, IconSearch, IconStar } from "../c
 import { Chev, Loading, Mascot } from "../components/ui";
 import { useStorybookData } from "../hooks/useStorybookData";
 import { useInlineAudio } from "../hooks/useInlineAudio";
-import { capitalize, childLabel, formatMonth, possessive } from "../lib/format";
-
-const monthKey = (iso: string) => iso.slice(0, 7);
+import { capitalize, childLabel, formatMonth, monthKey, possessive } from "../lib/format";
 
 // The Memories tab (VSB-136): the family's memories, each with who it's from
 // (VSB-135), with search and filters. Chapters are in the Book tab.

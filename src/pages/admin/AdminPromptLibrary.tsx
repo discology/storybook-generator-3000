@@ -2,7 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { apiGet, apiSend } from "../../lib/api";
 import { IconArchive, IconEdit, IconGrip, IconPlus, IconRefresh, IconSearch, IconTrash } from "../../components/icons";
-import { Mascot, Select, type MascotName } from "../../components/ui";
+import { ConfirmDialog, Mascot, Select, type MascotName } from "../../components/ui";
 import { AdminDots } from "./AdminReviewQueue";
 import type { Prompt } from "../../types";
 import { PROMPT_VARIABLES, promptParts, samplePromptValues } from "../../lib/promptVariables";
@@ -54,6 +54,7 @@ export default function AdminPromptLibrary() {
   const [menu, setMenu] = useState<string | null>(null);
   const [dragging, setDragging] = useState<string | null>(null);
   const [over, setOver] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<Prompt | null>(null);
 
   const load = () => {
     apiGet("/api/prompts").then(setPrompts);
@@ -82,7 +83,6 @@ export default function AdminPromptLibrary() {
   };
 
   const remove = async (p: Prompt) => {
-    if (!window.confirm(`Delete "${p.question}"? Memories recorded with it keep the question.`)) return;
     await apiSend(`/api/prompts/${p.id}`, "DELETE");
     load();
   };
@@ -197,7 +197,13 @@ export default function AdminPromptLibrary() {
                           <IconArchive size={18} /> Archive
                         </button>
                       )}
-                      <button className="danger" onClick={() => void remove(p)}>
+                      <button
+                        className="danger"
+                        onClick={() => {
+                          setMenu(null);
+                          setDeleting(p);
+                        }}
+                      >
                         <IconTrash size={18} /> Delete
                       </button>
                     </AdminDots>
@@ -234,6 +240,17 @@ export default function AdminPromptLibrary() {
       <p className="t-small t-muted hstack" style={{ marginTop: 10, gap: 6 }}>
         <IconGrip size={18} /> Drag prompts in the Published tab to change the order.
       </p>
+      <ConfirmDialog
+        open={deleting !== null}
+        onClose={() => setDeleting(null)}
+        danger
+        title="Delete prompt?"
+        description={deleting ? `Delete “${deleting.question}”? Memories recorded with it keep the question.` : undefined}
+        confirmLabel="Delete"
+        onConfirm={async () => {
+          if (deleting) await remove(deleting);
+        }}
+      />
     </div>
   );
 }

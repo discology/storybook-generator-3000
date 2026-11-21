@@ -145,7 +145,7 @@ export default function AdminCharacterEdit() {
           </button>
         </div>
       </div>
-      {error && <p className="status-line" style={{ color: "#d94c4c" }}>{error}</p>}
+      {error && <p className="status-line" role="alert" style={{ color: "#d94c4c" }}>{error}</p>}
       <p className="status-line">Changes apply to new chapters only. Chapters already made keep the version they used.</p>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 360px", gap: "1.5rem", alignItems: "start" }}>

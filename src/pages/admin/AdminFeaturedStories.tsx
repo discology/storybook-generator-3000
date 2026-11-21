@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { apiGet, apiSend, ApiError } from "../../lib/api";
+import { ConfirmDialog } from "../../components/ui";
 
 // The landing page's "Stories from other families" (VSB-141): the sample
 // family's chapters, each with a card and a public link.
@@ -38,6 +39,8 @@ export default function AdminFeaturedStories() {
   const [data, setData] = useState<FeaturedData | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pick, setPick] = useState("");
+  const [confirmSwitchFamily, setConfirmSwitchFamily] = useState(false);
+  const [removingStory, setRemovingStory] = useState<Featured | null>(null);
 
   const load = useCallback(() => apiGet("/api/admin/featured").then((d: FeaturedData) => setData(d)), []);
   useEffect(() => void load(), [load]);
@@ -69,7 +72,7 @@ export default function AdminFeaturedStories() {
         The team's sample stories, shown on the landing page under "Stories from other families". Anyone can read a featured story at its link, without signing in.
       </p>
       {error && (
-        <p className="status-line" style={{ color: "#d94c4c" }}>
+        <p className="status-line" role="alert" style={{ color: "#d94c4c" }}>
           {error}
         </p>
       )}
@@ -103,7 +106,10 @@ export default function AdminFeaturedStories() {
               style={{ width: "auto" }}
               disabled={!pick}
               onClick={() => {
-                if (data.featured.length && !window.confirm("Choosing another sample family removes the stories featured now. Continue?")) return;
+                if (data.featured.length) {
+                  setConfirmSwitchFamily(true);
+                  return;
+                }
                 void run(() => apiSend("/api/admin/featured/sample-family", "PUT", { householdId: pick })).then(() => setPick(""));
               }}
             >
@@ -139,9 +145,7 @@ export default function AdminFeaturedStories() {
                 onMove={(by) => move(i, by)}
                 onSave={(card) => run(() => apiSend(`/api/admin/featured/${f.id}`, "PUT", card))}
                 onRewrite={() => run(() => apiSend(`/api/admin/featured/${f.id}/card-line`, "POST"))}
-                onRemove={() => {
-                  if (window.confirm(`Remove "${f.title}" from the landing page? Its link stops working.`)) void run(() => apiSend(`/api/admin/featured/${f.id}`, "DELETE"));
-                }}
+                onRemove={() => setRemovingStory(f)}
               />
             ))}
           </tbody>
@@ -182,6 +186,29 @@ export default function AdminFeaturedStories() {
           )}
         </>
       )}
+      <ConfirmDialog
+        open={confirmSwitchFamily}
+        onClose={() => setConfirmSwitchFamily(false)}
+        danger
+        title="Switch sample family?"
+        description="Choosing another sample family removes the stories featured now."
+        confirmLabel="Continue"
+        onConfirm={async () => {
+          await run(() => apiSend("/api/admin/featured/sample-family", "PUT", { householdId: pick }));
+          setPick("");
+        }}
+      />
+      <ConfirmDialog
+        open={removingStory !== null}
+        onClose={() => setRemovingStory(null)}
+        danger
+        title="Remove featured story?"
+        description={removingStory ? `Remove “${removingStory.title}” from the landing page? Its link stops working.` : undefined}
+        confirmLabel="Remove"
+        onConfirm={async () => {
+          if (removingStory) await run(() => apiSend(`/api/admin/featured/${removingStory.id}`, "DELETE"));
+        }}
+      />
     </div>
   );
 }

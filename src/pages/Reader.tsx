@@ -1,15 +1,17 @@
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import PagePicture from "../components/PagePicture";
 import AccessDenied from "../components/AccessDenied";
 import { IconBookmark, IconChevronLeft, IconChevronRight, IconClose, IconPause, IconPeople, IconPlay, IconSparkle } from "../components/icons";
-import { BottomSheet, Loading, Switch } from "../components/ui";
+import { BottomSheet, Loading, MorphSlot, Switch } from "../components/ui";
 import { useStorybookData } from "../hooks/useStorybookData";
 import { apiGet, apiSend, ApiError } from "../lib/api";
 import { capitalize, chapterLabel, possessive } from "../lib/format";
 import type { ReaderChapter } from "../types";
 
 type Paper = "cream" | "white" | "dark";
+type TurnDir = 1 | -1 | 0;
 interface Prefs {
   size: number;
   paper: Paper;
@@ -23,6 +25,30 @@ const PAPERS: { value: Paper; label: string; swatch: string }[] = [
   { value: "white", label: "White", swatch: "#ffffff" },
   { value: "dark", label: "Dark", swatch: "#17161b" },
 ];
+
+function rubberband(dx: number, dimension: number, constant = 0.55): number {
+  const abs = Math.abs(dx);
+  if (abs === 0 || dimension <= 0) return 0;
+  const damped = (1 - 1 / ((abs * constant) / dimension + 1)) * dimension;
+  return dx < 0 ? -damped : damped;
+}
+
+const prefersReducedMotion = () =>
+  typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+
+function ReaderOrnament({ size = 20, draw = false }: { size?: number; draw?: boolean }) {
+  return (
+    <div className={`reader__ornament ${draw ? "reader__ornament--draw" : ""}`.trim()} aria-hidden="true">
+      <svg className="reader__ornament-rule reader__ornament-rule--left" width="70" height="4" viewBox="0 0 70 4">
+        <line x1="70" y1="2" x2="0" y2="2" pathLength={100} />
+      </svg>
+      <IconSparkle size={size} />
+      <svg className="reader__ornament-rule reader__ornament-rule--right" width="70" height="4" viewBox="0 0 70 4">
+        <line x1="0" y1="2" x2="70" y2="2" pathLength={100} />
+      </svg>
+    </div>
+  );
+}
 
 function loadPrefs(): Prefs {
   try {
@@ -76,6 +102,15 @@ const asChapter = (s: PublicStoryData): ReaderChapter => ({
   canShare: false,
 });
 
+interface DragState {
+  pointerId: number;
+  startX: number;
+  startY: number;
+  startTime: number;
+  axis: "none" | "x" | "y";
+  dx: number;
+}
+
 export default function Reader({ publicSlug }: { publicSlug?: string }) {
   const { id, chapterId } = useParams();
   const isPublic = Boolean(publicSlug);
@@ -83,13 +118,16 @@ export default function Reader({ publicSlug }: { publicSlug?: string }) {
   const [chapter, setChapter] = useState<ReaderChapter | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "denied" | "missing">("loading");
   const [index, setIndex] = useState(0);
+  const [turnDir, setTurnDir] = useState<TurnDir>(0);
   const [prefs, setPrefs] = useState<Prefs>(loadPrefs);
   const [controls, setControls] = useState(false);
   const [barsShown, setBarsShown] = useState(true);
   const [favorite, setFavorite] = useState(false);
   const wide = useMediaQuery("(min-width: 900px) and (min-aspect-ratio: 5/4)");
-  const touchX = useRef<number | null>(null);
+  const dragRef = useRef<DragState | null>(null);
+  const suppressTapRef = useRef(false);
   const pageRef = useRef<HTMLDivElement | null>(null);
+  const activeAnimRef = useRef<Animation | null>(null);
   // The speaker's voice on pre-birth pages (VSB-118): one player for the chapter.
   const voiceRef = useRef<HTMLAudioElement | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
@@ -112,6 +150,7 @@ export default function Reader({ publicSlug }: { publicSlug?: string }) {
   useEffect(() => {
     setState("loading");
     setIndex(0);
+    setTurnDir(0);
     if (publicSlug) {
       apiGet(`/api/public/stories/${encodeURIComponent(publicSlug)}`)
         .then((s: PublicStoryData) => {
@@ -161,36 +200,186 @@ export default function Reader({ publicSlug }: { publicSlug?: string }) {
   const ended = index >= pages.length;
   // A chapter with a question for the grown-ups gets its own page after the end (VSB-128).
   const grownUpsIndex = chapter?.reflection || chapter?.lesson ? pages.length + 1 : null;
+  const maxIndex = grownUpsIndex ?? pages.length;
   const onGrownUps = grownUpsIndex !== null && index === grownUpsIndex;
 
   const go = useCallback(
-    (next: number) => {
+    (next: number, dir?: TurnDir) => {
       if (!chapter) return;
-      const clamped = Math.max(0, Math.min(grownUpsIndex ?? pages.length, next));
+      const clamped = Math.max(0, Math.min(maxIndex, next));
+      if (clamped === index) return;
+      const resolvedDir: TurnDir = dir !== undefined ? dir : clamped > index ? 1 : -1;
+      setTurnDir(resolvedDir);
       setIndex(clamped);
       pageRef.current?.scrollTo({ top: 0 });
       if (isPublic) return;
       if (clamped < pages.length) void apiSend(`/api/chapters/${chapter.id}/mark`, "PUT", { lastPage: clamped }).catch(() => undefined);
       else void apiSend(`/api/chapters/${chapter.id}/mark`, "PUT", { finished: true }).catch(() => undefined);
     },
-    [chapter, pages.length, grownUpsIndex, isPublic]
+    [chapter, pages.length, maxIndex, index, isPublic]
   );
 
+  // Emil's Keyboard Rule: ArrowLeft / ArrowRight pass turnDir = 0 for instant 0ms turns.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (controls) return;
-      if (e.key === "ArrowRight") go(index + 1);
-      if (e.key === "ArrowLeft") go(index - 1);
+      if (e.key === "ArrowRight") go(index + 1, 0);
+      if (e.key === "ArrowLeft") go(index - 1, 0);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [go, index, controls]);
 
+  // WAAPI directional page turn for touch swipes & button taps (skipped when turnDir === 0).
+  useLayoutEffect(() => {
+    const el = pageRef.current;
+    if (!el) return;
+    activeAnimRef.current?.cancel();
+    el.style.transform = "";
+    el.style.transition = "";
+    if (turnDir === 0) return;
+
+    if (prefersReducedMotion()) {
+      activeAnimRef.current = el.animate([{ opacity: 0.4 }, { opacity: 1 }], {
+        duration: 180,
+        easing: "cubic-bezier(0.23, 1, 0.32, 1)",
+      });
+      return;
+    }
+
+    if (wide && el.classList.contains("reader__spread")) {
+      el.style.transformOrigin = "50% 50%";
+      activeAnimRef.current = el.animate(
+        [
+          { transform: `perspective(1400px) rotateY(${-4 * turnDir}deg)`, opacity: 0.4 },
+          { transform: "perspective(1400px) rotateY(0deg)", opacity: 1 },
+        ],
+        { duration: 280, easing: "cubic-bezier(0.23, 1, 0.32, 1)" }
+      );
+    } else {
+      activeAnimRef.current = el.animate(
+        [
+          { transform: `translateX(${16 * turnDir}px)`, opacity: 0 },
+          { transform: "translateX(0px)", opacity: 1 },
+        ],
+        { duration: 240, easing: "cubic-bezier(0.23, 1, 0.32, 1)" }
+      );
+    }
+  }, [index, turnDir, wide]);
+
+  const snapBackPage = () => {
+    const el = pageRef.current;
+    if (!el) return;
+    if (prefersReducedMotion()) {
+      el.style.transform = "";
+      return;
+    }
+    el.style.transition = "transform 300ms var(--ease-drawer)";
+    el.style.transform = "translateX(0px)";
+    const clear = () => {
+      el.style.transition = "";
+      el.style.transform = "";
+      el.removeEventListener("transitionend", clear);
+    };
+    el.addEventListener("transitionend", clear);
+  };
+
+  const onFramePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (controls || (e.pointerType === "mouse" && e.button !== 0)) return;
+    // Ignore pointer drags originating on interactive controls inside the page
+    const target = e.target as HTMLElement | null;
+    if (target?.closest("button, a, input, select, textarea")) return;
+    if (dragRef.current) return; // Multi-touch protection
+    dragRef.current = {
+      pointerId: e.pointerId,
+      startX: e.clientX,
+      startY: e.clientY,
+      startTime: Date.now(),
+      axis: "none",
+      dx: 0,
+    };
+  };
+
+  const onFramePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = dragRef.current;
+    if (!d || d.pointerId !== e.pointerId) return;
+    const rawDx = e.clientX - d.startX;
+    const rawDy = e.clientY - d.startY;
+
+    if (d.axis === "none") {
+      if (Math.abs(rawDx) < 10 && Math.abs(rawDy) < 10) return;
+      if (Math.abs(rawDx) > Math.abs(rawDy)) {
+        d.axis = "x";
+        e.currentTarget.setPointerCapture?.(e.pointerId);
+        activeAnimRef.current?.cancel();
+        if (pageRef.current) pageRef.current.style.transition = "none";
+      } else {
+        d.axis = "y";
+        dragRef.current = null;
+        return;
+      }
+    }
+
+    if (d.axis === "x") {
+      d.dx = rawDx;
+      const el = pageRef.current;
+      if (!el) return;
+      const width = el.offsetWidth || 360;
+      const atStartEdge = index === 0 && rawDx > 0;
+      const atEndEdge = index >= maxIndex && rawDx < 0;
+      const visualX = atStartEdge || atEndEdge ? rubberband(rawDx, width, 0.55) : rawDx;
+      if (!prefersReducedMotion()) {
+        el.style.transform = `translateX(${visualX}px)`;
+      }
+    }
+  };
+
+  const finishPointerDrag = (e: React.PointerEvent<HTMLDivElement>, cancelled = false) => {
+    const d = dragRef.current;
+    if (!d || d.pointerId !== e.pointerId) return;
+    dragRef.current = null;
+    if (d.axis !== "x") return;
+
+    suppressTapRef.current = true;
+    setTimeout(() => {
+      suppressTapRef.current = false;
+    }, 50);
+
+    if (cancelled) {
+      snapBackPage();
+      return;
+    }
+
+    const dx = e.clientX - d.startX;
+    const elapsed = Math.max(1, Date.now() - d.startTime);
+    const velocity = Math.abs(dx) / elapsed;
+    const shouldFlip = Math.abs(dx) > 60 || velocity > 0.11;
+
+    if (shouldFlip && dx < 0 && index < maxIndex) {
+      if (pageRef.current) {
+        pageRef.current.style.transition = "";
+        pageRef.current.style.transform = "";
+      }
+      go(index + 1, 1);
+    } else if (shouldFlip && dx > 0 && index > 0) {
+      if (pageRef.current) {
+        pageRef.current.style.transition = "";
+        pageRef.current.style.transform = "";
+      }
+      go(index - 1, -1);
+    } else {
+      snapBackPage();
+    }
+  };
+
   const toggleFavorite = async () => {
     if (!chapter) return;
     const next = !favorite;
     setFavorite(next);
-    await apiSend(`/api/chapters/${chapter.id}/mark`, "PUT", { favorite: next }).catch(() => setFavorite(!next));
+    await apiSend(`/api/chapters/${chapter.id}/mark`, "PUT", { favorite: next }).catch(() => {
+      setFavorite(!next);
+      toast.error("Couldn't save bookmark");
+    });
   };
 
   if (state === "denied") return <AccessDenied />;
@@ -224,6 +413,7 @@ export default function Reader({ publicSlug }: { publicSlug?: string }) {
   const textSize = SIZES[prefs.size] ?? 1;
 
   const onTap = () => {
+    if (suppressTapRef.current) return;
     if (prefs.hide) setBarsShown((s) => !s);
   };
 
@@ -237,6 +427,7 @@ export default function Reader({ publicSlug }: { publicSlug?: string }) {
       <h1 className="reader__title">{chapter.title}</h1>
     </header>
   );
+  const isVoicePlaying = Boolean(page.voice?.src && playing === page.voice.src);
   const words = page.text ? (
     <div className={`reader__text ${page.image ? "" : "reader__text--only"}`} style={{ fontSize: `${(wide ? 27 : 22) * textSize}px` }}>
       {paragraphs(page.text).map((p, i) => (
@@ -246,14 +437,28 @@ export default function Reader({ publicSlug }: { publicSlug?: string }) {
         // Before the birth, the person's own voice, under their words (VSB-118).
         <button
           type="button"
-          className={`reader__voice ${playing === page.voice.src ? "reader__voice--on" : ""}`}
+          className={`reader__voice ${isVoicePlaying ? "reader__voice--on" : ""}`}
           onClick={(e) => {
             e.stopPropagation();
             toggleVoice(page.voice!.src!);
           }}
         >
-          <span className="reader__voice-icon">{playing === page.voice.src ? <IconPause size={16} /> : <IconPlay size={16} />}</span>
-          Hear {page.voice.name} say it
+          <span className="reader__voice-icon">
+            <MorphSlot
+              active={isVoicePlaying ? "playing" : "idle"}
+              items={[
+                { key: "idle", content: <IconPlay size={16} /> },
+                { key: "playing", content: <IconPause size={16} /> },
+              ]}
+            />
+          </span>
+          <MorphSlot
+            active={isVoicePlaying ? "playing" : "idle"}
+            items={[
+              { key: "idle", content: `Hear ${page.voice.name} say it` },
+              { key: "playing", content: `Listening to ${page.voice.name}` },
+            ]}
+          />
           {page.voice.durationSec ? <span className="reader__voice-time">{Math.floor(page.voice.durationSec / 60)}:{String(page.voice.durationSec % 60).padStart(2, "0")}</span> : null}
         </button>
       )}
@@ -265,7 +470,7 @@ export default function Reader({ publicSlug }: { publicSlug?: string }) {
         wide ? "" : page.pictureSize === "full" ? "reader__pic--full" : page.pictureSize === "wordless" ? "reader__pic--wordless" : "reader__pic--inset"
       }`}
     >
-      <PagePicture src={`/${page.image}`} size={page.pictureSize} alt={page.visibleAction} />
+      <PagePicture src={`/${page.image}`} size={page.pictureSize} alt={page.visibleAction} instant={turnDir === 0} />
     </div>
   ) : null;
 
@@ -311,12 +516,10 @@ export default function Reader({ publicSlug }: { publicSlug?: string }) {
       <h1 className="ending__line">{chapter.title}</h1>
       {endingPicture && (
         <div className="reader__pic reader__pic--inset" style={{ maxWidth: 360, margin: "0 auto" }}>
-          <PagePicture src={`/${endingPicture}`} size="framed" alt="" />
+          <PagePicture src={`/${endingPicture}`} size="framed" alt="" instant={turnDir === 0} />
         </div>
       )}
-      <div className="reader__ornament" aria-hidden="true">
-        <IconSparkle size={20} />
-      </div>
+      <ReaderOrnament size={20} draw={turnDir !== 0} />
       {chapter.growing ? (
         // Before the birth the chapter grows a page per message (VSB-134).
         <div className="ending__growing">
@@ -336,13 +539,13 @@ export default function Reader({ publicSlug }: { publicSlug?: string }) {
           <Link className="btn btn--lime btn--caps" to="/try">
             Make your own story <IconChevronRight size={20} />
           </Link>
-          <button className="btn btn--outline" onClick={() => go(0)}>
+          <button className="btn btn--outline" onClick={() => go(0, -1)}>
             Read again
           </button>
         </div>
       ) : (
         <div className="stack" style={{ marginTop: 22, maxWidth: 380, marginLeft: "auto", marginRight: "auto" }}>
-          <button className="btn btn--purple" onClick={() => go(0)}>
+          <button className="btn btn--purple" onClick={() => go(0, -1)}>
             Read again
           </button>
           {nextOrClose}
@@ -350,7 +553,7 @@ export default function Reader({ publicSlug }: { publicSlug?: string }) {
       )}
       {isPublic ? null : grownUpsIndex !== null ? (
         <p style={{ marginTop: 18 }}>
-          <button type="button" className="tlink" style={{ display: "inline-flex", gap: 6, alignItems: "center", fontSize: 17 }} onClick={() => go(grownUpsIndex)}>
+          <button type="button" className="tlink" style={{ display: "inline-flex", gap: 6, alignItems: "center", fontSize: 17 }} onClick={() => go(grownUpsIndex, 1)}>
             For the grown-ups <IconChevronRight size={18} />
           </button>
         </p>
@@ -380,9 +583,7 @@ export default function Reader({ publicSlug }: { publicSlug?: string }) {
           {chapter.reflection}
         </p>
       )}
-      <div className="reader__ornament" aria-hidden="true">
-        <IconSparkle size={20} />
-      </div>
+      <ReaderOrnament size={20} draw={turnDir !== 0} />
       <div className="stack" style={{ marginTop: 18, maxWidth: 380, width: "100%", marginLeft: "auto", marginRight: "auto" }}>
         {nextOrClose}
       </div>
@@ -391,16 +592,7 @@ export default function Reader({ publicSlug }: { publicSlug?: string }) {
   );
 
   return (
-    <div
-      className={`reader reader--${prefs.paper} ${hidden ? "reader--hidden" : ""}`}
-      onTouchStart={(e) => (touchX.current = e.touches[0].clientX)}
-      onTouchEnd={(e) => {
-        if (touchX.current === null) return;
-        const dx = e.changedTouches[0].clientX - touchX.current;
-        touchX.current = null;
-        if (Math.abs(dx) > 60) go(index + (dx < 0 ? 1 : -1));
-      }}
-    >
+    <div className={`reader reader--${prefs.paper} ${hidden ? "reader--hidden" : ""}`}>
       {/* One player for the whole chapter, always mounted: it lived in the chapter
           header, which only shows on the first page, so voices on later pages never played. */}
       <audio ref={voiceRef} preload="none" onEnded={() => setPlaying(null)} />
@@ -416,7 +608,9 @@ export default function Reader({ publicSlug }: { publicSlug?: string }) {
             <IconChevronLeft size={28} strokeWidth={2.4} />
           </Link>
         )}
-        <span className="tbar__title">{ended || isPublic ? "" : capitalize(`${possessive(chapter.storybook.childName)} story`)}</span>
+        <span className="tbar__title" title={ended || isPublic ? undefined : capitalize(`${possessive(chapter.storybook.childName)} story`)}>
+          {ended || isPublic ? "" : capitalize(`${possessive(chapter.storybook.childName)} story`)}
+        </span>
         <div className="tbar__right">
           {!ended && (
             <button className="tbar__icon" onClick={() => setControls(true)} aria-label="Reading settings">
@@ -431,7 +625,14 @@ export default function Reader({ publicSlug }: { publicSlug?: string }) {
         </div>
       </div>
 
-      <div className="reader__frame" onClick={onTap}>
+      <div
+        className="reader__frame"
+        onClick={onTap}
+        onPointerDown={onFramePointerDown}
+        onPointerMove={onFramePointerMove}
+        onPointerUp={(e) => finishPointerDrag(e, false)}
+        onPointerCancel={(e) => finishPointerDrag(e, true)}
+      >
         {ended ? (
           <div className="reader__page" ref={pageRef} style={{ maxWidth: wide ? 760 : 480 }}>
             {onGrownUps ? grownUps : ending}
@@ -439,24 +640,12 @@ export default function Reader({ publicSlug }: { publicSlug?: string }) {
         ) : wide ? (
           <div className="reader__page reader__spread" ref={pageRef}>
             <div className="reader__left">
-              {picture ?? (
-                <div className="reader__ornament" style={{ fontSize: 30 }}>
-                  <IconSparkle size={30} />
-                </div>
-              )}
+              {picture ?? <ReaderOrnament size={30} />}
             </div>
             <div className="reader__right">
               {index === 0 && chapterHead}
-              {words ?? (
-                <div className="reader__ornament" aria-hidden="true">
-                  <IconSparkle size={22} />
-                </div>
-              )}
-              {index === pages.length - 1 && (
-                <div className="reader__ornament" aria-hidden="true">
-                  <IconSparkle size={18} />
-                </div>
-              )}
+              {words ?? <ReaderOrnament size={22} />}
+              {index === pages.length - 1 && <ReaderOrnament size={18} draw={turnDir !== 0} />}
             </div>
           </div>
         ) : (
@@ -470,7 +659,7 @@ export default function Reader({ publicSlug }: { publicSlug?: string }) {
 
       {!ended && (
         <nav className="reader__bottom" aria-label="Pages">
-          <button className="reader__nav-btn" onClick={() => go(index - 1)} disabled={index === 0}>
+          <button className="reader__nav-btn" onClick={() => go(index - 1, -1)} disabled={index === 0}>
             <IconChevronLeft size={22} /> Previous
           </button>
           <div className="reader__count">
@@ -485,7 +674,7 @@ export default function Reader({ publicSlug }: { publicSlug?: string }) {
               </span>
             )}
           </div>
-          <button className="reader__next" onClick={() => go(index + 1)}>
+          <button className="reader__next" onClick={() => go(index + 1, 1)}>
             {index === pages.length - 1 ? "The end" : "Next page"} <IconChevronRight size={20} />
           </button>
         </nav>

@@ -85,7 +85,7 @@ export default function ExportMemories() {
           <Select id="range" value={range} onChange={setRange} options={RANGES} />
         </Field>
         <Note kind="info" style={{ marginTop: 16 }}>Other contributors' private recordings are not included.</Note>
-        {error && <p className="error-text">{error}</p>}
+        {error && <p className="error-text" role="alert">{error}</p>}
         <button
           className="btn btn--lime btn--caps"
           style={{ marginTop: 18 }}
@@ -152,7 +152,7 @@ export function ExportStatus() {
         <Masthead title={<>Gathering<br />your moments.</>} art="papers" artMode="corner" style={{ paddingTop: 0 }} size="md" />
         <Sheet grow>
           <p className="h-title" style={{ fontSize: 26 }}>
-            {capitalize(possessive(view.childName ?? ""))} story · Export
+            {view.childName?.trim() ? `${capitalize(possessive(view.childName))} story` : "Your baby's story"} · Export
           </p>
           <div className="center-col" style={{ marginTop: 24 }}>
             <div className="spin-ring spin-ring--lg" />
@@ -180,7 +180,7 @@ export function ExportStatus() {
         <Masthead title={<>Your memories,<br />ready to keep.</>} art="download" artMode="corner" style={{ paddingTop: 0 }} size="md" />
         <Sheet grow>
           <p className="h-title" style={{ fontSize: 26 }}>
-            {capitalize(possessive(view.childName ?? ""))} story · Export
+            {view.childName?.trim() ? `${capitalize(possessive(view.childName))} story` : "Your baby's story"} · Export
           </p>
           <div className="steps" style={{ marginTop: 8 }}>
             {included.map((item) => (

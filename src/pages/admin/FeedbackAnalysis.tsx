@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiGet, apiSend, ApiError } from "../../lib/api";
+import { ConfirmDialog } from "../../components/ui";
 import { FLAG_CATEGORIES } from "../../lib/flags";
 
 // Admin → Feedback → Analysis (VSB-103, VSB-104): the AI groups flags into
@@ -99,6 +100,8 @@ export default function FeedbackAnalysis({ filters }: { filters: Record<string, 
   const [detail, setDetail] = useState<RunDetail | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [confirmAnalyze, setConfirmAnalyze] = useState<{ flags: number; pictures: number; estimate: number } | null>(null);
+  const [confirmTry, setConfirmTry] = useState<{ id: string; count: number; estimate: number } | null>(null);
 
   const loadRuns = useCallback(() => apiGet("/api/admin/analyses").then((r: RunSummary[]) => {
     setRuns(r);
@@ -141,17 +144,12 @@ export default function FeedbackAnalysis({ filters }: { filters: Record<string, 
 
   const analyze = async () => {
     const est = await apiSend("/api/admin/analyses", "POST", { filters });
-    if (!window.confirm(`Analyze ${est.flags} flag${est.flags === 1 ? "" : "s"} (${est.pictures} picture${est.pictures === 1 ? "" : "s"}) against the Guide Book? About $${est.estimate.toFixed(2)}.`)) return;
-    await act("analyze", async () => {
-      const { id } = await apiSend("/api/admin/analyses", "POST", { filters, confirm: true });
-      setOpen(id);
-    }, "Analyzing. It takes a minute or two; this page updates when it's ready.");
+    setConfirmAnalyze(est);
   };
 
   const tryIt = async (s: Suggestion) => {
     const est = await apiSend(`/api/admin/suggestions/${s.id}/try`, "POST", {});
-    if (!window.confirm(`Redraw ${est.count} flagged picture${est.count === 1 ? "" : "s"} with this change applied to a test copy of the rules? The live rules don't change. About $${est.estimate.toFixed(2)}.`)) return;
-    await act(`try-${s.id}`, () => apiSend(`/api/admin/suggestions/${s.id}/try`, "POST", { confirm: true }), "Drawing the trial pictures; they appear on the suggestion as they land.");
+    setConfirmTry({ id: s.id, count: est.count, estimate: est.estimate });
   };
 
   return (
@@ -165,14 +163,14 @@ export default function FeedbackAnalysis({ filters }: { filters: Record<string, 
           {busy === "analyze" ? "Starting…" : "Analyze flags in this view"}
         </button>
       </div>
-      {notice && <p className="status-line">{notice}</p>}
+      {notice && <p className="status-line" role="status">{notice}</p>}
 
       {runs && runs.length > 0 && (
         <div className="fb-counts">
           {runs.map((r) => (
             <button key={r.id} className={`flag-chip ${open === r.id ? "flag-chip--on" : ""}`} onClick={() => setOpen(r.id)}>
-              {new Date(r.createdAt).toLocaleDateString()} · {r.trigger === "weekly" ? "weekly" : "manual"} · {r.flags} flags
-              {r.status === "running" ? " · running…" : r.status === "failed" ? " · failed" : ` · ${r.suggestions} suggestions`}
+              {new Date(r.createdAt).toLocaleDateString()} · {r.trigger === "weekly" ? "weekly" : "manual"} · {r.flags} {r.flags === 1 ? "flag" : "flags"}
+              {r.status === "running" ? " · running…" : r.status === "failed" ? " · failed" : ` · ${r.suggestions} ${r.suggestions === 1 ? "suggestion" : "suggestions"}`}
               {r.costUsd != null ? ` · $${r.costUsd.toFixed(2)}` : ""}
             </button>
           ))}
@@ -182,13 +180,13 @@ export default function FeedbackAnalysis({ filters }: { filters: Record<string, 
 
       {detail && detail.id === open && (
         <div>
-          {detail.status === "running" && <p className="status-line">Analyzing {detail.flagIds.length} flags…</p>}
-          {detail.status === "failed" && <p className="error-text">{detail.error}</p>}
+          {detail.status === "running" && <p className="status-line" role="status">Analyzing {detail.flagIds.length} {detail.flagIds.length === 1 ? "flag" : "flags"}…</p>}
+          {detail.status === "failed" && <p className="error-text" role="alert">{detail.error}</p>}
           {detail.status === "ready" && (
             <>
               <p style={{ fontSize: 17 }}>{detail.summary}</p>
               <p className="t-xs t-muted">
-                Guide Book v{detail.guideVersion || "draft"} · Page Rules v{detail.ruleSetVersion} · {detail.flagIds.length} flags
+                Guide Book v{detail.guideVersion || "draft"} · Page Rules v{detail.ruleSetVersion} · {detail.flagIds.length} {detail.flagIds.length === 1 ? "flag" : "flags"}
               </p>
               {detail.patterns.length === 0 && <p className="status-line">No patterns found in these flags.</p>}
               {detail.patterns.map((p) => (
@@ -206,6 +204,49 @@ export default function FeedbackAnalysis({ filters }: { filters: Record<string, 
           )}
         </div>
       )}
+
+      <ConfirmDialog
+        open={confirmAnalyze !== null}
+        onClose={() => setConfirmAnalyze(null)}
+        title="Analyze flags?"
+        description={
+          confirmAnalyze
+            ? `Analyze ${confirmAnalyze.flags} flag${confirmAnalyze.flags === 1 ? "" : "s"} (${confirmAnalyze.pictures} picture${confirmAnalyze.pictures === 1 ? "" : "s"}) against the Guide Book? About $${confirmAnalyze.estimate.toFixed(2)}.`
+            : undefined
+        }
+        confirmLabel="Analyze"
+        onConfirm={async () => {
+          await act(
+            "analyze",
+            async () => {
+              const { id } = await apiSend("/api/admin/analyses", "POST", { filters, confirm: true });
+              setOpen(id);
+            },
+            "Analyzing. It takes a minute or two; this page updates when it's ready."
+          );
+        }}
+      />
+
+      <ConfirmDialog
+        open={confirmTry !== null}
+        onClose={() => setConfirmTry(null)}
+        title="Run trial redraws?"
+        description={
+          confirmTry
+            ? `Redraw ${confirmTry.count} flagged picture${confirmTry.count === 1 ? "" : "s"} with this change applied to a test copy of the rules? The live rules don't change. About $${confirmTry.estimate.toFixed(2)}.`
+            : undefined
+        }
+        confirmLabel="Try it"
+        onConfirm={async () => {
+          if (!confirmTry) return;
+          const { id } = confirmTry;
+          await act(
+            `try-${id}`,
+            () => apiSend(`/api/admin/suggestions/${id}/try`, "POST", { confirm: true }),
+            "Drawing the trial pictures; they appear on the suggestion as they land."
+          );
+        }}
+      />
     </div>
   );
 }
@@ -220,7 +261,7 @@ function PatternCard({ pattern: p, flags, suggestions, busy, act, tryIt }: { pat
           <strong style={{ fontSize: 19 }}>{p.name}</strong>
           <span className="row inline" style={{ gap: 6, margin: 0 }}>
             <span className={TREND_PILL[p.trend] ?? "pill"}>{p.trend}</span>
-            <span className="pill">{p.flagIds.length} flags</span>
+            <span className="pill">{p.flagIds.length} {p.flagIds.length === 1 ? "flag" : "flags"}</span>
           </span>
         </div>
         <p style={{ margin: "6px 0 0" }}>{p.summary}</p>
@@ -334,7 +375,7 @@ function SuggestionCard({ s, flags, busy, act, tryIt }: { s: Suggestion; flags: 
                   {t.status === "ready" && t.imagePath ? (
                     <img src={`/${t.imagePath}`} alt="Trial" style={{ width: "100%", borderRadius: 8 }} />
                   ) : t.status === "failed" ? (
-                    <p className="error-text">{t.error}</p>
+                    <p className="error-text" role="alert">{t.error}</p>
                   ) : (
                     <p className="t-small t-muted">Drawing…</p>
                   )}

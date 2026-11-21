@@ -78,7 +78,7 @@ export default function AdminCharacters() {
             </div>
           </div>
           {effectiveKey && <p className="status-line">Referenced as &lt;{effectiveKey}&gt;</p>}
-          {error && <p className="status-line" style={{ color: "#d94c4c" }}>{error}</p>}
+          {error && <p className="status-line" role="alert" style={{ color: "#d94c4c" }}>{error}</p>}
           <div className="row inline">
             <button className="btn-primary" style={{ width: "auto" }} disabled={!name.trim() || !effectiveKey} onClick={create}>
               Add as draft

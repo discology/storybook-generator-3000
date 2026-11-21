@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
 import AudioPlayer from "../components/AudioPlayer";
@@ -21,8 +21,11 @@ export default function MemoryDetail() {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState("");
   const [saving, setSaving] = useState(false);
+  const [retrying, setRetrying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [options, setOptions] = useState(false);
+  const favBusyRef = useRef(false);
+  const retryBusyRef = useRef(false);
 
   const load = useCallback(() => {
     apiGet(`/api/memories/${memoryId}`)
@@ -56,10 +59,18 @@ export default function MemoryDetail() {
   };
 
   const toggleFavorite = async () => {
-    if (!memory) return;
+    if (!memory || favBusyRef.current) return;
+    favBusyRef.current = true;
     const favorite = !memory.favorite;
     setMemory({ ...memory, favorite });
-    await apiSend(`/api/memories/${memory.id}/favorite`, "PUT", { favorite }).catch(load);
+    try {
+      await apiSend(`/api/memories/${memory.id}/favorite`, "PUT", { favorite });
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't update bookmark.");
+      load();
+    } finally {
+      favBusyRef.current = false;
+    }
   };
 
   const saveWords = async () => {
@@ -78,9 +89,19 @@ export default function MemoryDetail() {
   };
 
   const retry = async () => {
-    if (!memory) return;
-    await apiSend(`/api/memories/${memory.id}/process`, "POST");
-    load();
+    if (!memory || retryBusyRef.current) return;
+    retryBusyRef.current = true;
+    setRetrying(true);
+    setError(null);
+    try {
+      await apiSend(`/api/memories/${memory.id}/process`, "POST");
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't retry processing. Try again.");
+    } finally {
+      retryBusyRef.current = false;
+      setRetrying(false);
+    }
   };
 
   if (state === "denied") return <AccessDenied />;
@@ -170,8 +191,8 @@ export default function MemoryDetail() {
         ) : memory.status === "failed" ? (
           <Note kind="warn" style={{ marginTop: 10 }} title="We couldn't make out the words">
             {memory.processingError}{" "}
-            <button className="tlink" onClick={() => void retry()}>
-              Try again
+            <button className="tlink" disabled={retrying} onClick={() => void retry()}>
+              {retrying ? "Trying again…" : "Try again"}
             </button>
           </Note>
         ) : (
@@ -179,7 +200,7 @@ export default function MemoryDetail() {
             <IconSpinner size={22} /> Preparing your words…
           </p>
         )}
-        {error && <p className="error-text">{error}</p>}
+        {error && <p className="error-text" role="alert">{error}</p>}
 
         <div style={{ marginTop: 18 }}>
           <details className="disclosure">

@@ -1,4 +1,6 @@
+import { lazy, Suspense } from "react";
 import { Route, Routes } from "react-router-dom";
+import { Toaster } from "sonner";
 import { AuthProvider } from "./auth/AuthContext";
 import Home from "./pages/Home";
 import SignIn from "./pages/SignIn";
@@ -49,9 +51,29 @@ import AdminCosts from "./pages/admin/AdminCosts";
 import AdminFeaturedStories from "./pages/admin/AdminFeaturedStories";
 import AdminTeachers from "./pages/admin/AdminTeachers";
 
+const ReaderTurnPrototype = import.meta.env.DEV ? lazy(() => import("./pages/ReaderTurnPrototype")) : null;
+
 export default function App() {
   return (
     <AuthProvider>
+      <Toaster
+        position="bottom-center"
+        offset={24}
+        mobileOffset={20}
+        toastOptions={{
+          className: "vambie-toast",
+          style: {
+            background: "var(--cream)",
+            color: "var(--ink)",
+            border: "1.5px solid var(--sheet-edge)",
+            borderRadius: "16px",
+            fontFamily: "var(--font-body)",
+            fontSize: "15px",
+            fontWeight: 700,
+            boxShadow: "0 10px 30px rgba(59, 46, 36, 0.16)",
+          },
+        }}
+      />
       <Routes>
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminOverview />} />
@@ -120,6 +142,16 @@ export default function App() {
                 <Route path="/try/save" element={<TrySave />} />
                 <Route path="/stories/:slug" element={<PublicStory />} />
                 <Route path="/t/:key" element={<SettingsTextsByLink />} />
+                {import.meta.env.DEV && ReaderTurnPrototype && (
+                  <Route
+                    path="/prototypes/reader-turn"
+                    element={
+                      <Suspense fallback={null}>
+                        <ReaderTurnPrototype />
+                      </Suspense>
+                    }
+                  />
+                )}
               </Routes>
             </div>
           }

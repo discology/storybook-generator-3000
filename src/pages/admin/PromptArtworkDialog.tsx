@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { apiGet, apiSend, ApiError } from "../../lib/api";
 import { IconClose, IconSparkle, IconSpinner } from "../../components/icons";
-import { Field, Mascot } from "../../components/ui";
+import { Field, Mascot, ModalDialog } from "../../components/ui";
 import type { Prompt } from "../../types";
 import type { MascotName } from "../../components/ui";
 import { PromptText } from "./AdminPromptLibrary";
@@ -49,28 +49,31 @@ export default function PromptArtworkDialog({
   onClose: () => void;
 }) {
   const [tab, setTab] = useState<ArtworkTab>(initialTab);
-  const [library, setLibrary] = useState<Library | null>(null);
+  const [library, setLibrary] = useState<Library | null | "failed">(null);
   const [selected, setSelected] = useState<string | null>(card.artworkPath);
   const [idea, setIdea] = useState("");
   const [drawing, setDrawing] = useState(false);
   const [drawn, setDrawn] = useState<LibraryPicture[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const drawingRef = useRef(false);
 
-  const load = () =>
-    apiGet("/api/admin/prompt-art")
-      .then(setLibrary)
-      .catch(() => setError("Couldn't load the library."));
+  const load = useCallback(() => {
+    setError(null);
+    setLibrary((prev) => (prev === "failed" ? null : prev));
+    return apiGet("/api/admin/prompt-art")
+      .then((lib: Library) => setLibrary(lib))
+      .catch(() => {
+        setLibrary((prev) => (prev && prev !== "failed" ? prev : "failed"));
+        setError("Couldn't load the library.");
+      });
+  }, []);
   useEffect(() => {
     void load();
-  }, []);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && !drawing && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [drawing, onClose]);
+  }, [load]);
 
   const generate = async () => {
+    if (drawingRef.current) return;
+    drawingRef.current = true;
     setDrawing(true);
     setError(null);
     try {
@@ -87,6 +90,7 @@ export default function PromptArtworkDialog({
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "The pictures couldn't be drawn. Try again.");
     } finally {
+      drawingRef.current = false;
       setDrawing(false);
     }
   };
@@ -112,108 +116,126 @@ export default function PromptArtworkDialog({
     </div>
   );
 
-  return (
-    <>
-      <div className="backdrop" onClick={() => !drawing && onClose()} />
-      <div className="adm-modal" role="dialog" aria-modal="true" aria-label="Card artwork">
-        <div className="adm-modal__head">
-          <h2 className="h-title" style={{ fontSize: 26, margin: 0 }}>
-            Card artwork
-          </h2>
-          <button className="icon-btn" onClick={onClose} disabled={drawing} aria-label="Close">
-            <IconClose size={22} />
-          </button>
-        </div>
-        <div className="adm-tabs" role="tablist" style={{ margin: "0 0 16px" }}>
-          {TABS.map((t) => (
-            <button key={t.key} role="tab" aria-selected={tab === t.key} className={`adm-tab ${tab === t.key ? "adm-tab--on" : ""}`} onClick={() => setTab(t.key)}>
-              {t.label}
-              {t.key === "made" && library ? ` (${library.made.length})` : ""}
-            </button>
-          ))}
-        </div>
+  const validLibrary = library && library !== "failed" ? library : null;
 
-        <div className="adm-modal__body">
-          <section className="adm-modal__main">
-            {tab === "generate" && (
-              <>
-                <p className="t-body" style={{ marginTop: 0 }}>
-                  Draws {library?.perClick ?? 2} pictures of Baby Vambie, in the style of the card poses, for “{card.question ? <PromptText text={card.question} /> : "this card's question"}”
-                </p>
-                <Field label="Picture idea (optional)" htmlFor="art-idea" hint="Leave it empty to let the AI choose from the question.">
-                  <textarea
-                    id="art-idea"
-                    className="textarea"
-                    style={{ minHeight: 80 }}
-                    value={idea}
-                    onChange={(e) => setIdea(e.target.value)}
-                    maxLength={400}
-                    placeholder="Baby Vambie blowing out a candle on a little birthday cupcake"
-                  />
-                </Field>
-                <button className="btn btn--lime btn--sm btn--auto" style={{ marginTop: 14 }} onClick={() => void generate()} disabled={drawing || !card.question.trim()}>
-                  {drawing ? (
-                    <>
-                      <IconSpinner size={18} /> Drawing… about a minute
-                    </>
-                  ) : (
-                    <>
-                      <IconSparkle size={18} /> Draw {library?.perClick ?? 2} pictures · {COST_PER_CLICK}
-                    </>
-                  )}
-                </button>
-                {drawn.length > 0 ? (
+  return (
+    <ModalDialog open onClose={onClose} dismissible={!drawing} label="Card artwork">
+      <div className="adm-modal__head">
+        <h2 className="h-title" style={{ fontSize: 26, margin: 0 }}>
+          Card artwork
+        </h2>
+        <button className="icon-btn" onClick={onClose} disabled={drawing} aria-label="Close">
+          <IconClose size={22} />
+        </button>
+      </div>
+      <div className="adm-tabs" role="tablist" style={{ margin: "0 0 16px" }}>
+        {TABS.map((t) => (
+          <button key={t.key} role="tab" aria-selected={tab === t.key} className={`adm-tab ${tab === t.key ? "adm-tab--on" : ""}`} onClick={() => setTab(t.key)}>
+            {t.label}
+            {t.key === "made" && validLibrary ? ` (${validLibrary.made.length})` : ""}
+          </button>
+        ))}
+      </div>
+
+      <div className="adm-modal__body">
+        <section className="adm-modal__main">
+          {tab === "generate" && (
+            <>
+              <p className="t-body" style={{ marginTop: 0 }}>
+                Draws {validLibrary?.perClick ?? 2} pictures of Baby Vambie, in the style of the card poses, for “{card.question ? <PromptText text={card.question} /> : "this card's question"}”
+              </p>
+              <Field label="Picture idea (optional)" htmlFor="art-idea" hint="Leave it empty to let the AI choose from the question.">
+                <textarea
+                  id="art-idea"
+                  className="textarea"
+                  style={{ minHeight: 80 }}
+                  value={idea}
+                  onChange={(e) => setIdea(e.target.value)}
+                  maxLength={400}
+                  placeholder="Baby Vambie blowing out a candle on a little birthday cupcake"
+                />
+              </Field>
+              <button className="btn btn--lime btn--sm btn--auto" style={{ marginTop: 14 }} onClick={() => void generate()} disabled={drawing || !card.question.trim()}>
+                {drawing ? (
                   <>
-                    <h3 className="art-heading">Drawn just now</h3>
-                    {grid(drawn)}
-                    <p className="t-xs t-muted" style={{ marginTop: 8 }}>
-                      Every picture is kept under Made for cards, so you can come back to it.
-                    </p>
+                    <IconSpinner size={18} /> Drawing… about a minute
                   </>
                 ) : (
-                  !drawing && (
-                    <p className="t-small t-muted" style={{ marginTop: 14 }}>
-                      Pictures are drawn on a transparent background, like the card poses, so they sit on the card's color.
-                    </p>
-                  )
+                  <>
+                    <IconSparkle size={18} /> Draw {validLibrary?.perClick ?? 2} pictures · {COST_PER_CLICK}
+                  </>
                 )}
-              </>
-            )}
-            {tab === "poses" && (library ? grid(library.poses) : <p>Loading…</p>)}
-            {tab === "made" &&
-              (!library ? (
-                <p>Loading…</p>
-              ) : library.made.length ? (
-                grid(library.made, true)
+              </button>
+              {drawn.length > 0 ? (
+                <>
+                  <h3 className="art-heading">Drawn just now</h3>
+                  {grid(drawn)}
+                  <p className="t-xs t-muted" style={{ marginTop: 8 }}>
+                    Every picture is kept under Made for cards, so you can come back to it.
+                  </p>
+                </>
               ) : (
-                <p className="t-small t-muted">Nothing yet. Pictures you generate or upload for any card appear here.</p>
-              ))}
-            {error && (
-              <p className="error-text" role="alert">
-                {error}
-              </p>
-            )}
-          </section>
-
-          <aside className="adm-modal__side">
-            <div className={`prompt-card prompt-card--${card.cardColor} art-preview`}>
-              <span className={`badge badge--caps badge--sm prompt-card__badge ${card.cardColor === "purple" ? "badge--pink" : "badge--purple"}`}>{card.category || "Category"}</span>
-              <span className="prompt-card__q">{card.question ? <PromptText text={card.question} samples onCard /> : "Your question"}</span>
-              {selected ? (
-                <img src={`/${selected}`} alt="" className="prompt-card__art" style={{ borderRadius: 16, aspectRatio: "1", objectFit: "cover" }} />
-              ) : (
-                <Mascot name={defaultPose} className="prompt-card__art" />
+                !drawing && (
+                  <p className="t-small t-muted" style={{ marginTop: 14 }}>
+                    Pictures are drawn on a transparent background, like the card poses, so they sit on the card's color.
+                  </p>
+                )
               )}
-            </div>
-            <button className="btn btn--purple btn--sm" style={{ marginTop: 14 }} disabled={!selected || selected === card.artworkPath || drawing} onClick={() => selected && onPick(selected)}>
-              Use this picture
-            </button>
-            <p className="t-xs t-muted" style={{ marginTop: 8, textAlign: "center" }}>
-              Families see it after you publish the card.
+            </>
+          )}
+          {tab === "poses" &&
+            (validLibrary ? (
+              grid(validLibrary.poses)
+            ) : library === "failed" ? (
+              <p className="t-small t-muted">
+                Couldn't load card poses.{" "}
+                <button type="button" className="tlink" onClick={() => void load()}>
+                  Try again
+                </button>
+              </p>
+            ) : (
+              <p role="status">Loading…</p>
+            ))}
+          {tab === "made" &&
+            (library === "failed" ? (
+              <p className="t-small t-muted">
+                Couldn't load saved pictures.{" "}
+                <button type="button" className="tlink" onClick={() => void load()}>
+                  Try again
+                </button>
+              </p>
+            ) : !validLibrary ? (
+              <p role="status">Loading…</p>
+            ) : validLibrary.made.length ? (
+              grid(validLibrary.made, true)
+            ) : (
+              <p className="t-small t-muted">Nothing yet. Pictures you generate or upload for any card appear here.</p>
+            ))}
+          {error && (
+            <p className="error-text" role="alert">
+              {error}
             </p>
-          </aside>
-        </div>
+          )}
+        </section>
+
+        <aside className="adm-modal__side">
+          <div className={`prompt-card prompt-card--${card.cardColor} art-preview`}>
+            <span className={`badge badge--caps badge--sm prompt-card__badge ${card.cardColor === "purple" ? "badge--pink" : "badge--purple"}`}>{card.category || "Category"}</span>
+            <span className="prompt-card__q">{card.question ? <PromptText text={card.question} samples onCard /> : "Your question"}</span>
+            {selected ? (
+              <img src={`/${selected}`} alt="" className="prompt-card__art" style={{ borderRadius: 16, aspectRatio: "1", objectFit: "cover" }} />
+            ) : (
+              <Mascot name={defaultPose} className="prompt-card__art" />
+            )}
+          </div>
+          <button className="btn btn--purple btn--sm" style={{ marginTop: 14 }} disabled={!selected || selected === card.artworkPath || drawing} onClick={() => selected && onPick(selected)}>
+            Use this picture
+          </button>
+          <p className="t-xs t-muted" style={{ marginTop: 8, textAlign: "center" }}>
+            Families see it after you publish the card.
+          </p>
+        </aside>
       </div>
-    </>
+    </ModalDialog>
   );
 }

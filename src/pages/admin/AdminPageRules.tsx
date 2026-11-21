@@ -132,8 +132,8 @@ export default function AdminPageRules() {
         Saving creates a new version used for new chapters only. Existing chapters keep the version they were made with. How the AI plans and
         checks pages is worded under AI Instructions → Plan pages / Check pages.
       </p>
-      {error && <p className="status-line" style={{ color: "#d94c4c" }}>{error}</p>}
-      {notice && <p className="status-line">{notice}</p>}
+      {error && <p className="status-line" role="alert" style={{ color: "#d94c4c" }}>{error}</p>}
+      {notice && <p className="status-line" role="status">{notice}</p>}
 
       <div className="card">
         <h3 style={{ marginTop: 0 }}>Reading stages</h3>

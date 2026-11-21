@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
 import AccessDenied from "../components/AccessDenied";
+import HoldToConfirmButton from "../components/HoldToConfirmButton";
 import { memoryTitle } from "../components/MemoryListRow";
 import { IconCheck, IconChevronRight, IconFileText, IconMic, IconPlay, IconSpinner, IconTrash } from "../components/icons";
 import { Check, Chev, Loading, Masthead, Note, Sheet, StepRow } from "../components/ui";
@@ -22,7 +23,6 @@ export default function MemoryDelete() {
   const [preview, setPreview] = useState<Preview | null>(null);
   const [denied, setDenied] = useState(false);
   const [step, setStep] = useState<Step>("review");
-  const [typed, setTyped] = useState("");
   const [understood, setUnderstood] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -113,7 +113,7 @@ export default function MemoryDelete() {
   }
 
   if (step === "confirm") {
-    const ready = typed.trim() === "DELETE" && understood;
+    const ready = understood;
     return (
       <div className="page">
         <TopBar back={() => setStep("review")} />
@@ -126,27 +126,26 @@ export default function MemoryDelete() {
           <p className="t-body t-muted" style={{ marginTop: 8 }}>
             This removes the recording and its transcript.{held.length > 0 && " Connected story content will be held for review."}
           </p>
-          <div className="field" style={{ marginTop: 22 }}>
-            <label className="field__label field__label--strong" htmlFor="typed">
-              Type DELETE to confirm
-            </label>
-            <input id="typed" className="input" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="DELETE" autoComplete="off" autoCapitalize="characters" />
-          </div>
-          <div style={{ marginTop: 16 }}>
+          <div style={{ marginTop: 20 }}>
             <Check checked={understood} onChange={setUnderstood}>
               I understand this cannot be undone.
             </Check>
           </div>
-          {error && <p className="error-text">{error}</p>}
+          {error && <p className="error-text" role="alert">{error}</p>}
           <div className="stack" style={{ marginTop: 22 }}>
-            <button className={`btn btn--caps ${ready ? "btn--danger-solid" : ""}`} disabled={!ready} onClick={() => void remove()}>
-              Delete memory <Chev />
-            </button>
+            <HoldToConfirmButton
+              label={<>Hold to delete memory <Chev /></>}
+              holdingLabel="Keep holding…"
+              disabled={!ready}
+              onConfirm={() => void remove()}
+            />
             <button className="btn btn--outline" onClick={() => navigate(`${base}/memories/${memoryId}`)}>
               Cancel
             </button>
           </div>
-          <p className="t-center t-small t-muted" style={{ marginTop: 14 }}>Nothing is deleted until you confirm.</p>
+          <p id="hold-confirm-hint" className="t-center t-small t-muted" style={{ marginTop: 14 }}>
+            Press and hold for 2 seconds to permanently delete.
+          </p>
         </Sheet>
       </div>
     );

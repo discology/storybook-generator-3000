@@ -158,8 +158,8 @@ export default function ThisWeek() {
           )}
         </div>
 
-        {data.error && !data.generating && <p className="error-text">The last try didn't work: {data.error}</p>}
-        {error && <p className="error-text">{error}</p>}
+        {data.error && !data.generating && <p className="error-text" role="alert">The last try didn't work: {data.error}</p>}
+        {error && <p className="error-text" role="alert">{error}</p>}
 
         {owner && vambies.length > 0 && (
           <div style={{ marginTop: 18 }}>

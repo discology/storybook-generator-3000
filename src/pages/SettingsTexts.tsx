@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import TopBar from "../components/TopBar";
 import { Loading, Masthead, Note, Select, Sheet, Switch } from "../components/ui";
 import { apiGet, apiSend, ApiError } from "../lib/api";
@@ -62,13 +63,16 @@ function TextSettings({ api, back, viaLink }: { api: string; back?: string; viaL
       if (call === latest.current) {
         setView(next);
         setStatus("saved");
+        toast.success("Saved", { id: "settings-texts" });
         window.setTimeout(() => call === latest.current && setStatus(""), 1800);
       }
     } catch (err) {
       if (call === latest.current) {
         setView(before);
         setStatus("");
-        setError(err instanceof ApiError ? err.message : "Couldn't save. Try again.");
+        const msg = err instanceof ApiError ? err.message : "Couldn't save. Try again.";
+        setError(msg);
+        toast.error(msg, { id: "settings-texts" });
       }
     }
   };
@@ -204,7 +208,7 @@ function TextSettings({ api, back, viaLink }: { api: string; back?: string; viaL
         <p className="t-small t-muted" style={{ marginTop: 20 }}>
           Always sent: sign-in codes, and downloads you ask for.
         </p>
-        {error && <p className="error-text">{error}</p>}
+        {error && <p className="error-text" role="alert">{error}</p>}
         <p className={`text-pref__status ${status === "saved" ? "text-pref__status--on" : ""}`} role="status" aria-live="polite">
           {status === "saved" ? "Saved" : ""}
         </p>

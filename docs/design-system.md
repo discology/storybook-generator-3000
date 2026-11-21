@@ -93,3 +93,24 @@ Story pictures follow a different art direction from the app: a classic picture 
 - No words, letters or numbers in any picture. The story text is set below it.
 
 Characters are drawn in this style even when their reference art is a 3D render. The art direction is edited in Admin → Settings → Page rules, and each chapter keeps the version it was drawn with.
+
+## Motion and interaction
+
+Vambie's motion follows the picture-book metaphor — ink settling on warm cream paper, watercolor washes sweeping into place, and quiet bedtime page turns — gated strictly by how often an action happens. Run `npm run check:motion` after touching CSS or interactive components.
+
+- **Never animate keyboard-initiated or high-frequency actions (`ArrowLeft`/`ArrowRight` page turns in `Reader.tsx`, `BottomNav` tab switches, OTP digit typing, `Memories` search filtering, or `.admin-shell` tables, tabs and charts).**
+  Why: actions triggered dozens or hundreds of times a session feel sluggish when animated; keyboard navigation in `Reader.tsx` sets `turnDir = 0` so pages swap in `0ms` without replaying entrance curtains.
+- **Always use the three motion curve tokens (`--ease-out: cubic-bezier(0.23, 1, 0.32, 1)`, `--ease-in-out: cubic-bezier(0.77, 0, 0.175, 1)`, `--ease-drawer: cubic-bezier(0.32, 0.72, 0, 1)`) and never use `ease-in` on UI transitions or animations.**
+  Why: `ease-in` starts sluggishly at the exact millisecond the user is watching; strong custom `ease-out` responds immediately and settles like paper coming to rest.
+- **Never use `transition: all`; name the exact compositor-safe properties (`transform`, `opacity`, `clip-path`, `filter`, `background-color`, `color`).**
+  Why: `transition: all` accidentally animates layout properties (`width`, `height`, `padding`, `margin`) during responsive resizes or font loads and causes paint thrashing on phones.
+- **Never animate from `scale(0)`; start entrances at `scale(0.88)`–`scale(0.97)` paired with `opacity: 0` (or `clip-path: inset(...)` for `.ink-reveal` illustrations).**
+  Why: physical paper and ink never materialize from a zero-pixel point; starting near full size reads as a natural settle rather than a pop-up widget.
+- **Keep one entrance per container (`vambie-enter`) with non-uniform shrinking `--delay` gaps, and never stagger children inside an entering card (`.how-paper`, `.preparing-card`).**
+  Why: animating a card and then trickling its inner lines creates a double queue that delays reading; shrinking gaps (`0ms → 90ms → 140ms → 180ms`) read as one organic wave while keeping CTAs immediately clickable.
+- **Use asymmetric timing on destructive confirmations (`<HoldToConfirmButton>`): `2000ms linear` `clip-path` wash while held, `200ms var(--ease-out)` snap-back on early release, instead of mobile-hostile `"Type DELETE"` inputs.**
+  Why: progress fills must advance linearly so the 2-second commitment is honest and predictable, while aborting should feel instant and forgiving on a phone keyboard-free screen.
+- **Duplicate and clip (`clip-path: inset(...)`) active tab overlays in `<Segmented>`, and bridge in-place icon/label swaps with `<MorphSlot>` (`scale(0.88 → 1)` + `blur(2px → 0)` + `opacity`, `180ms var(--ease-out)`).**
+  Why: interpolating background and text colors independently produces muddy mid-frames, and raw icon swaps flash two distinct shapes unless a tiny 2px blur bridges the seam.
+- **Ship every keyframe and movement transition with a `@media (prefers-reduced-motion: reduce)` fallback that preserves comprehension via gentle opacity fades while removing translation, 3D rotation, blur, and stagger delays.**
+  Why: reduced motion means gentler, non-vestibular state changes rather than broken or abrupt teleportation.

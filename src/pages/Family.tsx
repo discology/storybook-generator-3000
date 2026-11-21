@@ -1,10 +1,11 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import TopBar from "../components/TopBar";
 import BottomNav from "../components/BottomNav";
 import AccessDenied from "../components/AccessDenied";
 import { IconChevronRight, IconRefresh, IconSmile, IconTrash } from "../components/icons";
-import { Avatar, BottomSheet, Chev, Field, Loading, Masthead, MenuRow, Note, Select, Sheet } from "../components/ui";
+import { Avatar, BottomSheet, Chev, ConfirmDialog, Field, Loading, Masthead, MenuRow, Note, Select, Sheet } from "../components/ui";
 import { apiGet, apiSend, ApiError } from "../lib/api";
 import { RELATIONSHIPS } from "../lib/relationships";
 import { possessive } from "../lib/format";
@@ -47,10 +48,13 @@ export default function Family() {
   const [contact, setContact] = useState("");
   const [relationship, setRelationship] = useState("Grandparent");
   const [busy, setBusy] = useState(false);
+  const [actionBusy, setActionBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [sent, setSent] = useState<SentInvite | null>(null);
   const [selected, setSelected] = useState<Person | null>(null);
+  const [removing, setRemoving] = useState<Person | null>(null);
   const [copied, setCopied] = useState(false);
+  const actionBusyRef = useRef(false);
 
   const load = useCallback(() => {
     apiGet(`/api/storybooks/${id}/family`)
@@ -80,22 +84,40 @@ export default function Family() {
   };
 
   const resend = async (person: Person) => {
+    if (actionBusyRef.current) return;
+    actionBusyRef.current = true;
+    setActionBusy(`resend-${person.id}`);
     setSelected(null);
+    setError(null);
     try {
       const res = await apiSend(`/api/family/${person.id}/resend`, "POST");
       setSent({ name: person.name, link: res.inviteLink, message: res.inviteMessage, texted: Boolean(res.texted) });
       load();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : "Couldn't make a new link.");
+    } finally {
+      actionBusyRef.current = false;
+      setActionBusy(null);
     }
   };
 
   const remove = async (person: Person) => {
-    const question = person.inviteStatus === "pending" ? `Cancel the invite for ${person.name}?` : `Remove ${person.name} from the storybook? Their memories stay.`;
-    if (!window.confirm(question)) return;
-    setSelected(null);
-    await apiSend(`/api/family/${person.id}`, "DELETE").catch(() => undefined);
-    load();
+    if (actionBusyRef.current) return;
+    actionBusyRef.current = true;
+    setActionBusy(`remove-${person.id}`);
+    setError(null);
+    try {
+      await apiSend(`/api/family/${person.id}`, "DELETE");
+      toast.success(person.inviteStatus === "pending" ? "Invitation cancelled" : `${person.name} removed`);
+      load();
+    } catch (err) {
+      const msg = err instanceof ApiError ? err.message : "Couldn't remove them. Try again.";
+      setError(msg);
+      toast.error(msg);
+    } finally {
+      actionBusyRef.current = false;
+      setActionBusy(null);
+    }
   };
 
   const share = async (invite: SentInvite) => {
@@ -106,6 +128,7 @@ export default function Family() {
     }
     await navigator.clipboard.writeText(text);
     setCopied(true);
+    toast.success("Invite copied");
     setTimeout(() => setCopied(false), 2000);
   };
 
@@ -150,16 +173,17 @@ export default function Family() {
             <span className="person__status">
               {status(p)}
               {data.isOwner && p.inviteStatus === "pending" && (
-                <button className="tlink tlink--light" onClick={() => void resend(p)}>
-                  Resend
+                <button className="tlink tlink--light" disabled={actionBusy !== null} onClick={() => void resend(p)}>
+                  {actionBusy === `resend-${p.id}` ? "Sending…" : "Resend"}
                 </button>
               )}
             </span>
-            <button className="tbar__icon" onClick={() => setSelected(p)} aria-label={`About ${p.isMe ? "you" : p.name}`} style={{ minWidth: 28 }}>
+            <button className="tbar__icon" onClick={() => setSelected(p)} aria-label={`About ${p.isMe ? "you" : p.name}`}>
               <IconChevronRight size={20} />
             </button>
           </div>
         ))}
+        {error && !data.isOwner && <p className="error-text" role="alert">{error}</p>}
 
         <Link to={`${base}/characters`} className="week-card" style={{ marginTop: 14 }}>
           <span className="week-card__icon">
@@ -175,6 +199,7 @@ export default function Family() {
 
       {data.isOwner && (
         <Sheet style={{ marginTop: 18 }}>
+          {sent && error && <p className="error-text" role="alert" style={{ marginBottom: 12 }}>{error}</p>}
           {sent ? (
             <div>
               <h2 className="h-title">{sent.texted ? `We texted ${sent.name} the invite` : `Send ${sent.name} the invite`}</h2>
@@ -208,7 +233,7 @@ export default function Family() {
               <Field label={`Relationship to ${data.childName}`} htmlFor="relationship">
                 <Select id="relationship" value={relationship} onChange={setRelationship} options={[...RELATIONSHIPS]} />
               </Field>
-              {error && <p className="error-text">{error}</p>}
+              {error && <p className="error-text" role="alert">{error}</p>}
               <button className="btn btn--lime btn--caps" type="submit" disabled={busy || !contact.trim()} style={{ marginTop: 20 }}>
                 {busy ? "Creating…" : "Send invitation"} <Chev />
               </button>
@@ -245,7 +270,11 @@ export default function Family() {
                   icon={<IconTrash size={22} />}
                   title={selected.inviteStatus === "pending" ? "Cancel invite" : "Remove from storybook"}
                   sub={selected.inviteStatus === "pending" ? undefined : "Their memories stay in the storybook."}
-                  onClick={() => void remove(selected)}
+                  onClick={() => {
+                    const target = selected;
+                    setSelected(null);
+                    setRemoving(target);
+                  }}
                   danger
                 />
               )}
@@ -254,6 +283,17 @@ export default function Family() {
           </div>
         )}
       </BottomSheet>
+      <ConfirmDialog
+        open={removing !== null}
+        onClose={() => setRemoving(null)}
+        danger
+        title={removing?.inviteStatus === "pending" ? `Cancel the invite for ${removing.name}?` : `Remove ${removing?.name ?? "member"}?`}
+        description={removing?.inviteStatus === "pending" ? "Their invitation link will stop working." : "Their memories stay in the storybook."}
+        confirmLabel={removing?.inviteStatus === "pending" ? "Cancel invite" : "Remove"}
+        onConfirm={async () => {
+          if (removing) await remove(removing);
+        }}
+      />
       <BottomNav storybookId={id!} />
     </div>
   );

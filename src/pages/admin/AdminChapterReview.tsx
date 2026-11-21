@@ -240,7 +240,7 @@ export default function AdminChapterReview() {
               />
               <span className="counter">{instructions.length}/500</span>
             </span>
-            {error && <p className="error-text">{error}</p>}
+            {error && <p className="error-text" role="alert">{error}</p>}
             <div className="stack-sm" style={{ marginTop: 12 }}>
               <button
                 className="btn btn--purple btn--sm"

@@ -119,8 +119,9 @@ export default function HowItWorks() {
 
   const onScroll = () => {
     const track = trackRef.current;
-    if (!track) return;
-    setIndex(Math.max(0, Math.min(last, Math.round(track.scrollLeft / track.clientWidth))));
+    if (!track || !track.clientWidth) return;
+    const next = Math.max(0, Math.min(last, Math.round(track.scrollLeft / track.clientWidth)));
+    setIndex((prev) => (prev === next ? prev : next));
   };
 
   return (

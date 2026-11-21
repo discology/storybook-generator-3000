@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
+import AudioPlayer from "../components/AudioPlayer";
 import TextConsent from "../components/TextConsent";
 import YouInThePictures from "../components/YouInThePictures";
 import { IconMic, IconRefresh, IconSpinner } from "../components/icons";
@@ -374,7 +375,7 @@ function TextWhenReady({ draft, onSaved }: { draft: Draft; onSaved: () => void }
         </div>
       )}
       {devCode && step === "code" && <p className="t-small t-muted">Dev mode code: {devCode}</p>}
-      {error && <p className="error-text">{error}</p>}
+      {error && <p className="error-text" role="alert">{error}</p>}
       {step === "phone" && <TextConsent style={{ marginTop: 10 }} />}
     </div>
   );
@@ -423,7 +424,7 @@ function Details({ onDone }: { onDone: () => void }) {
           htmlFor="child"
           hint={stage === "expecting" ? "No name yet? That's fine. You'll add it with their birthday." : undefined}
         >
-          <input id="child" className="input" value={childName} onChange={(e) => setChildName(e.target.value)} maxLength={40} autoComplete="off" placeholder="Mia" />
+          <input id="child" className="input" value={childName} onChange={(e) => setChildName(e.target.value)} maxLength={40} autoCapitalize="words" enterKeyHint="next" autoComplete="off" placeholder="Mia" />
         </Field>
         <Field label="Are they here yet?">
           <Segmented options={[{ value: "born", label: "Born" }, { value: "expecting", label: "On the way" }]} value={stage} onChange={setStage} />
@@ -442,7 +443,7 @@ function Details({ onDone }: { onDone: () => void }) {
         <Field label="You are their…" htmlFor="relationship">
           <Select id="relationship" value={relationship} onChange={setRelationship} options={[...RELATIONSHIPS]} />
         </Field>
-        {error && <p className="error-text">{error}</p>}
+        {error && <p className="error-text" role="alert">{error}</p>}
         <button className="btn btn--lime btn--caps" type="submit" style={{ marginTop: 20 }} disabled={busy || (!childName.trim() && stage === "born")}>
           {busy ? "One moment…" : lesson ? "Make my story" : "Next: a memory"} <Chev />
         </button>
@@ -564,7 +565,7 @@ function Memory({ draft, onDone, failed }: { draft: Draft; onDone: () => void; f
           )}
           {rec.state === "recorded" && rec.url && (
             <>
-              <audio controls src={rec.url} style={{ width: "100%" }} />
+              <AudioPlayer src={rec.url} durationSec={rec.seconds} />
               <div className="hstack" style={{ marginTop: 12, gap: 10 }}>
                 <button type="button" className="btn btn--outline" onClick={rec.reset}>
                   Record again
@@ -575,7 +576,7 @@ function Memory({ draft, onDone, failed }: { draft: Draft; onDone: () => void; f
               </div>
             </>
           )}
-          {rec.error && <p className="error-text">{rec.error}</p>}
+          {rec.error && <p className="error-text" role="alert">{rec.error}</p>}
           <p className="t-small t-muted">Talk the way you'd tell a friend. A minute or two is plenty (up to 5).</p>
         </div>
       ) : (
@@ -586,7 +587,7 @@ function Memory({ draft, onDone, failed }: { draft: Draft; onDone: () => void; f
           </button>
         </div>
       )}
-      {error && <p className="error-text">{error}</p>}
+      {error && <p className="error-text" role="alert">{error}</p>}
       <KeepNote />
     </Shell>
   );
@@ -661,6 +662,8 @@ function Preview({ draft, onSave, onRetry }: { draft: Draft; onSave: () => void;
     if (el) el.scrollTo({ left: Math.max(0, Math.min(slides - 1, i)) * el.clientWidth, behavior: "smooth" });
   };
 
+  const delayVar = (ms: number) => ({ "--delay": `${ms}ms` }) as React.CSSProperties;
+
   return (
     <div className="page how">
       <div className="tbar">
@@ -668,24 +671,34 @@ function Preview({ draft, onSave, onRetry }: { draft: Draft; onSave: () => void;
           Vambie
         </Link>
       </div>
-      <p className="try-title">
+      <p className="try-title vambie-enter" style={delayVar(90)}>
         <span className="reader__chapter">{capitalize(possessive(draft.child.name))} storybook</span>
         <span className="try-title__name">{draft.preview.title}</span>
       </p>
       <div
         className="how-track"
         ref={track}
-        onScroll={() => track.current && setIndex(Math.round(track.current.scrollLeft / track.current.clientWidth))}
+        onScroll={() => {
+          const el = track.current;
+          if (!el || !el.clientWidth) return;
+          const next = Math.round(el.scrollLeft / el.clientWidth);
+          setIndex((prev) => (prev === next ? prev : next));
+        }}
         aria-roledescription="carousel"
         aria-label="Story preview"
       >
-        {pages.map((p) => (
+        {pages.map((p, pageIdx) => (
           <section key={p.pageNumber} className="how-slide" aria-roledescription="slide" aria-label={`Page ${p.pageNumber}`}>
-            <div className="how-paper try-page">
+            <div className={`how-paper try-page ${pageIdx === 0 ? "vambie-enter" : ""}`.trim()} style={pageIdx === 0 ? delayVar(0) : undefined}>
               {p.picture !== "none" && (
                 <div className="how-art">
                   {p.picture === "ready" && p.image ? (
-                    <img className="try-fade" src={`/${p.image}`} alt={p.visibleAction} />
+                    <img
+                      className="ink-reveal"
+                      style={pageIdx === 0 ? { animationDelay: "140ms" } : undefined}
+                      src={`/${p.image}`}
+                      alt={p.visibleAction}
+                    />
                   ) : p.picture === "drawing" ? (
                     <div className="try-drawing" role="status">
                       <IconSpinner size={26} />
@@ -724,7 +737,7 @@ function Preview({ draft, onSave, onRetry }: { draft: Draft; onSave: () => void;
       </div>
       <div className="how-nav">
         <span className="how-btn how-btn--spacer" aria-hidden="true" />
-        <div className="how-dots" aria-hidden="true">
+        <div className="how-dots vambie-enter vambie-enter--fade" style={delayVar(180)} aria-hidden="true">
           {Array.from({ length: slides }, (_, i) => (
             <span key={i} className={i === index ? "on" : ""} />
           ))}
@@ -738,11 +751,13 @@ function Preview({ draft, onSave, onRetry }: { draft: Draft; onSave: () => void;
         )}
       </div>
       {index < slides - 1 && (
-        <button className="btn btn--lime btn--caps try-save" onClick={onSave}>
+        <button className="btn btn--lime btn--caps try-save vambie-enter" style={delayVar(180)} onClick={onSave}>
           {draft.saved ? `Read ${possessive(draft.child.name)} storybook` : "Save my story and text me a link"} <Chev />
         </button>
       )}
-      <p className="how-count">{KEEP_NOTE}</p>
+      <p className="how-count vambie-enter vambie-enter--fade" style={delayVar(180)}>
+        {KEEP_NOTE}
+      </p>
     </div>
   );
 }

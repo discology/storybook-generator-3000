@@ -3,7 +3,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import { flushSync } from "react-dom";
 import { apiGet, apiSend, ApiError } from "../../lib/api";
 import { IconImage, IconInfo, IconMenu, IconMic, IconSparkle, IconTrash, IconUpload } from "../../components/icons";
-import { Check, Chev, Field, Select } from "../../components/ui";
+import { Check, Chev, ConfirmDialog, Field, Select } from "../../components/ui";
 import { CARD_ART, PromptArt, PromptText } from "./AdminPromptLibrary";
 import { PROMPT_VARIABLES, unknownPromptVariables } from "../../lib/promptVariables";
 import PromptArtworkDialog, { type ArtworkTab } from "./PromptArtworkDialog";
@@ -45,6 +45,7 @@ export default function AdminPromptEdit() {
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [artDialog, setArtDialog] = useState<ArtworkTab | null>(null);
+  const [confirmArchive, setConfirmArchive] = useState(false);
   const fileRef = useRef<HTMLInputElement | null>(null);
   const questionRef = useRef<HTMLInputElement | null>(null);
   const supportingRef = useRef<HTMLInputElement | null>(null);
@@ -135,7 +136,6 @@ export default function AdminPromptEdit() {
   };
 
   const archive = async () => {
-    if (!window.confirm("Archive this prompt? Families stop seeing it; memories recorded with it keep the question.")) return;
     await apiSend(`/api/prompts/${id}`, "PUT", { status: "archived" });
     navigate("/admin/prompts");
   };
@@ -309,7 +309,7 @@ export default function AdminPromptEdit() {
             </div>
           </div>
 
-          {error && <p className="error-text">{error}</p>}
+          {error && <p className="error-text" role="alert">{error}</p>}
           <div className="note note--info" style={{ marginTop: 22, fontSize: 15 }}>
             <span className="note__icon">
               <IconInfo size={14} />
@@ -317,11 +317,21 @@ export default function AdminPromptEdit() {
             <span className="note__body">Publishing updates future cards. Previous recordings keep the prompt version they used.</span>
           </div>
           {form.status !== "archived" && (
-            <button className="tlink t-red" style={{ marginTop: 18, display: "inline-flex", gap: 6, alignItems: "center", color: "var(--red)" }} onClick={() => void archive()}>
+            <button className="tlink t-red" style={{ marginTop: 18, display: "inline-flex", gap: 6, alignItems: "center", color: "var(--red)" }} onClick={() => setConfirmArchive(true)}>
               <IconTrash size={18} /> Archive prompt
             </button>
           )}
         </section>
+
+        <ConfirmDialog
+          open={confirmArchive}
+          onClose={() => setConfirmArchive(false)}
+          danger
+          title="Archive this prompt?"
+          description="Families stop seeing it; memories recorded with it keep the question."
+          confirmLabel="Archive"
+          onConfirm={archive}
+        />
 
         {artDialog && (
           <PromptArtworkDialog

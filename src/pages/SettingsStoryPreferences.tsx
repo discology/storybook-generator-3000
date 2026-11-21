@@ -166,7 +166,7 @@ export default function SettingsStoryPreferences() {
         </Field>
 
         <Note kind="info" style={{ marginTop: 18 }}>Only new chapters adapt. Existing chapters stay just as you remember them.</Note>
-        {error && <p className="error-text">{error}</p>}
+        {error && <p className="error-text" role="alert">{error}</p>}
         <button className="btn btn--lime btn--caps" style={{ marginTop: 18 }} onClick={() => void save()}>
           {saved ? "Saved" : "Save changes"} <Chev />
         </button>

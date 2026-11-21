@@ -1,5 +1,6 @@
 import { useMemo, useState, Fragment } from "react";
 import { Link, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import TopBar from "../components/TopBar";
 import BottomNav from "../components/BottomNav";
 import AccessDenied from "../components/AccessDenied";
@@ -50,7 +51,10 @@ export default function Book() {
   const toggleMark = async (c: StorybookChapter) => {
     const next = !(marks[c.id] ?? c.favorite);
     setMarks((m) => ({ ...m, [c.id]: next }));
-    await apiSend(`/api/chapters/${c.id}/mark`, "PUT", { favorite: next }).catch(() => setMarks((m) => ({ ...m, [c.id]: !next })));
+    await apiSend(`/api/chapters/${c.id}/mark`, "PUT", { favorite: next }).catch(() => {
+      setMarks((m) => ({ ...m, [c.id]: !next }));
+      toast.error("Couldn't save bookmark");
+    });
   };
 
   return (

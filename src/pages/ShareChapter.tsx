@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import TopBar from "../components/TopBar";
 import AccessDenied from "../components/AccessDenied";
 import { IconChevronRight, IconPeople } from "../components/icons";
@@ -68,8 +69,11 @@ export function ChapterAccess() {
     try {
       await apiSend(`/api/chapters/${chapterId}/access`, "PUT", { shareMode: mode, contributorIds: picked });
       setSaved(true);
+      toast.success("Sharing access saved");
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't save. Try again.");
+      const msg = err instanceof ApiError ? err.message : "Couldn't save. Try again.";
+      setError(msg);
+      toast.error(msg);
     } finally {
       setSaving(false);
     }
@@ -139,7 +143,7 @@ export function ChapterAccess() {
           </div>
         )}
         <Note kind="info" style={{ marginTop: 16 }}>Original recordings and transcripts stay private.</Note>
-        {error && <p className="error-text">{error}</p>}
+        {error && <p className="error-text" role="alert">{error}</p>}
         <button className="btn btn--lime btn--caps" style={{ marginTop: 18 }} onClick={() => void save()} disabled={saving}>
           {saved ? "Saved" : saving ? "Saving…" : "Save access"} <Chev />
         </button>
@@ -194,6 +198,7 @@ export default function ShareChapter() {
     }
     await navigator.clipboard.writeText(result.text);
     setCopied(true);
+    toast.success("Chapter message copied");
   };
 
   if (denied) return <AccessDenied />;
@@ -276,7 +281,7 @@ export default function ShareChapter() {
                 <span className="counter">{message.length}/200</span>
               </span>
             </div>
-            {error && <p className="error-text">{error}</p>}
+            {error && <p className="error-text" role="alert">{error}</p>}
             <button className="btn btn--lime btn--caps" style={{ marginTop: 18 }} onClick={() => void send()} disabled={busy || to.length === 0}>
               {busy ? "Sending…" : "Send chapter link"} <Chev />
             </button>
