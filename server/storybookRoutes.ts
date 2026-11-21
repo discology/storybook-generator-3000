@@ -3,6 +3,7 @@ import fs from "fs";
 import multer from "multer";
 import path from "path";
 import { prisma } from "./db";
+import { param } from "./params";
 import { withLatestImage } from "./pageImages";
 import { createPagedChapter, isLiving, recordedBy } from "./storyPages";
 import { getCurrentUser } from "./session";
@@ -361,7 +362,7 @@ router.post("/storybooks/:id/memories", async (req, res) => {
 });
 
 router.post("/memories/:id/audio", upload.single("audio"), usageFromRequest("family"), async (req, res) => {
-  const member = await memberForMemory(req, res, req.params.id);
+  const member = await memberForMemory(req, res, param(req, "id"));
   if (!member) return;
   if (member.memory.contributorId !== member.me.id) return res.status(403).json({ error: "access_denied" });
   if (!req.file) return res.status(400).json({ error: "No audio uploaded" });

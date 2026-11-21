@@ -3,6 +3,7 @@ import express, { Router } from "express";
 import fs from "fs";
 import path from "path";
 import { prisma } from "./db";
+import { param } from "./params";
 import { withLatestImage } from "./pageImages";
 import { canSeeChapter, isOwner, memberForMemory, requireMember } from "./access";
 import { appUrl, renderMessage } from "./messageTemplates";
@@ -135,7 +136,7 @@ export async function failInterruptedExports() {
 
 // The requester's own export, or null after sending 401/403/404.
 async function myExport(req: express.Request, res: express.Response) {
-  const request = await prisma.exportRequest.findUnique({ where: { id: req.params.exportId }, include: { storybook: { include: { child: true } } } });
+  const request = await prisma.exportRequest.findUnique({ where: { id: param(req, "exportId") }, include: { storybook: { include: { child: true } } } });
   if (!request) {
     res.status(404).json({ error: "Export not found" });
     return null;
@@ -200,7 +201,7 @@ router.get("/exports/:exportId/download", async (req, res) => {
 // --- Memory deletion ---
 // The recorder can delete their memory, and the storybook's owner can delete any.
 async function deletableMemory(req: express.Request, res: express.Response) {
-  const member = await memberForMemory(req, res, req.params.id);
+  const member = await memberForMemory(req, res, param(req, "id"));
   if (!member) return null;
   if (member.memory.contributorId !== member.me.id && member.me.role !== "owner") {
     res.status(403).json({ error: "Only the person who recorded this memory can delete it." });

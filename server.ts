@@ -4,6 +4,8 @@ import express from "express";
 import path from "path";
 import authRoutes from "./server/authRoutes";
 import { requireAdmin } from "./server/admin";
+import { prisma, useWriteAheadLog } from "./server/db";
+import { errorHandler } from "./server/errors";
 import storybookRoutes from "./server/storybookRoutes";
 import familyRoutes from "./server/familyRoutes";
 import promptRoutes from "./server/promptRoutes";
@@ -55,7 +57,16 @@ app.use(express.json());
 app.use("/api/twilio", express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
-app.get("/api/health", (_req, res) => res.json({ ok: true }));
+// Fly restarts a machine that fails this check, so it asks the database too:
+// a wedged query path shouldn't look healthy. It reads a real table, because
+// `SELECT 1` never touches the file and passes on a damaged database.
+app.get("/api/health", async (_req, res) => {
+  const db = await Promise.race([
+    prisma.session.findFirst({ select: { id: true } }).then(() => true, () => false),
+    new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 3000)),
+  ]);
+  res.status(db ? 200 : 503).json({ ok: db });
+});
 
 // Recordings, exports and reference photos are never served directly, and a
 // family's pictures only to its members (server/uploadAccess.ts).
@@ -124,10 +135,13 @@ if (production) {
   app.get(/^\/(?!api\/|uploads\/).*/, (_req, res) => res.sendFile(path.join(dist, "index.html"), { headers: { "Cache-Control": "no-cache" } }));
 }
 
+app.use(errorHandler);
+
 // One failed request shouldn't take the whole server down.
 process.on("unhandledRejection", (error) => console.error("Unhandled error:", error));
 
 const PORT = process.env.PORT ? Number(process.env.PORT) : 3002;
+await useWriteAheadLog();
 app.listen(PORT, () => {
   console.log(`Storybook Generator 3000 backend listening on http://localhost:${PORT}`);
   void failInterruptedIllustrations();
