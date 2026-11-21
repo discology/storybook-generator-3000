@@ -34,7 +34,7 @@ for (let c = 0; c < 150; c++) {
 await prisma.$disconnect();
 
 const port = 3900 + Math.floor(Math.random() * 90);
-const server = spawn("npx", ["tsx", "server.ts"], { env: { ...process.env, PORT: String(port), NODE_ENV: "test" }, stdio: "ignore" });
+const server = spawn(process.execPath, ["--import", "tsx", "server.ts"], { env: { ...process.env, PORT: String(port), NODE_ENV: "test" }, stdio: "ignore" });
 const base = `http://127.0.0.1:${port}`;
 try {
   for (let i = 0; !(await fetch(`${base}/api/health`).then((r) => r.ok).catch(() => false)); i++) {

@@ -8,6 +8,7 @@ on:
 jobs:
   check:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     env:
       # Only for generating the client; each test file migrates its own scratch database.
       DATABASE_URL: file:./ci.db

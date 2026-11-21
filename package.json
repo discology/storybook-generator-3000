@@ -15,7 +15,7 @@
     "characters:import-renders": "tsx prisma/importVambieRenders.ts",
     "check:motion": "node scripts/check-motion.mjs",
     "typecheck": "tsc --noEmit -p .",
-    "test": "node --import tsx --test tests/*.test.ts",
+    "test": "node --import tsx --test --test-timeout=120000 tests/*.test.ts",
     "measure:home": "tsx scripts/measure-home.ts"
   },
   "dependencies": {

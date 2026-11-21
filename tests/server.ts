@@ -9,7 +9,9 @@ export async function startServer() {
       s.close(() => resolve(p));
     });
   });
-  const child: ChildProcess = spawn("npx", ["tsx", "server.ts"], {
+  // node itself, not npx: on Linux npx doesn't pass SIGTERM on, and the
+  // orphaned server kept the test run open after every test had passed.
+  const child: ChildProcess = spawn(process.execPath, ["--import", "tsx", "server.ts"], {
     env: { ...process.env, PORT: String(port), NODE_ENV: "test", ADMIN_PHONES: "" },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -26,10 +28,16 @@ export async function startServer() {
   return {
     base,
     log: () => log,
-    stop: () => new Promise<void>((resolve) => {
-      child.once("exit", () => resolve());
-      child.kill("SIGTERM");
-    }),
+    stop: () =>
+      new Promise<void>((resolve) => {
+        if (child.exitCode !== null) return resolve();
+        const force = setTimeout(() => child.kill("SIGKILL"), 3000);
+        child.once("exit", () => {
+          clearTimeout(force);
+          resolve();
+        });
+        child.kill("SIGTERM");
+      }),
   };
 }
 
