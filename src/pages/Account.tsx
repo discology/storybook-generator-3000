@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import TopBar from "../components/TopBar";
-import { IconBook, IconChevronRight, IconSignOut, IconTrash, IconUser } from "../components/icons";
-import { Check, Chev, Field, Loading, Masthead, MenuRow, Note, Sheet, StepRow } from "../components/ui";
+import HoldToConfirmButton from "../components/HoldToConfirmButton";
+import { IconBook, IconCheck, IconChevronRight, IconSignOut, IconTrash, IconUser } from "../components/icons";
+import { Check, Chev, Field, Loading, Masthead, MenuRow, MorphSlot, Note, Sheet, StepRow } from "../components/ui";
 import { useAuth } from "../auth/AuthContext";
 import { apiGet, apiSend, ApiError } from "../lib/api";
 import { capitalize, possessive } from "../lib/format";
@@ -25,9 +27,12 @@ export default function Account() {
     try {
       await apiSend("/api/account", "PUT", { name });
       setSaved(true);
+      toast.success("Account saved");
       refresh();
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't save. Try again.");
+      const msg = err instanceof ApiError ? err.message : "Couldn't save. Try again.";
+      setError(msg);
+      toast.error(msg);
     }
   };
 
@@ -53,9 +58,29 @@ export default function Account() {
         <Field label="Mobile number" htmlFor="phone" hint="You sign in with a code texted to this number.">
           <input id="phone" className="input" value={user.phone ?? ""} disabled />
         </Field>
-        {error && <p className="error-text">{error}</p>}
+        {error && <p className="error-text" role="alert">{error}</p>}
         <button className="btn btn--lime btn--caps" style={{ marginTop: 20 }} onClick={() => void save()} disabled={!name.trim()}>
-          {saved ? "Saved" : "Save"} <Chev />
+          <MorphSlot
+            active={saved ? "saved" : "save"}
+            items={[
+              {
+                key: "save",
+                content: (
+                  <>
+                    Save <Chev />
+                  </>
+                ),
+              },
+              {
+                key: "saved",
+                content: (
+                  <>
+                    <IconCheck size={20} strokeWidth={3} /> Saved
+                  </>
+                ),
+              },
+            ]}
+          />
         </button>
         <hr className="divider" style={{ margin: "22px 0 4px" }} />
         <div className="menu">
@@ -87,7 +112,6 @@ export function DeleteAccount() {
   const { refresh } = useAuth();
   const [plan, setPlan] = useState<Plan | null>(null);
   const [step, setStep] = useState<"review" | "confirm" | "deleting" | "done">("review");
-  const [typed, setTyped] = useState("");
   const [understood, setUnderstood] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -145,7 +169,7 @@ export function DeleteAccount() {
   }
 
   if (step === "confirm") {
-    const ready = typed.trim() === "DELETE" && understood;
+    const ready = understood;
     return (
       <div className="page">
         <TopBar back={() => setStep("review")} />
@@ -159,27 +183,26 @@ export function DeleteAccount() {
               ? "This deletes the storybooks you started, with every memory and chapter in them, and your account."
               : "This deletes your memories and your account. Chapters made from your memories will be held for review."}
           </p>
-          <div className="field" style={{ marginTop: 20 }}>
-            <label className="field__label field__label--strong" htmlFor="typed">
-              Type DELETE to confirm
-            </label>
-            <input id="typed" className="input" value={typed} onChange={(e) => setTyped(e.target.value)} placeholder="DELETE" autoComplete="off" autoCapitalize="characters" />
-          </div>
-          <div style={{ marginTop: 16 }}>
+          <div style={{ marginTop: 20 }}>
             <Check checked={understood} onChange={setUnderstood}>
               I understand this cannot be undone.
             </Check>
           </div>
-          {error && <p className="error-text">{error}</p>}
+          {error && <p className="error-text" role="alert">{error}</p>}
           <div className="stack" style={{ marginTop: 22 }}>
-            <button className={`btn btn--caps ${ready ? "btn--danger-solid" : ""}`} disabled={!ready} onClick={() => void remove()}>
-              Delete account <Chev />
-            </button>
+            <HoldToConfirmButton
+              label={<>Hold to delete account <Chev /></>}
+              holdingLabel="Keep holding…"
+              disabled={!ready}
+              onConfirm={() => void remove()}
+            />
             <button className="btn btn--outline" onClick={() => navigate(`${base}/settings`)}>
               Cancel
             </button>
           </div>
-          <p className="t-center t-small t-muted" style={{ marginTop: 14 }}>Nothing is deleted until you confirm.</p>
+          <p id="hold-confirm-hint" className="t-center t-small t-muted" style={{ marginTop: 14 }}>
+            Press and hold for 2 seconds to permanently delete.
+          </p>
         </Sheet>
       </div>
     );

@@ -59,7 +59,7 @@ export default function ShotReviews({
     setError(null);
     try {
       await apiSend("/api/admin/shot-reviews/accept", "POST", { signature: item.signature });
-      onChanged(`"${item.signature}" accepted as fine. It comes back if it's flagged on more than ${item.pages} pages.`);
+      onChanged(`"${item.signature}" accepted as fine. It comes back if it's flagged on more than ${item.pages} ${item.pages === 1 ? "page" : "pages"}.`);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "Couldn't save it.");
     } finally {
@@ -71,9 +71,9 @@ export default function ShotReviews({
     <div className="card" style={{ borderLeft: "4px solid var(--amber)" }}>
       <h3 style={{ marginTop: 0 }}>Shots to review</h3>
       <p className="status-line">
-        Shot patterns flagged for camera or composition on {threshold} or more pages. Block one to add it to "Shots that don't work" (a new Page Rules version, used by new chapters), or accept it as fine.
+        Shot patterns flagged for camera or composition on {threshold} or more {threshold === 1 ? "page" : "pages"}. Block one to add it to "Shots that don't work" (a new Page Rules version, used by new chapters), or accept it as fine.
       </p>
-      {disabled && disabledNote && <p className="status-line">{disabledNote}</p>}
+      {disabled && disabledNote && <p className="status-line" role="status">{disabledNote}</p>}
       {items.map((item, index) => (
         <article key={item.signature} className="fb-card" style={{ gridTemplateColumns: "minmax(0, 1fr)" }}>
           <div>
@@ -112,7 +112,7 @@ export default function ShotReviews({
                   Use instead
                 </label>
                 <input id={`sr-instead-${index}`} className="input" value={form.instead} onChange={(e) => setForm({ ...form, instead: e.target.value })} placeholder="A medium shot from the side with the whole body in frame." />
-                {error && <p className="error-text">{error}</p>}
+                {error && <p className="error-text" role="alert">{error}</p>}
                 <div className="row inline" style={{ gap: 8, marginTop: 10 }}>
                   <button className="btn-small btn-primary" disabled={busy !== null || !form.pattern.trim()} onClick={() => void block(item)}>
                     {busy === item.signature ? "Saving…" : "Block this shot"}
@@ -130,7 +130,7 @@ export default function ShotReviews({
                 <button className="btn-small btn-secondary" disabled={disabled || busy !== null} onClick={() => void accept(item)}>
                   {busy === `accept-${item.signature}` ? "Saving…" : "Accept as fine"}
                 </button>
-                {error && open === null && busy === null && <span className="error-text">{error}</span>}
+                {error && open === null && busy === null && <span className="error-text" role="alert">{error}</span>}
               </div>
             )}
           </div>

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import clsx from "clsx";
 import TopBar from "../components/TopBar";
 import TextConsent from "../components/TextConsent";
 import { TERMS_VERSION } from "../lib/legal";
@@ -45,6 +46,10 @@ export default function SignIn() {
     return () => clearTimeout(t);
   }, [resendIn]);
 
+  useEffect(() => {
+    if (step === "code") boxes.current[0]?.focus();
+  }, [step]);
+
   const sendCode = async (e?: React.FormEvent) => {
     e?.preventDefault();
     if (!number.trim()) return;
@@ -65,7 +70,6 @@ export default function SignIn() {
       setDigits(["", "", "", "", "", ""]);
       setStep("code");
       setResendIn(RESEND_SECONDS);
-      setTimeout(() => boxes.current[0]?.focus(), 50);
     } catch {
       setError("We couldn't reach Vambie. Check your connection and try again.");
     } finally {
@@ -147,9 +151,15 @@ export default function SignIn() {
               {digits.map((d, i) => (
                 <input
                   key={i}
-                  ref={(el) => (boxes.current[i] = el)}
+                  ref={(el) => {
+                    boxes.current[i] = el;
+                  }}
+                  className={clsx(d && "otp__box--filled")}
                   value={d}
                   inputMode="numeric"
+                  pattern="[0-9]*"
+                  enterKeyHint="done"
+                  autoFocus={i === 0}
                   autoComplete={i === 0 ? "one-time-code" : "off"}
                   aria-label={`Digit ${i + 1}`}
                   maxLength={i === 0 ? 6 : 1}
@@ -168,7 +178,7 @@ export default function SignIn() {
                 Dev mode: no SMS provider is set up, so your code is <strong>{devCode}</strong>.
               </Note>
             )}
-            {error && <p className="error-text">{error}</p>}
+            {error && <p className="error-text" role="alert">{error}</p>}
             <button className="btn btn--lime btn--caps" type="submit" disabled={busy || !digits.every(Boolean)} style={{ marginTop: 20 }}>
               {busy ? "Checking…" : "Verify and continue"} <Chev />
             </button>
@@ -237,6 +247,7 @@ export default function SignIn() {
                 className="input"
                 type="tel"
                 inputMode="tel"
+                enterKeyHint="send"
                 autoComplete="tel-national"
                 value={number}
                 onChange={(e) => setNumber(e.target.value)}
@@ -245,7 +256,7 @@ export default function SignIn() {
               />
             </div>
           </Field>
-          {error && <p className="error-text">{error}</p>}
+          {error && <p className="error-text" role="alert">{error}</p>}
           <button className="btn btn--lime btn--caps" type="submit" disabled={busy || !number.trim()} style={{ marginTop: 20 }}>
             {busy ? "Sending…" : "Send code"} <Chev />
           </button>

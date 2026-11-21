@@ -138,7 +138,7 @@ export default function OurCharacters() {
             />
             <label htmlFor="clothing">What they usually wear (can change)</label>
             <input id="clothing" {...field("usualClothing")} placeholder="e.g. a green cardigan and comfortable trousers" />
-            {error && <p className="status-line" style={{ color: "#d94c4c" }}>{error}</p>}
+            {error && <p className="status-line" role="alert" style={{ color: "#d94c4c" }}>{error}</p>}
             <button className="btn-primary chevron" type="submit" disabled={saving}>
               {saving ? "Saving…" : "Next: design their look"}
             </button>

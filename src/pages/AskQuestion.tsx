@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import TopBar from "../components/TopBar";
 import AccessDenied from "../components/AccessDenied";
 import { IconLock, IconMic } from "../components/icons";
@@ -70,6 +71,7 @@ export default function AskQuestion() {
     }
     await navigator.clipboard.writeText(result.text);
     setCopied(true);
+    toast.success("Question copied");
   };
 
   const base = `/storybooks/${id}`;
@@ -154,7 +156,7 @@ export default function AskQuestion() {
                     <span className="counter">{message.length}/200</span>
                   </span>
                 </div>
-                {error && <p className="error-text">{error}</p>}
+                {error && <p className="error-text" role="alert">{error}</p>}
                 <button className="btn btn--lime btn--caps" style={{ marginTop: 18 }} onClick={() => void send()} disabled={busy || to.length === 0}>
                   {busy ? "Sending…" : "Send the question"} <Chev />
                 </button>

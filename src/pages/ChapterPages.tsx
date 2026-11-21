@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import TopBar from "../components/TopBar";
 import PagePicture from "../components/PagePicture";
 import AccessDenied from "../components/AccessDenied";
 import { IconBookmark as IconFlag, IconCheck, IconChevronDown, IconEdit, IconRefresh, IconSpinner, IconWand } from "../components/icons";
-import { Chev, Loading, Note, RadioRow, Select } from "../components/ui";
+import { Chev, Loading, MorphSlot, Note, RadioRow, Select } from "../components/ui";
 import { PARENT_REASONS } from "../lib/flags";
 import { apiGet, apiSend, ApiError } from "../lib/api";
 import { chapterLabel } from "../lib/format";
@@ -114,7 +114,7 @@ export default function ChapterPages() {
           {chapter.title}
         </h1>
         <p className="masthead__sub" style={{ fontSize: 17, marginTop: 8 }}>
-          {chapter.pages.length} pages · {reviewed ? `${approved} approved` : chapter.status === "published" ? "in the book" : "goes into the book on its own"}
+          {chapter.pages.length} {chapter.pages.length === 1 ? "page" : "pages"} · {reviewed ? `${approved} approved` : chapter.status === "published" ? "in the book" : "goes into the book on its own"}
         </p>
       </header>
 
@@ -147,7 +147,7 @@ export default function ChapterPages() {
             ))}
           </Note>
         )}
-        {error && <p className="error-text">{error}</p>}
+        {error && <p className="error-text" role="alert">{error}</p>}
       </div>
 
       <div style={{ marginTop: 16 }}>
@@ -392,6 +392,14 @@ function PageCard({
   const pictured = hasPicture(page);
   const asset = page.assets[0];
   const ready = page.assets.find((a) => a.status === "ready");
+  const prevStatusRef = useRef<string | undefined>(asset?.status);
+  const [freshReveal, setFreshReveal] = useState(false);
+  useEffect(() => {
+    if (prevStatusRef.current === "generating" && asset?.status === "ready") {
+      setFreshReveal(true);
+    }
+    prevStatusRef.current = asset?.status;
+  }, [asset?.status]);
   const shot = (() => {
     try {
       return page.shot ? (JSON.parse(page.shot) as { type: string; angle: string; focus: string }) : null;
@@ -423,7 +431,7 @@ function PageCard({
       {pictured && (
         <div style={{ position: "relative", margin: page.pictureSize === "full" || page.pictureSize === "wordless" || !page.pictureSize ? "0 -20px" : 0 }}>
           {ready?.imagePath ? (
-            <PagePicture src={`/${ready.imagePath}`} size={page.pictureSize} alt={page.visibleAction} dim={asset?.status === "generating"} />
+            <PagePicture src={`/${ready.imagePath}`} size={page.pictureSize} alt={page.visibleAction} dim={asset?.status === "generating"} reveal={freshReveal} />
           ) : (
             <div style={{ aspectRatio: shape, background: "#ece4d3", borderRadius: 14 }} />
           )}
@@ -604,7 +612,7 @@ function PageCard({
           </div>
           <textarea className="textarea" rows={2} value={offNote} onChange={(e) => setOffNote(e.target.value)} maxLength={1000} placeholder="Anything else? (optional)" aria-label="Anything else" style={{ marginTop: 10 }} />
           <p className="field__hint">Goes to the Vambie team so the next pages come out better. It doesn't change this page.</p>
-          {offError && <p className="error-text">{offError}</p>}
+          {offError && <p className="error-text" role="alert">{offError}</p>}
           <div className="hstack" style={{ marginTop: 10 }}>
             <button className="btn btn--purple btn--xs btn--auto" disabled={offBusy || !offReason} onClick={() => void sendOff()}>
               {offBusy ? "Sending…" : "Send to the Vambie team"}
@@ -632,13 +640,41 @@ function PageCard({
 
       {mode === "view" && (
         <div className="hstack" style={{ flexWrap: "wrap", gap: 8, marginTop: 14 }}>
-          {reviewed && !page.approvedAt && (
+          {reviewed && (
             <button
-              className="btn btn--lime btn--xs btn--auto"
-              disabled={disabled || (pictured && !ready)}
-              onClick={() => void act(`approve-${page.id}`, () => apiSend(`/api/pages/${page.id}/approve`, "PUT"))}
+              className={`btn ${page.approvedAt ? "btn--soft" : "btn--lime"} btn--xs btn--auto`}
+              disabled={Boolean(page.approvedAt) || disabled || (pictured && !ready)}
+              onClick={() => !page.approvedAt && void act(`approve-${page.id}`, () => apiSend(`/api/pages/${page.id}/approve`, "PUT"))}
             >
-              <IconCheck size={16} strokeWidth={3} /> {busy === `approve-${page.id}` ? "Approving…" : "Approve page"}
+              <MorphSlot
+                active={page.approvedAt ? "approved" : busy === `approve-${page.id}` ? "approving" : "idle"}
+                items={[
+                  {
+                    key: "idle",
+                    content: (
+                      <>
+                        <IconCheck size={16} strokeWidth={3} /> Approve page
+                      </>
+                    ),
+                  },
+                  {
+                    key: "approving",
+                    content: (
+                      <>
+                        <IconSpinner size={16} /> Approving…
+                      </>
+                    ),
+                  },
+                  {
+                    key: "approved",
+                    content: (
+                      <>
+                        <IconCheck size={16} strokeWidth={3} /> Approved
+                      </>
+                    ),
+                  },
+                ]}
+              />
             </button>
           )}
           <button className="btn btn--outline btn--xs btn--auto" disabled={disabled} onClick={() => setMode("edit")}>

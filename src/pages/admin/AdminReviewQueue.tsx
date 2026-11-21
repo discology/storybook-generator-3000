@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { apiGet, apiSend } from "../../lib/api";
+import { apiGet, apiSend, ApiError } from "../../lib/api";
 import { IconBook, IconDots, IconEdit, IconFileText, IconSearch, IconShield, IconSort, IconWarning } from "../../components/icons";
 
 interface QueueChapter {
@@ -52,6 +52,9 @@ export default function AdminReviewQueue() {
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<{ key: SortKey; dir: 1 | -1 }>({ key: "chapter", dir: 1 });
   const [menu, setMenu] = useState<string | null>(null);
+  const [holdingId, setHoldingId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const holdBusyRef = useRef(false);
 
   const load = () => {
     apiGet("/api/admin/chapters").then(setData);
@@ -70,9 +73,20 @@ export default function AdminReviewQueue() {
   }, [data, tab, query, sort]);
 
   const holdChapter = async (id: string) => {
+    if (holdBusyRef.current) return;
+    holdBusyRef.current = true;
+    setHoldingId(id);
     setMenu(null);
-    await apiSend(`/api/admin/chapters/${id}/hold`, "PUT");
-    load();
+    setError(null);
+    try {
+      await apiSend(`/api/admin/chapters/${id}/hold`, "PUT");
+      load();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : "Couldn't hold chapter. Try again.");
+    } finally {
+      holdBusyRef.current = false;
+      setHoldingId(null);
+    }
   };
 
   if (!data) return <p>Loading…</p>;
@@ -105,6 +119,7 @@ export default function AdminReviewQueue() {
           </button>
         ))}
       </div>
+      {error && <p className="error-text" role="alert" style={{ marginBottom: 12 }}>{error}</p>}
 
       <table className="adm-table">
         <thead>
@@ -144,8 +159,8 @@ export default function AdminReviewQueue() {
                       <IconFileText size={18} /> Open review
                     </button>
                     {c.guardianStatus === "approved" && (
-                      <button className="danger" onClick={() => void holdChapter(c.id)}>
-                        <IconWarning size={18} /> Hold this chapter
+                      <button className="danger" disabled={holdingId !== null} onClick={() => void holdChapter(c.id)}>
+                        <IconWarning size={18} /> {holdingId === c.id ? "Holding…" : "Hold this chapter"}
                       </button>
                     )}
                     <button onClick={() => navigate(`/admin/families?q=${encodeURIComponent(c.childName)}`)}>

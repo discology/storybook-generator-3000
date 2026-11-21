@@ -30,7 +30,7 @@ export default function MemoryListRow({
         <Avatar name={memory.contributor.name} src={memory.contributor.portrait} />
       </span>
       <Link to={to} className="mem-row__text" style={{ color: "inherit", textDecoration: "none" }}>
-        <div className="mem-row__title">{memoryTitle(memory)}</div>
+        <div className="mem-row__title" title={memoryTitle(memory)}>{memoryTitle(memory)}</div>
         <div className="mem-row__meta">
           {who} · {formatDate(memory.eventDate ?? memory.recordedAt)}
           {memory.status === "failed" ? " · Needs another try" : ""}
@@ -46,7 +46,7 @@ export default function MemoryListRow({
           <IconSpinner size={20} />
         </span>
       ) : null}
-      <Link to={to} className="tbar__icon" aria-label="Memory options" style={{ minWidth: 32 }}>
+      <Link to={to} className="tbar__icon" aria-label="Memory options">
         <IconDotsVertical size={22} />
       </Link>
     </div>

@@ -69,7 +69,7 @@ export default function SettingsPrivacy() {
             </div>
             <p className="field__hint">When this is off, only the words are kept: each recording is deleted once it's transcribed.</p>
             <Note kind="info" style={{ marginTop: 14 }}>You can change these choices when saving each memory.</Note>
-            {error && <p className="error-text">{error}</p>}
+            {error && <p className="error-text" role="alert">{error}</p>}
             <button className="btn btn--lime btn--caps" style={{ marginTop: 16 }} onClick={() => void save()}>
               {saved ? "Saved" : "Save defaults"} <Chev />
             </button>

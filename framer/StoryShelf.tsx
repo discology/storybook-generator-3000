@@ -6,7 +6,7 @@
 // app's /try when the page has no lesson box. Fonts, colors and the app's
 // address are settings in Framer's right-hand panel.
 
-import { useEffect, useState, type CSSProperties } from "react";
+import { useCallback, useEffect, useRef, useState, type CSSProperties } from "react";
 import { createPortal } from "react-dom";
 import { addPropertyControls, ControlType, RenderTarget } from "framer";
 
@@ -143,9 +143,9 @@ function StoryModal(props: Props & { story: Story; onClose: () => void }) {
   const { appUrl, headingFont, textFont, endButtonLabel, buttonColor, buttonTextColor, story, onClose } = props;
   const [pages, setPages] = useState<Page[] | null | "unavailable">(null);
   const [index, setIndex] = useState(0);
-  const [touchX, setTouchX] = useState<number | null>(null);
+  const touchRef = useRef<{ x: number; y: number } | null>(null);
   const total = Array.isArray(pages) ? pages.length : 0;
-  const go = (n: number) => setIndex((i) => Math.max(0, Math.min(total, n ?? i)));
+  const go = useCallback((n: number) => setIndex((i) => Math.max(0, Math.min(total, n ?? i))), [total]);
 
   useEffect(() => {
     fetch(`${appBase(appUrl)}/api/public/stories/${encodeURIComponent(story.slug)}`)
@@ -155,19 +155,22 @@ function StoryModal(props: Props & { story: Story; onClose: () => void }) {
   }, [appUrl, story.slug]);
 
   useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-      if (e.key === "ArrowRight") go(index + 1);
-      if (e.key === "ArrowLeft") go(index - 1);
-    };
-    window.addEventListener("keydown", onKey);
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
-      window.removeEventListener("keydown", onKey);
       document.body.style.overflow = overflow;
     };
-  });
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+      if (e.key === "ArrowRight") setIndex((i) => Math.max(0, Math.min(total, i + 1)));
+      if (e.key === "ArrowLeft") setIndex((i) => Math.max(0, Math.min(total, i - 1)));
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose, total]);
 
   // The lesson box listens for this and opens its modal; without one, the app's /try.
   const makeYourOwn = () => {
@@ -191,16 +194,24 @@ function StoryModal(props: Props & { story: Story; onClose: () => void }) {
         aria-modal="true"
         aria-label={story.title}
         onClick={(e) => e.stopPropagation()}
-        onTouchStart={(e) => setTouchX(e.touches[0].clientX)}
+        onTouchStart={(e) => {
+          if (e.touches.length > 1) {
+            touchRef.current = null;
+            return;
+          }
+          touchRef.current = { x: e.touches[0].clientX, y: e.touches[0].clientY };
+        }}
         onTouchEnd={(e) => {
-          if (touchX === null) return;
-          const dx = e.changedTouches[0].clientX - touchX;
-          setTouchX(null);
+          if (!touchRef.current) return;
+          const dx = e.changedTouches[0].clientX - touchRef.current.x;
+          const dy = e.changedTouches[0].clientY - touchRef.current.y;
+          touchRef.current = null;
+          if (Math.abs(dy) > Math.abs(dx)) return;
           if (Math.abs(dx) > 50) go(index + (dx < 0 ? 1 : -1));
         }}
-        style={{ position: "relative", width: "100%", maxWidth: 480, maxHeight: "92vh", overflowY: "auto", background: "#fff", borderRadius: 16, padding: "20px 20px 14px", boxSizing: "border-box", color: "#111" }}
+        style={{ position: "relative", width: "100%", maxWidth: 480, maxHeight: "92dvh", overflowY: "auto", background: "#fff", borderRadius: 16, padding: "20px 20px calc(14px + env(safe-area-inset-bottom, 0px))", boxSizing: "border-box", color: "#111" }}
       >
-        <button type="button" onClick={onClose} aria-label="Close" style={{ position: "absolute", top: 8, right: 12, border: "none", background: "none", fontSize: 26, lineHeight: 1, cursor: "pointer", color: "#111" }}>
+        <button type="button" onClick={onClose} aria-label="Close" style={{ position: "absolute", top: 4, right: 6, width: 44, height: 44, display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", background: "none", fontSize: 26, lineHeight: 1, cursor: "pointer", color: "#111", padding: 0 }}>
           ×
         </button>
         {/* Explicit, so the landing page's own heading styles don't reach into the modal. */}
@@ -215,7 +226,7 @@ function StoryModal(props: Props & { story: Story; onClose: () => void }) {
               <img
                 src={`${appBase(appUrl)}/${page.image}`}
                 alt={page.visibleAction}
-                style={{ display: "block", width: "100%", aspectRatio: pictureRatio, maxHeight: "52vh", objectFit: "contain", borderRadius: 10, background: "#F7F2E6" }}
+                style={{ display: "block", width: "100%", aspectRatio: pictureRatio, maxHeight: "52dvh", objectFit: "contain", borderRadius: 10, background: "#F7F2E6" }}
               />
             )}
             {page.text && <p style={{ fontSize: 17, lineHeight: 1.5, margin: "14px 2px 6px" }}>{page.text}</p>}
@@ -243,7 +254,7 @@ function StoryModal(props: Props & { story: Story; onClose: () => void }) {
             <button type="button" onClick={() => go(index - 1)} disabled={index === 0} style={{ ...navButton, opacity: index === 0 ? 0.3 : 1 }}>
               ‹ Previous
             </button>
-            <span style={{ fontSize: 14, color: "#555" }}>
+            <span style={{ fontSize: 14, color: "#555", fontVariantNumeric: "tabular-nums" }}>
               {index + 1} / {total}
             </span>
             <button type="button" onClick={() => go(index + 1)} style={navButton}>

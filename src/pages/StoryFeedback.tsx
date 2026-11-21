@@ -92,7 +92,7 @@ export default function StoryFeedback() {
               </label>
               <textarea id="note" className="textarea" value={note} onChange={(e) => setNote(e.target.value)} maxLength={1000} placeholder="Tell us what felt different." />
             </div>
-            {error && <p className="error-text">{error}</p>}
+            {error && <p className="error-text" role="alert">{error}</p>}
             <button className="btn btn--lime" style={{ marginTop: 18 }} onClick={() => void send()} disabled={busy}>
               {busy ? "Sending…" : "Send feedback"} <Chev />
             </button>

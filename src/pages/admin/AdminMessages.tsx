@@ -115,7 +115,7 @@ export default function AdminMessages() {
                   )}
                 </div>
                 {notice?.key === t.key && (
-                  <div className="status-line" style={{ color: notice.ok ? "var(--green, #2f8f3f)" : "#d94c4c" }}>
+                  <div className="status-line" role={notice.ok ? "status" : "alert"} style={{ color: notice.ok ? "var(--green, #2f8f3f)" : "#d94c4c" }}>
                     {notice.text}
                   </div>
                 )}

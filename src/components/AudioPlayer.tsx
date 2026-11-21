@@ -13,7 +13,12 @@ function loadPeaks(src: string, bars: number): Promise<number[]> {
       key,
       fetch(src)
         .then((res) => res.arrayBuffer())
-        .then((data) => new AudioContext().decodeAudioData(data))
+        .then((data) => {
+          const ctx = new AudioContext();
+          return ctx
+            .decodeAudioData(data)
+            .finally(() => void ctx.close().catch(() => undefined));
+        })
         .then((audio) => {
           const channel = audio.getChannelData(0);
           const size = Math.floor(channel.length / bars) || 1;
@@ -45,10 +50,19 @@ export default function AudioPlayer({
   bars?: number;
 }) {
   const audioRef = useRef<HTMLAudioElement | null>(null);
+  const scrubbingRef = useRef<number | null>(null);
   const [playing, setPlaying] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(durationSec ?? 0);
   const [peaks, setPeaks] = useState(() => placeholderPeaks(bars));
+
+  useEffect(() => {
+    setPlaying(false);
+    setProgress(0);
+    setCurrentTime(0);
+    setDuration(durationSec ?? 0);
+  }, [src, durationSec]);
 
   useEffect(() => {
     if (!src) return;
@@ -68,14 +82,58 @@ export default function AudioPlayer({
     else audio.pause();
   };
 
-  const seek = (e: React.MouseEvent<HTMLDivElement>) => {
+  const seekToRatio = (ratio: number) => {
+    const clamped = Math.max(0, Math.min(1, ratio));
     const audio = audioRef.current;
-    if (!audio || !audio.duration || !Number.isFinite(audio.duration)) return;
-    const rect = e.currentTarget.getBoundingClientRect();
-    audio.currentTime = ((e.clientX - rect.left) / rect.width) * audio.duration;
+    const total = audio && Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : duration;
+    if (!audio || !total) return;
+    const nextTime = clamped * total;
+    if (Number.isFinite(audio.duration) && audio.duration > 0) {
+      audio.currentTime = nextTime;
+    }
+    setCurrentTime(nextTime);
+    setProgress(clamped);
   };
 
-  const shown = playing || progress > 0 ? (audioRef.current?.currentTime ?? 0) : duration;
+  const seekFromPointer = (el: HTMLDivElement, clientX: number) => {
+    const rect = el.getBoundingClientRect();
+    if (rect.width <= 0) return;
+    seekToRatio((clientX - rect.left) / rect.width);
+  };
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (!src) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    scrubbingRef.current = e.pointerId;
+    seekFromPointer(e.currentTarget, e.clientX);
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (scrubbingRef.current !== e.pointerId) return;
+    seekFromPointer(e.currentTarget, e.clientX);
+  };
+
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (scrubbingRef.current !== e.pointerId) return;
+    scrubbingRef.current = null;
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) {
+      e.currentTarget.releasePointerCapture(e.pointerId);
+    }
+  };
+
+  const onKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const audio = audioRef.current;
+    const total = audio && Number.isFinite(audio.duration) && audio.duration > 0 ? audio.duration : duration;
+    if (!audio || !total) return;
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+      e.preventDefault();
+      const step = Math.min(5, Math.max(1, total * 0.05));
+      const delta = e.key === "ArrowRight" ? step : -step;
+      seekToRatio((currentTime + delta) / total);
+    }
+  };
+
+  const shown = playing || progress > 0 ? currentTime : duration;
 
   return (
     <div className={`player ${variant === "purple" ? "player--purple" : ""}`}>
@@ -89,10 +147,13 @@ export default function AudioPlayer({
           onEnded={() => {
             setPlaying(false);
             setProgress(0);
+            setCurrentTime(0);
           }}
           onLoadedMetadata={(e) => Number.isFinite(e.currentTarget.duration) && setDuration(e.currentTarget.duration)}
           onTimeUpdate={(e) => {
+            if (scrubbingRef.current !== null) return;
             const a = e.currentTarget;
+            setCurrentTime(a.currentTime);
             if (a.duration && Number.isFinite(a.duration)) setProgress(a.currentTime / a.duration);
           }}
         />
@@ -100,7 +161,20 @@ export default function AudioPlayer({
       <button type="button" className="player__btn" onClick={toggle} disabled={!src} aria-label={playing ? "Pause" : "Play"}>
         {playing ? <IconPause size={24} /> : <IconPlay size={24} />}
       </button>
-      <div className="player__wave" onClick={seek} aria-hidden="true">
+      <div
+        className="player__wave"
+        role="slider"
+        tabIndex={src ? 0 : -1}
+        aria-label="Seek"
+        aria-valuemin={0}
+        aria-valuemax={Math.round(duration)}
+        aria-valuenow={Math.round(shown)}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onKeyDown={onKeyDown}
+      >
         {peaks.map((p, i) => (
           <span key={i} className={i / peaks.length < progress || (!playing && progress === 0) ? "on" : ""} style={{ height: `${Math.round(p * 100)}%` }} />
         ))}

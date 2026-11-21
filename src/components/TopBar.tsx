@@ -42,7 +42,7 @@ export default function TopBar(props: TopBarProps) {
           Vambie
         </Link>
       )}
-      {title && !props.wordmark && <span className="tbar__title">{title}</span>}
+      {title && !props.wordmark && <span className="tbar__title" title={typeof title === "string" ? title : undefined}>{title}</span>}
       <div className="tbar__right">
         {props.right}
         {menu && (

@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { apiGet, apiSend, ApiError } from "../../lib/api";
 import { IconClose } from "../../components/icons";
+import { ConfirmDialog, ModalDialog } from "../../components/ui";
 
 // Admin → Guide Book (VSB-102): the numbered rules every storybook is checked
 // against. Edits are local until saved as a new version.
@@ -31,6 +33,7 @@ export default function AdminGuideBook() {
   const [rules, setRules] = useState<GuideRule[]>([]);
   const [viewing, setViewing] = useState<number | null>(null);
   const [editing, setEditing] = useState<GuideRule | null>(null);
+  const [removingRule, setRemovingRule] = useState<GuideRule | null>(null);
   const [note, setNote] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -66,8 +69,11 @@ export default function AdminGuideBook() {
       setViewing(null);
       await load();
       setMessage(`Saved as version ${version}.`);
+      toast.success(`Saved as version ${version}`);
     } catch (e) {
-      setMessage(e instanceof ApiError ? e.message : "Couldn't save.");
+      const msg = e instanceof ApiError ? e.message : "Couldn't save.";
+      setMessage(msg);
+      toast.error(msg);
     } finally {
       setBusy(false);
     }
@@ -99,7 +105,7 @@ export default function AdminGuideBook() {
         {data.versions.length > 1 && (
           <select
             className="input"
-            style={{ width: "auto", minHeight: 38, fontSize: 15 }}
+            style={{ width: "auto", minHeight: 38, fontSize: 16 }}
             value={viewing ?? latest}
             aria-label="Version"
             onChange={(e) => {
@@ -117,8 +123,8 @@ export default function AdminGuideBook() {
           </select>
         )}
       </div>
-      {readOnly && <p className="status-line">You're looking at an earlier version. Pick the newest one to edit.</p>}
-      {message && <p className="status-line">{message}</p>}
+      {readOnly && <p className="status-line" role="status">You're looking at an earlier version. Pick the newest one to edit.</p>}
+      {message && <p className="status-line" role="status">{message}</p>}
 
       {Object.entries(data.sections).map(([key, name]) => (
         <section key={key} style={{ marginTop: 24 }}>
@@ -145,7 +151,7 @@ export default function AdminGuideBook() {
                         <button className="btn-small btn-secondary" onClick={() => setEditing(r)}>
                           Edit
                         </button>
-                        <button className="btn-small btn-secondary" onClick={() => window.confirm(`Remove ${r.id}?`) && setRules((all) => all.filter((x) => x.id !== r.id))}>
+                        <button className="btn-small btn-secondary" onClick={() => setRemovingRule(r)}>
                           Remove
                         </button>
                       </span>
@@ -190,6 +196,17 @@ export default function AdminGuideBook() {
       )}
 
       {editing && <RuleDialog rule={editing} targets={data.targets} sections={data.sections} onClose={() => setEditing(null)} onSave={saveRule} />}
+      <ConfirmDialog
+        open={removingRule !== null}
+        onClose={() => setRemovingRule(null)}
+        danger
+        title={removingRule ? `Remove ${removingRule.id}?` : "Remove rule?"}
+        description={removingRule ? `“${removingRule.title}” will be removed from this draft until you save.` : undefined}
+        confirmLabel="Remove"
+        onConfirm={() => {
+          if (removingRule) setRules((all) => all.filter((x) => x.id !== removingRule.id));
+        }}
+      />
     </div>
   );
 }
@@ -210,48 +227,51 @@ function RuleDialog({ rule, targets, sections, onClose, onSave }: { rule: GuideR
     </>
   );
   return (
-    <>
-      <div className="backdrop" onClick={onClose} />
-      <div className="adm-modal adm-modal--auto" role="dialog" aria-modal="true" aria-label={`Rule ${rule.id}`} style={{ width: "min(640px, calc(100vw - 32px))", overflowY: "auto" }}>
-        <div className="adm-modal__head">
-          <h2 className="h-title" style={{ fontSize: 24, margin: 0 }}>
-            {rule.id} · {sections[rule.section]}
-          </h2>
-          <button className="icon-btn" onClick={onClose} aria-label="Close">
-            <IconClose size={22} />
-          </button>
-        </div>
-        {field("title", "Title")}
-        {field("rule", "The rule", 4)}
-        {field("why", "Why it matters", 2)}
-        {field("good", "Like this (a good example)", 2)}
-        {field("bad", "Not like this (a bad example)", 2)}
-        <span className="field__label" style={{ marginTop: 10, display: "block" }}>
-          Where it's enforced
-        </span>
-        <div className="flag-chips">
-          {Object.entries(targets).map(([key, name]) => (
-            <button
-              key={key}
-              type="button"
-              className={`flag-chip ${form.enforcedIn.includes(key) ? "flag-chip--on" : ""}`}
-              aria-pressed={form.enforcedIn.includes(key)}
-              onClick={() => set("enforcedIn", form.enforcedIn.includes(key) ? form.enforcedIn.filter((t) => t !== key) : [...form.enforcedIn, key])}
-            >
-              {name}
-            </button>
-          ))}
-        </div>
-        <div className="row inline" style={{ gap: 8, marginTop: 16 }}>
-          <button className="btn-small btn-primary" disabled={!form.title.trim() || !form.rule.trim()} onClick={() => onSave({ ...form, title: form.title.trim(), rule: form.rule.trim() })}>
-            Keep this rule
-          </button>
-          <button className="btn-small btn-secondary" onClick={onClose}>
-            Cancel
-          </button>
-        </div>
-        <p className="t-xs t-muted">Changes are saved together, as a new version, from the bar at the bottom of the page.</p>
+    <ModalDialog
+      open
+      onClose={onClose}
+      label={`Rule ${rule.id}`}
+      className="adm-modal--auto"
+      style={{ width: "min(640px, calc(100vw - 32px))", overflowY: "auto" }}
+    >
+      <div className="adm-modal__head">
+        <h2 className="h-title" style={{ fontSize: 24, margin: 0 }}>
+          {rule.id} · {sections[rule.section]}
+        </h2>
+        <button className="icon-btn" onClick={onClose} aria-label="Close">
+          <IconClose size={22} />
+        </button>
       </div>
-    </>
+      {field("title", "Title")}
+      {field("rule", "The rule", 4)}
+      {field("why", "Why it matters", 2)}
+      {field("good", "Like this (a good example)", 2)}
+      {field("bad", "Not like this (a bad example)", 2)}
+      <span className="field__label" style={{ marginTop: 10, display: "block" }}>
+        Where it's enforced
+      </span>
+      <div className="flag-chips">
+        {Object.entries(targets).map(([key, name]) => (
+          <button
+            key={key}
+            type="button"
+            className={`flag-chip ${form.enforcedIn.includes(key) ? "flag-chip--on" : ""}`}
+            aria-pressed={form.enforcedIn.includes(key)}
+            onClick={() => set("enforcedIn", form.enforcedIn.includes(key) ? form.enforcedIn.filter((t) => t !== key) : [...form.enforcedIn, key])}
+          >
+            {name}
+          </button>
+        ))}
+      </div>
+      <div className="row inline" style={{ gap: 8, marginTop: 16 }}>
+        <button className="btn-small btn-primary" disabled={!form.title.trim() || !form.rule.trim()} onClick={() => onSave({ ...form, title: form.title.trim(), rule: form.rule.trim() })}>
+          Keep this rule
+        </button>
+        <button className="btn-small btn-secondary" onClick={onClose}>
+          Cancel
+        </button>
+      </div>
+      <p className="t-xs t-muted">Changes are saved together, as a new version, from the bar at the bottom of the page.</p>
+    </ModalDialog>
   );
 }

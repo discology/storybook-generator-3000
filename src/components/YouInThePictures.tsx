@@ -165,7 +165,7 @@ export default function YouInThePictures({
           Your photo stays private: only the artist uses it, to draw you, and it never appears in the book. Just you, please, never {child}. Baby Vambie stands in for {child} on every page.
         </Note>
 
-        {error && <p className="error-text">{error}</p>}
+        {error && <p className="error-text" role="alert">{error}</p>}
         <button className="btn btn--lime btn--caps" type="button" disabled={busy} onClick={() => void save()} style={{ marginTop: 20 }}>
           {busy ? (file ? "Reading your photo…" : "Saving…") : "Save"} <Chev />
         </button>

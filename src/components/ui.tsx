@@ -1,5 +1,8 @@
-import { useEffect, type CSSProperties, type ReactNode } from "react";
+import { useState, type CSSProperties, type ReactNode } from "react";
 import { Link } from "react-router-dom";
+import * as Dialog from "@radix-ui/react-dialog";
+import { Drawer } from "vaul";
+import clsx from "clsx";
 import {
   IconAlert,
   IconCheck,
@@ -299,6 +302,21 @@ export function Segmented<T extends string>({
   onChange: (value: T) => void;
   dark?: boolean;
 }) {
+  const count = Math.max(1, options.length);
+  const activeIdx = Math.max(
+    0,
+    options.findIndex((o) => o.value === value)
+  );
+  const gapPx = dark ? 4 : 8;
+  const padPx = dark ? 4 : 0;
+  const rightIdx = count - 1 - activeIdx;
+  const totalGaps = (count - 1) * gapPx;
+  const itemSubtract = `${(2 * padPx + totalGaps) / count}px`;
+  const pct = 100 / count;
+  const leftExpr = `calc(${padPx}px + ${activeIdx * pct}% - ${activeIdx} * ${itemSubtract} + ${activeIdx * gapPx}px)`;
+  const rightExpr = `calc(${padPx}px + ${rightIdx * pct}% - ${rightIdx} * ${itemSubtract} + ${rightIdx * gapPx}px)`;
+  const clipPath = `inset(${padPx}px ${rightExpr} ${padPx}px ${leftExpr} round ${dark ? "999px" : "14px"})`;
+
   return (
     <div className={`seg ${dark ? "seg--dark" : ""}`} role="tablist">
       {options.map((o) => (
@@ -313,7 +331,41 @@ export function Segmented<T extends string>({
           {o.label}
         </button>
       ))}
+      <div className="seg__overlay" style={{ clipPath }} aria-hidden="true">
+        {options.map((o) => (
+          <span key={o.value} className="seg__btn seg__btn--overlay">
+            {o.label}
+          </span>
+        ))}
+      </div>
     </div>
+  );
+}
+
+export function MorphSlot<T extends string>({
+  active,
+  items,
+  className,
+}: {
+  active: T;
+  items: { key: T; content: ReactNode }[];
+  className?: string;
+}) {
+  return (
+    <span className={`morph-slot ${className ?? ""}`.trim()}>
+      {items.map((item) => {
+        const isActive = item.key === active;
+        return (
+          <span
+            key={item.key}
+            className={`morph-slot__item ${isActive ? "morph-slot__item--active" : ""}`.trim()}
+            aria-hidden={!isActive || undefined}
+          >
+            {item.content}
+          </span>
+        );
+      })}
+    </span>
   );
 }
 
@@ -335,37 +387,160 @@ export function ProgressSteps({ step, total }: { step: number; total: number }) 
 
 const AVATAR_COLORS = ["#ffd3a1", "#ffc2e4", "#c9f5a8", "#bfe3ff", "#e3d1ff", "#ffe08a"];
 
+const firstChar = (part: string) => {
+  const chars = Array.from(part);
+  return chars.find((c) => !/^[\p{P}\p{S}]$/u.test(c) || /\p{Extended_Pictographic}/u.test(c)) ?? "";
+};
+
 export function initials(name: string) {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .map((p) => ({ raw: p, ch: firstChar(p) }))
+    .filter((p) => p.ch);
   if (parts.length === 0) return "?";
-  return (parts[0][0] + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
+  const first = parts[0].ch;
+  const isEmoji = first.codePointAt(0)! > 0xffff || /\p{Extended_Pictographic}/u.test(first);
+  if (isEmoji) return first;
+  const last = parts.length > 1 ? parts[parts.length - 1].ch : "";
+  return (first + last).toUpperCase() || "?";
 }
 
 export function Avatar({ name, src, size, vambie }: { name: string; src?: string | null; size?: "sm" | "lg"; vambie?: boolean }) {
-  const color = AVATAR_COLORS[[...name].reduce((n, c) => n + c.charCodeAt(0), 0) % AVATAR_COLORS.length];
+  const [failedSrc, setFailedSrc] = useState<string | null>(null);
+  const color = AVATAR_COLORS[Array.from(name).reduce((n, c) => n + (c.codePointAt(0) ?? 0), 0) % AVATAR_COLORS.length];
+  const validSrc = src && src !== failedSrc ? src : null;
   return (
     <span className={`avatar ${size ? `avatar--${size}` : ""} ${vambie ? "avatar--vambie" : ""}`} style={vambie ? undefined : { background: color }}>
-      {vambie ? <Mascot name="peek" style={{ width: "120%", marginTop: "18%" }} /> : src ? <img src={src} alt="" /> : initials(name)}
+      {vambie ? <Mascot name="peek" style={{ width: "120%", marginTop: "18%" }} /> : validSrc ? <img src={validSrc} alt="" onError={() => setFailedSrc(validSrc)} /> : initials(name)}
     </span>
   );
 }
 
 export function BottomSheet({ open, onClose, children, label }: { open: boolean; onClose: () => void; children: ReactNode; label: string }) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-  if (!open) return null;
   return (
-    <>
-      <div className="backdrop" onClick={onClose} />
-      <div className="bsheet" role="dialog" aria-modal="true" aria-label={label}>
-        <div className="bsheet__grip" />
-        {children}
-      </div>
-    </>
+    <Drawer.Root open={open} onOpenChange={(next) => !next && onClose()}>
+      <Drawer.Portal>
+        <Drawer.Overlay className="backdrop" />
+        <Drawer.Content className="bsheet" aria-describedby={undefined}>
+          <div className="bsheet__grip" aria-hidden="true" />
+          <Drawer.Title className="sr-only">{label}</Drawer.Title>
+          {children}
+        </Drawer.Content>
+      </Drawer.Portal>
+    </Drawer.Root>
+  );
+}
+
+function getDialogContainer() {
+  if (typeof document === "undefined") return undefined;
+  return document.querySelector<HTMLElement>(".admin-shell") ?? document.body;
+}
+
+export function ModalDialog({
+  open,
+  onClose,
+  label,
+  className,
+  style,
+  dismissible = true,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  label: string;
+  className?: string;
+  style?: CSSProperties;
+  dismissible?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <Dialog.Root open={open} onOpenChange={(next) => !next && dismissible && onClose()}>
+      <Dialog.Portal container={getDialogContainer()}>
+        <Dialog.Overlay className="backdrop" />
+        <Dialog.Content
+          className={clsx("adm-modal", className)}
+          style={style}
+          aria-describedby={undefined}
+          onEscapeKeyDown={(e) => !dismissible && e.preventDefault()}
+          onPointerDownOutside={(e) => !dismissible && e.preventDefault()}
+          onInteractOutside={(e) => !dismissible && e.preventDefault()}
+        >
+          <Dialog.Title className="sr-only">{label}</Dialog.Title>
+          {children}
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
+  );
+}
+
+export function ConfirmDialog({
+  open,
+  onClose,
+  onConfirm,
+  title,
+  description,
+  confirmLabel = "Confirm",
+  cancelLabel = "Cancel",
+  danger = false,
+  busy = false,
+}: {
+  open: boolean;
+  onClose: () => void;
+  onConfirm: () => void | Promise<void>;
+  title: ReactNode;
+  description?: ReactNode;
+  confirmLabel?: ReactNode;
+  cancelLabel?: ReactNode;
+  danger?: boolean;
+  busy?: boolean;
+}) {
+  const [running, setRunning] = useState(false);
+  const activeBusy = busy || running;
+
+  const handleConfirm = async () => {
+    if (activeBusy) return;
+    setRunning(true);
+    try {
+      await onConfirm();
+      onClose();
+    } finally {
+      setRunning(false);
+    }
+  };
+
+  return (
+    <Dialog.Root open={open} onOpenChange={(next) => !next && !activeBusy && onClose()}>
+      <Dialog.Portal container={getDialogContainer()}>
+        <Dialog.Overlay className="backdrop" />
+        <Dialog.Content
+          className="confirm-dialog"
+          onEscapeKeyDown={(e) => activeBusy && e.preventDefault()}
+          onPointerDownOutside={(e) => activeBusy && e.preventDefault()}
+          onInteractOutside={(e) => activeBusy && e.preventDefault()}
+        >
+          <Dialog.Title className="h-title confirm-dialog__title">{title}</Dialog.Title>
+          {description ? (
+            <Dialog.Description className="t-body t-muted confirm-dialog__desc">{description}</Dialog.Description>
+          ) : (
+            <Dialog.Description className="sr-only">{typeof title === "string" ? title : "Confirm action"}</Dialog.Description>
+          )}
+          <div className="confirm-dialog__actions">
+            <button type="button" className="btn btn--outline btn--sm" disabled={activeBusy} onClick={onClose}>
+              {cancelLabel}
+            </button>
+            <button
+              type="button"
+              className={clsx("btn btn--sm", danger ? "btn--danger-solid" : "btn--lime")}
+              disabled={activeBusy}
+              onClick={() => void handleConfirm()}
+            >
+              {activeBusy ? "Working…" : confirmLabel}
+            </button>
+          </div>
+        </Dialog.Content>
+      </Dialog.Portal>
+    </Dialog.Root>
   );
 }
 

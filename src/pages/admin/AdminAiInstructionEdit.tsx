@@ -134,12 +134,12 @@ export default function AdminAiInstructionEdit() {
           <textarea id="body" ref={textareaRef} rows={18} value={body} onChange={(e) => edit(e.target.value)} style={{ fontFamily: "ui-monospace, monospace", fontSize: "0.85rem" }} />
 
           {unknown.length > 0 && (
-            <p className="status-line" style={{ color: "#d94c4c" }}>
+            <p className="status-line" role="alert" style={{ color: "#d94c4c" }}>
               Not available in this step: {unknown.map((n) => `<${n}>`).join(", ")}
             </p>
           )}
           {error && (
-            <p className="status-line" style={{ color: "#d94c4c" }}>
+            <p className="status-line" role="alert" style={{ color: "#d94c4c" }}>
               {error}
             </p>
           )}
@@ -212,9 +212,9 @@ export default function AdminAiInstructionEdit() {
           <p className="status-line">
             Sends these instructions, saved or not, to the AI using sample values, so you can see the reply before saving. Each run is a real, billed AI call.
           </p>
-          {testing && <p className="status-line">Waiting for the AI… this can take 10–20 seconds.</p>}
+          {testing && <p className="status-line" role="status">Waiting for the AI… this can take 10–20 seconds.</p>}
           {testError && (
-            <p className="status-line" style={{ color: "#d94c4c" }}>
+            <p className="status-line" role="alert" style={{ color: "#d94c4c" }}>
               {testError}
             </p>
           )}

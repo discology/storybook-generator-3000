@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { toast } from "sonner";
 import TopBar from "../components/TopBar";
 import BottomNav from "../components/BottomNav";
 import AudioPlayer from "../components/AudioPlayer";
 import AccessDenied from "../components/AccessDenied";
-import { IconCheck, IconChevronLeft, IconDownload, IconEdit, IconLock, IconMic, IconPeople, IconRefresh, IconSparkle, IconUpload, IconWarning } from "../components/icons";
-import { Chev, Field, Loading, Mascot, Masthead, Note, Select, Sheet, Switch, type MascotName } from "../components/ui";
+import { IconCheck, IconChevronLeft, IconDownload, IconEdit, IconLock, IconMic, IconPause, IconPeople, IconPlay, IconRefresh, IconSparkle, IconUpload, IconWarning } from "../components/icons";
+import { Chev, ConfirmDialog, Field, Loading, Mascot, Masthead, MorphSlot, Note, Select, Sheet, Switch, type MascotName } from "../components/ui";
 import { useStorybookData } from "../hooks/useStorybookData";
 import { apiGet, apiSend } from "../lib/api";
 import { childLabel, formatDuration, possessive } from "../lib/format";
@@ -80,7 +81,6 @@ export default function Recorder() {
   const [chosen, setChosen] = useState<DeckCard | null>(null);
   const [stage, setStage] = useState<Stage>("deck");
   const [seconds, setSeconds] = useState(0);
-  const [levels, setLevels] = useState<number[]>(() => Array(BARS).fill(0.08));
   const [blob, setBlob] = useState<Blob | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [when, setWhen] = useState("today");
@@ -91,6 +91,7 @@ export default function Recorder() {
   // A memory is recorded or typed (VSB-85).
   const [typed, setTyped] = useState(false);
   const [text, setText] = useState("");
+  const [confirmKind, setConfirmKind] = useState<null | "leave-typed" | "leave-recording" | "rerecord">(null);
 
   const recorderRef = useRef<MediaRecorder | null>(null);
   const chunksRef = useRef<Blob[]>([]);
@@ -99,6 +100,8 @@ export default function Recorder() {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const rafRef = useRef<number | null>(null);
   const deckRef = useRef<HTMLDivElement | null>(null);
+  const savingRef = useRef(false);
+  const barRefs = useRef<(HTMLSpanElement | null)[]>([]);
 
   useEffect(() => {
     apiGet("/api/prompts?status=published").then(setPrompts).catch(() => setPrompts([]));
@@ -116,13 +119,21 @@ export default function Recorder() {
     }
   }, [storybook]);
 
+  const resetBars = useCallback(() => {
+    for (let i = 0; i < BARS; i++) {
+      const bar = barRefs.current[i];
+      if (bar) bar.style.transform = "scaleY(0.08)";
+    }
+  }, []);
+
   const stopEverything = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current);
     if (rafRef.current) cancelAnimationFrame(rafRef.current);
     streamRef.current?.getTracks().forEach((t) => t.stop());
     void audioCtxRef.current?.close().catch(() => undefined);
     audioCtxRef.current = null;
-  }, []);
+    resetBars();
+  }, [resetBars]);
 
   useEffect(() => () => stopEverything(), [stopEverything]);
   useEffect(() => () => {
@@ -182,7 +193,8 @@ export default function Recorder() {
     const el = deckRef.current;
     if (!el || !el.firstElementChild) return;
     const width = (el.firstElementChild as HTMLElement).offsetWidth + 14;
-    setCardIndex(Math.min(cards.length - 1, Math.max(0, Math.round(el.scrollLeft / width))));
+    const next = Math.min(cards.length - 1, Math.max(0, Math.round(el.scrollLeft / width)));
+    setCardIndex((prev) => (prev === next ? prev : next));
   };
 
   const meter = (stream: MediaStream) => {
@@ -201,12 +213,14 @@ export default function Recorder() {
         last = t;
         analyser.getByteFrequencyData(data);
         const step = Math.floor(data.length / BARS);
-        const next = Array.from({ length: BARS }, (_, i) => {
+        for (let i = 0; i < BARS; i++) {
+          const bar = barRefs.current[i];
+          if (!bar) continue;
           const mirrored = i < BARS / 2 ? BARS / 2 - 1 - i : i - BARS / 2;
           const v = data[Math.min(data.length - 1, 2 + mirrored * step)] / 255;
-          return Math.max(0.08, Math.min(1, v * 1.4));
-        });
-        setLevels(next);
+          const level = Math.max(0.08, Math.min(1, v * 1.4));
+          bar.style.transform = `scaleY(${level})`;
+        }
       };
       rafRef.current = requestAnimationFrame(tick);
     } catch {
@@ -267,7 +281,6 @@ export default function Recorder() {
   function finishRecording() {
     if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.stop();
     stopEverything();
-    setLevels(Array(BARS).fill(0.08));
     setStage("review");
   }
 
@@ -284,7 +297,12 @@ export default function Recorder() {
   };
 
   const leaveRecording = () => {
-    if (typed ? !text.trim() || window.confirm("Discard what you've written?") : window.confirm("Stop and discard this recording?")) discard();
+    if (typed) {
+      if (!text.trim()) discard();
+      else setConfirmKind("leave-typed");
+      return;
+    }
+    setConfirmKind("leave-recording");
   };
 
   const startTyping = (card: DeckCard) => {
@@ -302,8 +320,10 @@ export default function Recorder() {
   };
 
   const save = async () => {
+    if (savingRef.current) return;
     if (typed) return saveTyped();
     if (!blob || !storybook) return;
+    savingRef.current = true;
     setStage("uploading");
     try {
       let savedId = memoryId;
@@ -332,12 +352,15 @@ export default function Recorder() {
       setStage("saved");
     } catch {
       setStage("upload-error");
+    } finally {
+      savingRef.current = false;
     }
   };
 
   // Typed words are saved with the memory itself; there's nothing to upload.
   const saveTyped = async () => {
-    if (!storybook) return;
+    if (!storybook || savingRef.current) return;
+    savingRef.current = true;
     setStage("uploading");
     try {
       const memory = await apiSend(`/api/storybooks/${storybook.id}/memories`, "POST", {
@@ -352,6 +375,8 @@ export default function Recorder() {
       setStage("saved");
     } catch {
       setStage("upload-error");
+    } finally {
+      savingRef.current = false;
     }
   };
 
@@ -369,6 +394,31 @@ export default function Recorder() {
   const base = `/storybooks/${storybook.id}`;
   const child = childLabel(storybook.child.displayName, storybook.me?.role === "owner");
   const nextDay = new Date(storybook.nextChapterAt).toLocaleDateString("en-US", { weekday: "long" });
+
+  const confirmModal = (
+    <ConfirmDialog
+      open={confirmKind !== null}
+      onClose={() => setConfirmKind(null)}
+      onConfirm={discard}
+      danger
+      title={
+        confirmKind === "leave-typed"
+          ? "Discard what you've written?"
+          : confirmKind === "rerecord"
+            ? "Record it again?"
+            : "Stop and discard this recording?"
+      }
+      description={
+        confirmKind === "leave-typed"
+          ? "Your typed words haven't been saved yet."
+          : confirmKind === "rerecord"
+            ? "This recording will be discarded so you can start fresh."
+            : "Leaving now discards this unsaved recording."
+      }
+      confirmLabel={confirmKind === "rerecord" ? "Re-record" : "Discard"}
+      cancelLabel="Keep it"
+    />
+  );
 
   if (stage === "mic-blocked") {
     return (
@@ -433,7 +483,15 @@ export default function Recorder() {
               <IconUpload size={22} /> {typed ? "Try saving again" : "Retry upload"} <Chev />
             </button>
             {typed ? (
-              <button className="btn btn--outline btn--caps" onClick={() => void navigator.clipboard?.writeText(text)}>
+              <button
+                className="btn btn--outline btn--caps"
+                onClick={() =>
+                  void navigator.clipboard?.writeText(text).then(
+                    () => toast.success("Copied your words"),
+                    () => toast.error("Couldn't copy")
+                  )
+                }
+              >
                 Copy my words <Chev />
               </button>
             ) : (
@@ -447,25 +505,31 @@ export default function Recorder() {
             <Link to="/help" className="tlink">Get help</Link>
           </Note>
         </Sheet>
+        {confirmModal}
       </div>
     );
   }
 
   if (stage === "saved") {
+    const delayVar = (ms: number) => ({ "--delay": `${ms}ms` }) as React.CSSProperties;
     return (
       <div className="page">
         <div className="saved-screen">
-          <span className="badge badge--lime badge--caps">
-            <IconCheck size={18} strokeWidth={3} /> Saved
-          </span>
-          <h1 className="h-display" style={{ marginTop: 16 }}>
-            A little moment.
-            <br />
-            Safely kept.
-          </h1>
-          <Mascot name="hug-book" className="saved-screen__art" />
-          <p className="t-body">Your {typed ? "words are" : "recording is"} saved in {possessive(child)} memories.</p>
-          <div className="preparing-card">
+          <div className="vambie-enter" style={delayVar(0)}>
+            <span className="badge badge--lime badge--caps">
+              <IconCheck size={18} strokeWidth={3} /> Saved
+            </span>
+            <h1 className="h-display" style={{ marginTop: 16 }}>
+              A little moment.
+              <br />
+              Safely kept.
+            </h1>
+          </div>
+          <div className="vambie-enter" style={{ ...delayVar(80), width: "100%", display: "flex", flexDirection: "column", alignItems: "center" }}>
+            <Mascot name="hug-book" className="saved-screen__art" />
+            <p className="t-body">Your {typed ? "words are" : "recording is"} saved in {possessive(child)} memories.</p>
+          </div>
+          <div className="preparing-card vambie-enter" style={delayVar(140)}>
             <IconSparkle size={30} />
             <div>
               <p className="preparing-card__title">Preparing your memory</p>
@@ -478,7 +542,7 @@ export default function Recorder() {
               </p>
             </div>
           </div>
-          <div className="stack" style={{ width: "100%", marginTop: 16 }}>
+          <div className="stack vambie-enter" style={{ ...delayVar(180), width: "100%", marginTop: 16 }}>
             <Link className="btn btn--lime btn--caps" to={base}>
               Back to {possessive(child)} story <Chev />
             </Link>
@@ -493,7 +557,7 @@ export default function Recorder() {
               </button>
             )}
           </div>
-          <p className="saved-screen__links">
+          <p className="saved-screen__links vambie-enter vambie-enter--fade" style={delayVar(180)}>
             {chosen?.id && (
               <button className="tlink tlink--light" onClick={discard}>
                 Add another memory
@@ -529,7 +593,7 @@ export default function Recorder() {
             <>
               <AudioPlayer src={previewUrl} durationSec={seconds} />
               <p className="t-center" style={{ margin: "12px 0 0" }}>
-                <button className="tlink" onClick={() => window.confirm("Record it again? This recording will be discarded.") && discard()}>
+                <button className="tlink" onClick={() => setConfirmKind("rerecord")}>
                   <IconRefresh size={18} /> Re-record
                 </button>
               </p>
@@ -573,6 +637,7 @@ export default function Recorder() {
             {stage === "uploading" ? "Saving…" : "Save memory"} <Chev />
           </button>
         </Sheet>
+        {confirmModal}
       </div>
     );
   }
@@ -610,23 +675,51 @@ export default function Recorder() {
           </button>
           {tooShort && text.trim() && <p className="t-small t-muted t-center">A sentence or two is plenty.</p>}
         </Sheet>
+        {confirmModal}
       </div>
     );
   }
 
   if (stage === "recording" || stage === "paused" || stage === "requesting") {
     const card = chosen ?? FREEFORM;
+    const statusState = stage === "paused" ? "paused" : stage === "requesting" ? "requesting" : "recording";
     return (
       <div className="page">
         <TopBar back={stage === "requesting" ? () => setStage("deck") : leaveRecording} />
         <div className="rec-screen">
-          <span className="badge badge--purple badge--caps">{card.category}</span>
+          <MorphSlot
+            active={statusState}
+            items={[
+              {
+                key: "requesting",
+                content: <span className="badge badge--purple badge--caps">{card.category}</span>,
+              },
+              {
+                key: "recording",
+                content: (
+                  <span className="badge badge--lime badge--caps">
+                    <span className="rec-status-dot" aria-hidden="true" /> Listening · {card.category}
+                  </span>
+                ),
+              },
+              {
+                key: "paused",
+                content: <span className="badge badge--amber badge--caps">Paused · {card.category}</span>,
+              },
+            ]}
+          />
           <h1 className="h-display">{card.question}</h1>
           <p className="t-body" style={{ marginTop: 8 }}>{card.supportingText}</p>
           <Mascot name="mic" className="rec-screen__art" />
           <div className="live-wave" aria-hidden="true">
-            {levels.map((v, i) => (
-              <span key={i} style={{ height: `${Math.round(v * 100)}%`, opacity: stage === "paused" ? 0.4 : 1 }} />
+            {Array.from({ length: BARS }, (_, i) => (
+              <span
+                key={i}
+                ref={(el) => {
+                  barRefs.current[i] = el;
+                }}
+                style={{ opacity: stage === "paused" ? 0.4 : 1 }}
+              />
             ))}
           </div>
           <p className="rec-timer" aria-live="off">{formatDuration(seconds)}</p>
@@ -641,16 +734,44 @@ export default function Recorder() {
           </button>
           <div className="rec-actions">
             <button className="btn btn--ghost btn--caps" onClick={togglePause} disabled={stage === "requesting"}>
-              {stage === "paused" ? "Resume" : "Pause"}
+              <MorphSlot
+                active={stage === "paused" ? "paused" : "recording"}
+                items={[
+                  {
+                    key: "recording",
+                    content: (
+                      <>
+                        <IconPause size={18} /> Pause
+                      </>
+                    ),
+                  },
+                  {
+                    key: "paused",
+                    content: (
+                      <>
+                        <IconPlay size={18} /> Resume
+                      </>
+                    ),
+                  },
+                ]}
+              />
             </button>
             <button className="btn btn--lime btn--caps" onClick={finishRecording} disabled={stage === "requesting" || seconds < 1}>
               Finish <Chev />
             </button>
           </div>
           <p className="t-small t-muted-dark" style={{ marginTop: 16 }}>
-            {stage === "requesting" ? "Allow the microphone to start." : "A little moment is enough."}
+            <MorphSlot
+              active={statusState}
+              items={[
+                { key: "requesting", content: "Allow the microphone to start." },
+                { key: "recording", content: "A little moment is enough." },
+                { key: "paused", content: "Paused — tap Resume whenever you're ready." },
+              ]}
+            />
           </p>
         </div>
+        {confirmModal}
       </div>
     );
   }
@@ -661,7 +782,7 @@ export default function Recorder() {
     <div className="page page--nav">
       <TopBar wordmark menu={`${base}/settings`} />
       <Masthead title={<>A little nudge.<br />A real memory.</>} style={{ paddingTop: 0, paddingBottom: 14 }} />
-      <div className="pad" style={{ overflowX: "auto" }}>
+      <div className="pad chip-scroller">
         <div className="chips" style={{ flexWrap: "nowrap" }}>
           {categories.map((c) => (
             <button

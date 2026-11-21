@@ -4,7 +4,7 @@ import { Chev, Mascot } from "../components/ui";
 // First screen for someone who isn't signed in.
 export default function Landing() {
   return (
-    <div className="page">
+    <div className="page page--landing">
       <div className="tbar">
         <span className="wordmark" style={{ marginLeft: 8 }}>
           Vambie
@@ -17,6 +17,7 @@ export default function Landing() {
       </div>
 
       <header className="landing-hero">
+        <div className="landing-hero__wash ink-reveal" aria-hidden="true" />
         <h1 className="h-display">
           Little moments.
           <br />

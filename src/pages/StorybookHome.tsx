@@ -133,7 +133,7 @@ export default function StorybookHome() {
         <span className="home-hero__kicker">
           {capitalize(possessive(child))} story · {questionLabel(prompt)}
         </span>
-        <div className="home-ask" aria-busy={prompt === undefined}>
+        <div className={`home-ask ${prompt !== undefined ? "home-ask--ready" : ""}`.trim()} aria-busy={prompt === undefined}>
           <h1 className="home-ask__q">
             <QuestionText text={question} />
           </h1>
@@ -213,25 +213,30 @@ function QuestionText({ text }: { text: string }) {
 function EmptyStorybook({ storybook, prompt }: { storybook: StorybookView; prompt: HomeQuestion | null | undefined }) {
   const base = `/storybooks/${storybook.id}`;
   const record = prompt ? `${base}/record?card=${prompt.id}` : `${base}/record`;
+  const delayVar = (ms: number) => ({ "--delay": `${ms}ms` }) as React.CSSProperties;
   return (
     <div className="page page--nav">
       <TopBar wordmark menu={`${base}/settings`} />
       <header className="masthead masthead--plate" style={{ paddingBottom: 6 }}>
-        <h1 className="h-display masthead__title">
-          Every story
-          <br />
-          starts somewhere.
-        </h1>
-        <p className="masthead__sub" style={{ marginTop: 8 }}>
-          {capitalize(possessive(childLabel(storybook.child.displayName, storybook.me?.role === "owner")))} story.
-        </p>
-        <Mascot name="closedbook" className="masthead__art masthead__art--scene" />
-        <p className="t-center" style={{ position: "relative", zIndex: 2, fontSize: 19, margin: "6px 0 0" }}>
-          Your first memory can be a tiny one.
-        </p>
+        <div className="vambie-enter" style={delayVar(0)}>
+          <h1 className="h-display masthead__title">
+            Every story
+            <br />
+            starts somewhere.
+          </h1>
+          <p className="masthead__sub" style={{ marginTop: 8 }}>
+            {capitalize(possessive(childLabel(storybook.child.displayName, storybook.me?.role === "owner")))} story.
+          </p>
+        </div>
+        <div className="vambie-enter" style={delayVar(80)}>
+          <Mascot name="closedbook" className="masthead__art masthead__art--scene" />
+          <p className="t-center" style={{ position: "relative", zIndex: 2, fontSize: 19, margin: "6px 0 0" }}>
+            Your first memory can be a tiny one.
+          </p>
+        </div>
       </header>
       <div className="pad stack" style={{ marginTop: 14 }}>
-        <Link to={record} className="first-question" aria-busy={prompt === undefined}>
+        <Link to={record} className="first-question vambie-enter" style={delayVar(140)} aria-busy={prompt === undefined}>
           <IconSparkle size={34} />
           <span className="grow">
             <span className="badge badge--lavender badge--caps badge--sm">{capitalize(questionLabel(prompt))}</span>
@@ -241,10 +246,10 @@ function EmptyStorybook({ storybook, prompt }: { storybook: StorybookView; promp
           </span>
           <Chev size={26} />
         </Link>
-        <Link className="btn btn--lime btn--caps" to={record}>
+        <Link className="btn btn--lime btn--caps vambie-enter" style={delayVar(180)} to={record}>
           <IconMic size={24} filled /> Record your first memory <Chev />
         </Link>
-        <Link className="btn btn--ghost btn--caps" to={`${base}/family`}>
+        <Link className="btn btn--ghost btn--caps vambie-enter" style={delayVar(180)} to={`${base}/family`}>
           <IconPeople size={24} /> Invite family <Chev />
         </Link>
       </div>

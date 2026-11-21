@@ -105,12 +105,12 @@ export default function AdminMessageEdit() {
           </p>
 
           {unknown.length > 0 && (
-            <p className="status-line" style={{ color: "#d94c4c" }}>
+            <p className="status-line" role="alert" style={{ color: "#d94c4c" }}>
               Not available in this message: {unknown.map((n) => `<${n}>`).join(", ")}
             </p>
           )}
           {error && (
-            <p className="status-line" style={{ color: "#d94c4c" }}>
+            <p className="status-line" role="alert" style={{ color: "#d94c4c" }}>
               {error}
             </p>
           )}

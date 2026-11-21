@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 import { apiGet, apiSend, ApiError } from "../../lib/api";
+import { ConfirmDialog, ModalDialog } from "../../components/ui";
 import { ACTION_AREAS, FLAG_CATEGORIES, PICTURE_CATEGORIES } from "../../lib/flags";
 import FeedbackAnalysis from "./FeedbackAnalysis";
 import ShotReviews, { type ShotReviewItem } from "./ShotReviews";
@@ -66,7 +68,7 @@ const STAGES: [string, string][] = [
   ["big_kid", "Big kid"],
 ];
 const label = (key: string) => FLAG_CATEGORIES[key] ?? key;
-const FILTER = { width: "auto", minHeight: 40, fontSize: 15, padding: "0 10px" };
+const FILTER = { width: "auto", minHeight: 40, fontSize: 16, padding: "0 10px" };
 
 export default function AdminFeedback() {
   const [tab, setTab] = useState<"flags" | "analysis" | "actions">("flags");
@@ -84,8 +86,10 @@ export default function AdminFeedback() {
   const [actions, setActions] = useState<{ items: ActionItem[]; jira: boolean } | null>(null);
   const [selected, setSelected] = useState<string[]>([]);
   const [creating, setCreating] = useState<string[] | null>(null);
+  const [retestPrompt, setRetestPrompt] = useState<{ category: string; count: number; estimate: number } | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
+  const busyRef = useRef(false);
 
   const query = new URLSearchParams(Object.entries(filters).filter(([, v]) => v)).toString();
   const load = useCallback(() => apiGet(`/api/admin/flags?${query}`).then(setData), [query]);
@@ -98,14 +102,22 @@ export default function AdminFeedback() {
   }, []);
 
   const act = async (key: string, run: () => Promise<unknown>, done?: string) => {
+    if (busyRef.current) return;
+    busyRef.current = true;
     setBusy(key);
     setNotice(null);
     try {
       await run();
-      if (done) setNotice(done);
+      if (done) {
+        setNotice(done);
+        toast.success(done);
+      }
     } catch (e) {
-      setNotice(e instanceof ApiError ? e.message : "Something went wrong.");
+      const msg = e instanceof ApiError ? e.message : "Something went wrong.";
+      setNotice(msg);
+      toast.error(msg);
     } finally {
+      busyRef.current = false;
       setBusy(null);
       void load();
       void loadActions();
@@ -113,10 +125,26 @@ export default function AdminFeedback() {
   };
 
   const retest = async (category: string) => {
-    const { count, estimate } = await apiSend("/api/admin/flags/retest", "POST", { category });
+    if (busyRef.current) return;
+    busyRef.current = true;
+    setBusy(`retest-${category}`);
+    setNotice(null);
+    let count = 0;
+    let estimate = 0;
+    try {
+      const res = await apiSend("/api/admin/flags/retest", "POST", { category });
+      count = res.count;
+      estimate = res.estimate;
+    } catch (e) {
+      setNotice(e instanceof ApiError ? e.message : "Couldn't check picture flags.");
+      busyRef.current = false;
+      setBusy(null);
+      return;
+    }
+    busyRef.current = false;
+    setBusy(null);
     if (!count) return setNotice(`No open picture flags in "${label(category)}".`);
-    if (!window.confirm(`Redraw ${count} flagged picture${count === 1 ? "" : "s"} in "${label(category)}" with today's rules? About $${estimate.toFixed(2)}.`)) return;
-    await act(`retest-${category}`, () => apiSend("/api/admin/flags/retest", "POST", { category, confirm: true }), `Re-testing ${count} picture${count === 1 ? "" : "s"}. They appear on each flag as they're drawn; refresh to see them.`);
+    setRetestPrompt({ category, count, estimate });
   };
 
   const set = (k: keyof typeof filters, v: string) => {
@@ -144,7 +172,7 @@ export default function AdminFeedback() {
           Action items{actions ? ` (${actions.items.filter((i) => i.status === "open").length} open)` : ""}
         </button>
       </div>
-      {notice && <p className="status-line">{notice}</p>}
+      {notice && <p className="status-line" role="status">{notice}</p>}
 
       {tab === "flags" && (
         <>
@@ -231,7 +259,7 @@ export default function AdminFeedback() {
           )}
 
           {selected.length > 0 && (
-            <p className="status-line">
+            <p className="status-line" role="status">
               {selected.length} selected ·{" "}
               <button className="tlink" onClick={() => setCreating(selected)}>
                 Make an action item from them
@@ -261,11 +289,33 @@ export default function AdminFeedback() {
             setCreating(null);
             setSelected([]);
             setNotice("Action item created.");
+            toast.success("Action item created.");
             void load();
             void loadActions();
           }}
         />
       )}
+
+      <ConfirmDialog
+        open={retestPrompt !== null}
+        onClose={() => setRetestPrompt(null)}
+        title="Redraw flagged pictures?"
+        description={
+          retestPrompt
+            ? `Redraw ${retestPrompt.count} flagged picture${retestPrompt.count === 1 ? "" : "s"} in "${label(retestPrompt.category)}" with today's rules? About $${retestPrompt.estimate.toFixed(2)}.`
+            : undefined
+        }
+        confirmLabel="Redraw all"
+        onConfirm={async () => {
+          if (!retestPrompt) return;
+          const { category, count } = retestPrompt;
+          await act(
+            `retest-${category}`,
+            () => apiSend("/api/admin/flags/retest", "POST", { category, confirm: true }),
+            `Re-testing ${count} picture${count === 1 ? "" : "s"}. They appear on each flag as they're drawn; refresh to see them.`
+          );
+        }}
+      />
     </div>
   );
 }
@@ -290,7 +340,7 @@ function FlagCard({ flag: f, busy, act, selected, onSelect, onAction }: { flag: 
               <figure style={{ margin: 0 }}>
                 {latest.status === "ready" && latest.imagePath && <img src={`/${latest.imagePath}`} alt="Redrawn with today's rules" />}
                 {latest.status === "drawing" && <p className="t-small t-muted">Drawing…</p>}
-                {latest.status === "failed" && <p className="error-text">{latest.error}</p>}
+                {latest.status === "failed" && <p className="error-text" role="alert">{latest.error}</p>}
                 <figcaption className="t-xs t-muted">
                   {latest.kind === "replan" ? "Replanned shot, today's rules" : "Today's rules"}
                   {latest.ruleSetVersion ? ` (v${latest.ruleSetVersion})` : ""}, {new Date(latest.createdAt).toLocaleDateString()}
@@ -324,7 +374,7 @@ function FlagCard({ flag: f, busy, act, selected, onSelect, onAction }: { flag: 
           </label>
           <select
             className="input"
-            style={{ width: "auto", minHeight: 34, padding: "0 8px" }}
+            style={{ width: "auto", minHeight: 34, fontSize: 16, padding: "0 8px" }}
             value={f.status}
             disabled={busy !== null}
             aria-label="Status"
@@ -458,7 +508,7 @@ function ActionItems({ data, busy, act, onNew }: { data: { items: ActionItem[]; 
                 </a>
               ) : (
                 <>
-                  <select className="input" style={{ width: "auto", minHeight: 34, padding: "0 8px" }} value={types[i.id] ?? "Task"} onChange={(e) => setTypes({ ...types, [i.id]: e.target.value as "Story" | "Task" })} aria-label="Jira type">
+                  <select className="input" style={{ width: "auto", minHeight: 34, fontSize: 16, padding: "0 8px" }} value={types[i.id] ?? "Task"} onChange={(e) => setTypes({ ...types, [i.id]: e.target.value as "Story" | "Task" })} aria-label="Jira type">
                     <option value="Task">Task</option>
                     <option value="Story">Story (development)</option>
                   </select>
@@ -493,43 +543,47 @@ function ActionDialog({ flagIds, onClose, onSaved }: { flagIds: string[]; onClos
     }
   };
   return (
-    <>
-      <div className="backdrop" onClick={() => !busy && onClose()} />
-      <div className="adm-modal adm-modal--auto" role="dialog" aria-modal="true" aria-label="New action item" style={{ width: "min(560px, calc(100vw - 32px))" }}>
-        <h2 className="h-title" style={{ fontSize: 26, margin: "0 0 12px" }}>
-          New action item
-        </h2>
-        <p className="t-small t-muted" style={{ marginTop: 0 }}>
-          {flagIds.length ? `From ${flagIds.length} flag${flagIds.length === 1 ? "" : "s"}; they'll be marked "Action item".` : "Not linked to any flags."}
-        </p>
-        <label className="field__label" htmlFor="ai-title">
-          Title
-        </label>
-        <input id="ai-title" className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Close-ups drift back to medium shots" />
-        <label className="field__label" htmlFor="ai-area" style={{ marginTop: 10 }}>
-          What to change
-        </label>
-        <select id="ai-area" className="input" value={area} onChange={(e) => setArea(e.target.value)}>
-          {Object.entries(ACTION_AREAS).map(([k, v]) => (
-            <option key={k} value={k}>
-              {v}
-            </option>
-          ))}
-        </select>
-        <label className="field__label" htmlFor="ai-details" style={{ marginTop: 10 }}>
-          Details
-        </label>
-        <textarea id="ai-details" className="input" rows={4} value={details} onChange={(e) => setDetails(e.target.value)} placeholder="What to try, and how we'll know it worked." />
-        {error && <p className="error-text">{error}</p>}
-        <div className="row inline" style={{ gap: 8, marginTop: 14 }}>
-          <button className="btn-small btn-primary" disabled={busy || !title.trim()} onClick={() => void save()}>
-            {busy ? "Saving…" : "Create action item"}
-          </button>
-          <button className="btn-small btn-secondary" disabled={busy} onClick={onClose}>
-            Cancel
-          </button>
-        </div>
+    <ModalDialog
+      open
+      onClose={onClose}
+      dismissible={!busy}
+      label="New action item"
+      className="adm-modal--auto"
+      style={{ width: "min(560px, calc(100vw - 32px))" }}
+    >
+      <h2 className="h-title" style={{ fontSize: 26, margin: "0 0 12px" }}>
+        New action item
+      </h2>
+      <p className="t-small t-muted" style={{ marginTop: 0 }}>
+        {flagIds.length ? `From ${flagIds.length} flag${flagIds.length === 1 ? "" : "s"}; they'll be marked "Action item".` : "Not linked to any flags."}
+      </p>
+      <label className="field__label" htmlFor="ai-title">
+        Title
+      </label>
+      <input id="ai-title" className="input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Close-ups drift back to medium shots" />
+      <label className="field__label" htmlFor="ai-area" style={{ marginTop: 10 }}>
+        What to change
+      </label>
+      <select id="ai-area" className="input" value={area} onChange={(e) => setArea(e.target.value)}>
+        {Object.entries(ACTION_AREAS).map(([k, v]) => (
+          <option key={k} value={k}>
+            {v}
+          </option>
+        ))}
+      </select>
+      <label className="field__label" htmlFor="ai-details" style={{ marginTop: 10 }}>
+        Details
+      </label>
+      <textarea id="ai-details" className="input" rows={4} value={details} onChange={(e) => setDetails(e.target.value)} placeholder="What to try, and how we'll know it worked." />
+      {error && <p className="error-text" role="alert">{error}</p>}
+      <div className="row inline" style={{ gap: 8, marginTop: 14 }}>
+        <button className="btn-small btn-primary" disabled={busy || !title.trim()} onClick={() => void save()}>
+          {busy ? "Saving…" : "Create action item"}
+        </button>
+        <button className="btn-small btn-secondary" disabled={busy} onClick={onClose}>
+          Cancel
+        </button>
       </div>
-    </>
+    </ModalDialog>
   );
 }

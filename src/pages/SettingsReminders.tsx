@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
+import { toast } from "sonner";
 import TopBar from "../components/TopBar";
 import AccessDenied from "../components/AccessDenied";
-import { IconHold } from "../components/icons";
-import { Chev, Loading, Masthead, Note, Segmented, Select, Sheet, Switch } from "../components/ui";
+import { IconCheck, IconHold } from "../components/icons";
+import { Chev, Loading, Masthead, MorphSlot, Note, Segmented, Select, Sheet, Switch } from "../components/ui";
 import { useStorybookData } from "../hooks/useStorybookData";
 import { apiSend, ApiError } from "../lib/api";
 import { formatClock, formatDate } from "../lib/format";
@@ -62,9 +63,12 @@ export default function SettingsReminders() {
         remindersPausedUntil: next.remindersPausedUntil,
       });
       setSaved(true);
+      toast.success("Reminder settings saved");
       reload(true);
     } catch (err) {
-      setError(err instanceof ApiError ? err.message : "Couldn't save. Try again.");
+      const msg = err instanceof ApiError ? err.message : "Couldn't save. Try again.";
+      setError(msg);
+      toast.error(msg);
     }
   };
 
@@ -124,9 +128,29 @@ export default function SettingsReminders() {
         <Note kind="info" style={{ marginTop: 16 }}>
           Each week's memories become a new chapter on {chapterDay} morning{form.enabled ? ", after your reminder" : ""}.
         </Note>
-        {error && <p className="error-text">{error}</p>}
+        {error && <p className="error-text" role="alert">{error}</p>}
         <button className="btn btn--lime btn--caps" style={{ marginTop: 18 }} onClick={() => void save()}>
-          {saved ? "Saved" : "Save changes"} <Chev />
+          <MorphSlot
+            active={saved ? "saved" : "save"}
+            items={[
+              {
+                key: "save",
+                content: (
+                  <>
+                    Save changes <Chev />
+                  </>
+                ),
+              },
+              {
+                key: "saved",
+                content: (
+                  <>
+                    <IconCheck size={20} strokeWidth={3} /> Saved
+                  </>
+                ),
+              },
+            ]}
+          />
         </button>
         <p className="t-center t-small t-muted" style={{ marginTop: 10 }}>
           Other texts are in <Link to={`/storybooks/${id}/settings/texts`}>Text messages</Link>.

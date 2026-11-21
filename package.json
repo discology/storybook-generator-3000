@@ -12,12 +12,15 @@
     "db:seed": "tsx prisma/seed.ts",
     "db:studio": "prisma studio",
     "characters:import-voot": "tsx prisma/importVootCharacters.ts",
-    "characters:import-renders": "tsx prisma/importVambieRenders.ts"
+    "characters:import-renders": "tsx prisma/importVambieRenders.ts",
+    "check:motion": "node scripts/check-motion.mjs"
   },
   "dependencies": {
     "@google/genai": "^2.27.0",
     "@prisma/client": "^6.19.3",
+    "@radix-ui/react-dialog": "^1.3.1",
     "archiver": "^8.0.0",
+    "clsx": "^2.1.1",
     "cookie-parser": "^1.4.7",
     "express": "^4.19.2",
     "multer": "^2.4.0",
@@ -25,7 +28,9 @@
     "prisma": "^6.19.3",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "react-router-dom": "^7.18.4"
+    "react-router-dom": "^7.18.4",
+    "sonner": "^2.0.8",
+    "vaul": "^1.1.2"
   },
   "devDependencies": {
     "@types/archiver": "^8.0.0",

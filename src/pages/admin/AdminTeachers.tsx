@@ -60,7 +60,7 @@ export default function AdminTeachers() {
       </div>
       {active === 0 && <p className="status-line">No teacher is active, so lesson stories use the Lesson stories rules alone. Turn a teacher on to use them.</p>}
       {error && (
-        <p className="status-line" style={{ color: "#d94c4c" }}>
+        <p className="status-line" role="alert" style={{ color: "#d94c4c" }}>
           {error}
         </p>
       )}

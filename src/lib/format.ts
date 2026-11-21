@@ -8,11 +8,20 @@ export const formatDate = (value: string | Date | null | undefined, options: Int
 
 export const formatMonth = (value: string | Date) => new Date(value).toLocaleDateString("en-US", { month: "long", year: "numeric" });
 
+export const monthKey = (value: string | Date) => {
+  const d = new Date(value);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+};
+
 // "Chapter 03"
 export const chapterLabel = (sequence: number) => `Chapter ${String(sequence).padStart(2, "0")}`;
 
 // "Mia's" — and "James'" for names ending in s.
-export const possessive = (name: string) => (name.endsWith("s") ? `${name}'` : `${name}'s`);
+export const possessive = (name: string) => {
+  const trimmed = name.trim();
+  if (!trimmed) return "";
+  return trimmed.endsWith("s") ? `${trimmed}'` : `${trimmed}'s`;
+};
 
 // The child's name, or before one is given "your baby" to the parents and "the
 // baby" to everyone else (VSB-121). Shared with the server.

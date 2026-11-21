@@ -221,7 +221,7 @@ export default function InvitationAccept() {
             <input id="name" className="input" value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. June" autoComplete="given-name" />
           </Field>
         )}
-        {error && <p className="error-text">{error}</p>}
+        {error && <p className="error-text" role="alert">{error}</p>}
         <div className="stack" style={{ marginTop: 20 }}>
           <button className="btn btn--lime btn--caps" onClick={() => void accept()} disabled={busy || (needsName && !name.trim())}>
             {busy ? "Joining…" : "Accept invitation"} <Chev />

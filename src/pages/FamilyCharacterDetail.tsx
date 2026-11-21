@@ -55,7 +55,7 @@ export default function FamilyCharacterDetail() {
     }
   };
 
-  if (!character) return <p className="status-line screen-pad">{error ?? "Loading…"}</p>;
+  if (!character) return <p className="status-line screen-pad" role={error ? "alert" : "status"}>{error ?? "Loading…"}</p>;
 
   const variants = [...new Set(character.designs.map((d) => d.variant))].sort((a, b) => (a === "today" ? -1 : b === "today" ? 1 : a.localeCompare(b)));
   const back = params.get("back");
@@ -117,7 +117,7 @@ export default function FamilyCharacterDetail() {
             </button>
           </>
         )}
-        {error && <p className="status-line" style={{ color: "#d94c4c" }}>{error}</p>}
+        {error && <p className="status-line" role="alert" style={{ color: "#d94c4c" }}>{error}</p>}
 
         {variants.map((variant) => {
           const designs = character.designs.filter((d) => d.variant === variant);
@@ -158,7 +158,7 @@ export default function FamilyCharacterDetail() {
                       <div key={d.id}>
                         {d.portraitPath && <img src={`/${d.portraitPath}`} alt="" style={{ width: "100%", borderRadius: 10, display: "block" }} />}
                         <div className="status-line" style={{ fontSize: "0.75rem" }}>
-                          v{d.version} · {formatDate(d.approvedAt)} · on {d.pages} pages
+                          v{d.version} · {formatDate(d.approvedAt)} · on {d.pages} {d.pages === 1 ? "page" : "pages"}
                         </div>
                       </div>
                     ))}
@@ -406,7 +406,7 @@ function DraftEditor({
           />
         </label>
       )}
-      {notice && <p className="status-line">{notice}</p>}
+      {notice && <p className="status-line" role="status">{notice}</p>}
 
       <div className="row inline" style={{ marginTop: "0.75rem", flexWrap: "wrap" }}>
         {dirty && (

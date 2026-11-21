@@ -82,7 +82,7 @@ export default function LessonBox(props: Props) {
           aria-label="What do you want to teach Baby Vambie?"
           maxLength={300}
           rows={2}
-          style={{ width: "100%", border: "none", outline: "none", resize: "none", background: "transparent", color: textColor, fontFamily: textFont, fontSize: 15, lineHeight: 1.4, padding: 0 }}
+          style={{ width: "100%", border: "none", outline: "none", resize: "none", background: "transparent", color: textColor, fontFamily: textFont, fontSize: 16, lineHeight: 1.4, padding: 0 }}
         />
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginTop: 8 }}>
           <span role="status" style={{ fontSize: 13, color: "#B4232A", minHeight: 16 }}>
@@ -140,7 +140,7 @@ function LessonModal(props: Props & { lesson: string; onClose: () => void }) {
         onSubmit={submit}
         style={{ position: "relative", width: "100%", maxWidth: 420, background: "#fff", borderRadius: 16, padding: "26px 22px 20px", boxSizing: "border-box", color: "#111" }}
       >
-        <button type="button" onClick={onClose} aria-label="Close" style={{ position: "absolute", top: 10, right: 12, border: "none", background: "none", fontSize: 26, lineHeight: 1, cursor: "pointer", color: "#111" }}>
+        <button type="button" onClick={onClose} aria-label="Close" style={{ position: "absolute", top: 6, right: 6, width: 44, height: 44, display: "inline-flex", alignItems: "center", justifyContent: "center", border: "none", background: "none", fontSize: 26, lineHeight: 1, cursor: "pointer", color: "#111", padding: 0 }}>
           ×
         </button>
         <h2 style={{ fontFamily: headingFont, fontSize: 30, lineHeight: 1, textTransform: "uppercase", textAlign: "left", color: "#111", background: "none", padding: 0, margin: "0 28px 12px 0" }}>{modalTitle}</h2>

@@ -259,7 +259,7 @@ export function AdminVisitors() {
           </button>
           {saved && <span className="t-small t-muted">{saved}</span>}
         </div>
-        {error && <p className="error-text">{error}</p>}
+        {error && <p className="error-text" role="alert">{error}</p>}
         <p className="field__hint" style={{ marginTop: 12 }}>
           Each preview costs about $0.40, so {Number(cap) || 0} a day is at most about ${Math.round((Number(cap) || 0) * 0.4)}. Past the cap, visitors can still record and save; their story is made once they verify their number. Each device and network also gets {data.perDevice - 1} preview and {data.perDevice - 1} retry a day, and unsaved drafts are deleted after {data.keptDays} days. 0 pauses free previews.
         </p>
