@@ -41,6 +41,8 @@ npm run db:seed             # adds the starter prompt cards
 npm run dev
 ```
 
+Run the checks with `npm run typecheck` and `npm test` (each test file uses its own scratch database, so no keys or `.env` are needed); CI runs both on every pull request. `npm run measure:home` times the home screen for a family three years in.
+
 Open http://localhost:5174. Without Twilio settings, the sign-in code appears on screen. [Getting started](docs/getting-started.md) has the full setup, including the admin panel.
 
 ## Documentation

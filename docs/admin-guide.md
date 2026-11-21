@@ -6,6 +6,8 @@ The admin panel is where the Vambie team reviews chapters and shapes how every c
 
 The week at a glance: chapters held for review, open family feedback, memories and chapters this week, the number of storybooks, invites waiting, and memories that couldn't be transcribed. Below that are chapters whose pictures need another try, and the latest family feedback, each linking to its chapter.
 
+**Invites and referrals** counts invites sent, relatives who joined, new families that started from another family's referral link, and how many of those pay, with the new families per family so far. The table lists the families whose links brought someone.
+
 ## Story Review
 
 Every chapter passes through here.
@@ -86,6 +88,8 @@ Version 1 was drafted from the Vambie world bible, the voice rules, the art dire
 ## Families
 
 Every storybook: the child, who started it, how many people have joined or are invited, the reading stage, the number of memories and chapters, and when the last memory was recorded. Recordings and transcripts aren't shown here.
+
+**Plan** shows Grandfathered (saved before plans existed: no chapter limit), Free, or the subscription and its status. **Extra chapters** is the family's credit balance; **Give one** adds a chapter with a note for the ledger (a double click still adds one). See [Plans and extra chapters](how-it-works.md#plans-and-extra-chapters).
 
 ## Characters
 

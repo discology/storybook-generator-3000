@@ -197,6 +197,20 @@ Pictures are most of the cost: about $0.05 to draw each one, plus about $0.008 f
 
 The real costs are recorded for every AI call. Admin → Costs shows them per chapter, per family and week by week (see the [admin guide](admin-guide.md#costs)).
 
+## Plans and extra chapters
+
+A family is the customer; relatives who join never pay. Plans are rows in the database, read only through `server/entitlements.ts`:
+
+- **Free:** the first full chapter. A saved visitor preview is that chapter.
+- **Family ($20 a month):** 5 chapters a calendar month, up to 12 pages, every reading stage, any number of family members and children. Billing isn't built yet (GitHub #1); an admin can set a subscription by hand.
+- **Families saved before plans existed** are grandfathered and keep making chapters as before. So is the sample family.
+- **Extra chapters (credits)** are used once the month's chapters are made. Every grant is a row in an append-only ledger with a reason (a comp from Admin → Families, a top-up, a referral reward later); the same grant is never written twice.
+- **Payment overdue:** the plan keeps working for 7 days, then only extra chapters can be used.
+
+A chapter is paid for when it starts and given back if writing it fails. When a family has no chapter left, the weekly chapter is skipped until the next week (its memories wait), "Make it now" answers with the reason, and the owner's home says it in place of "Next chapter". Admin rewrites of an existing chapter, and pages before the birth, aren't counted.
+
+**Referral links.** Every family has a link, `/r/<code>`, under Family → Know another family, and a relative sees "Start your own for your child" at the end of a chapter. Someone who starts a storybook within 30 days of opening it is counted as that family's referral (never the family's own owner starting another one). A relative joining the storybook is an invite, not a referral.
+
 ## Not built yet
 
 - Stories in languages other than English.

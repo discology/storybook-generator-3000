@@ -123,6 +123,17 @@ export default function Reader({ publicSlug }: { publicSlug?: string }) {
   const [controls, setControls] = useState(false);
   const [barsShown, setBarsShown] = useState(true);
   const [favorite, setFavorite] = useState(false);
+  // A relative reading the family's book can start one for their own child,
+  // credited to this family as a referral (GitHub #3).
+  const [ownStoryUrl, setOwnStoryUrl] = useState<string | null>(null);
+  const storybookId = chapter?.storybook?.id;
+  const relative = !isPublic && chapter !== null && !chapter.canShare;
+  useEffect(() => {
+    if (!relative || !storybookId) return;
+    apiGet(`/api/storybooks/${storybookId}/referral`)
+      .then((r: { url: string }) => setOwnStoryUrl(r.url))
+      .catch(() => setOwnStoryUrl(null));
+  }, [relative, storybookId]);
   const wide = useMediaQuery("(min-width: 900px) and (min-aspect-ratio: 5/4)");
   const dragRef = useRef<DragState | null>(null);
   const suppressTapRef = useRef(false);
@@ -549,6 +560,11 @@ export default function Reader({ publicSlug }: { publicSlug?: string }) {
             Read again
           </button>
           {nextOrClose}
+          {ownStoryUrl && (
+            <a className="btn btn--outline" href={ownStoryUrl}>
+              Start your own for your child
+            </a>
+          )}
         </div>
       )}
       {isPublic ? null : grownUpsIndex !== null ? (

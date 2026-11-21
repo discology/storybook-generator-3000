@@ -221,14 +221,17 @@ router.get("/admin/families", async (_req, res) => {
   const storybooks = await prisma.storybook.findMany({
     where: familyBook,
     include: {
-      child: { include: { household: { include: { contributors: true } } } },
+      child: { include: { household: { include: { contributors: true, subscription: true } } } },
       _count: { select: { memories: true, chapters: true } },
       memories: { orderBy: { recordedAt: "desc" }, take: 1, select: { recordedAt: true } },
     },
     orderBy: { createdAt: "desc" },
   });
+  const balances = await prisma.creditEntry.groupBy({ by: ["householdId"], where: { pool: "credits" }, _sum: { delta: true } });
+  const credits = new Map(balances.map((b) => [b.householdId, b._sum.delta ?? 0]));
   res.json(
     storybooks.map((s) => {
+      const h = s.child.household;
       const people = s.child.household.contributors.filter((c) => c.inviteStatus !== "revoked");
       return {
         id: s.id,
@@ -242,6 +245,9 @@ router.get("/admin/families", async (_req, res) => {
         stage: stageInfo(effectiveStage(s)).label,
         lastMemoryAt: s.memories[0]?.recordedAt ?? null,
         createdAt: s.createdAt,
+        householdId: h.id,
+        plan: h.grandfathered ? "Grandfathered" : h.subscription ? `${h.subscription.planId} · ${h.subscription.status}` : "Free",
+        credits: credits.get(h.id) ?? 0,
       };
     })
   );

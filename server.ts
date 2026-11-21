@@ -36,6 +36,8 @@ import teacherRoutes from "./server/teachers";
 import { startWeeklyDigest } from "./server/feedbackAnalysis";
 import { startHeldTexts, startTextCleanup } from "./server/texts";
 import { startReminders } from "./server/reminders";
+import planRoutes from "./server/planRoutes";
+import referralRoutes, { captureReferral, referralLanding } from "./server/referrals";
 
 const production = process.env.NODE_ENV === "production";
 
@@ -56,6 +58,8 @@ app.use(express.json());
 // Twilio's webhooks post form fields (server/textRoutes.ts).
 app.use("/api/twilio", express.urlencoded({ extended: false }));
 app.use(cookieParser());
+app.get("/r/:code", referralLanding);
+app.use(captureReferral);
 
 // Fly restarts a machine that fails this check, so it asks the database too:
 // a wedged query path shouldn't look healthy. It reads a real table, because
@@ -125,6 +129,8 @@ app.use("/api", feedbackRoutes);
 app.use("/api", promptAnswerRoutes);
 app.use("/api", featuredStoryRoutes);
 app.use("/api", teacherRoutes);
+app.use("/api", referralRoutes);
+app.use("/api", planRoutes);
 
 // In production this server also serves the built web app (npm run build);
 // in development Vite serves it.

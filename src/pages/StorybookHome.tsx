@@ -95,7 +95,12 @@ export default function StorybookHome() {
   const waiting = storybook.memories.filter((m) => m.chapterIds.length === 0 && m.storyUseConsent && m.status !== "failed");
   // Before the birth there are no weekly chapters: each message becomes a page right away (VSB-134).
   const weekly = storybook.child.stage !== "expecting";
-  const nextLine = storybook.generating ? "Writing the next chapter now." : weekly && waiting.length ? `Next chapter: ${weekday(storybook.nextChapterAt)} morning.` : "";
+  const blocked = storybook.plan?.nextChapter?.message;
+  const nextLine = storybook.generating
+    ? "Writing the next chapter now."
+    : weekly && waiting.length
+      ? (blocked ?? `Next chapter: ${weekday(storybook.nextChapterAt)} morning.`)
+      : "";
   // The chapter covers: chapters that need the owner first, then the ones in the book.
   type Tone = "todo" | "new" | "done" | "growing";
   const strip: { chapter: (typeof published)[number]; tag: string; tone: Tone; to: string | null }[] = [

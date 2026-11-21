@@ -347,7 +347,6 @@ export interface StorybookMemory {
   mine: boolean;
   favorite: boolean;
   excerpt: string | null;
-  words: string; // the full transcript, for search
   chapterIds: string[];
   audioSrc: string | null;
   typed: boolean; // written, not recorded
@@ -420,6 +419,14 @@ export interface StorybookView {
   nextChapterAt: string;
   generating: boolean;
   batchError: string | null;
+  // Owner only: the household's plan, and why the next chapter can't be made.
+  plan: {
+    reason: string;
+    allowance: number | null;
+    allowanceUsed: number;
+    credits: number;
+    nextChapter: { why: "paywall" | "quota" | "past_due"; message: string } | null;
+  } | null;
   defaultContributorId: string;
   myRole: string;
 }

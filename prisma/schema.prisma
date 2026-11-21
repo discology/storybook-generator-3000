@@ -86,7 +86,73 @@ model Household {
   // The team's sample family (VSB-141): the only family whose chapters can be
   // featured on the landing page. Only a family whose members are all admins.
   isSample       Boolean   @default(false)
+  // Families saved before plans existed keep making chapters without a plan.
+  grandfathered  Boolean   @default(false)
+  subscription   Subscription?
+  credits        CreditEntry[]
+  // Family-to-family referral: this family's /r/<code> link, and who brought it.
+  referralCode          String? @unique
+  referredByHouseholdId String?
+  referredByUserId      String?
   createdAt   DateTime     @default(now())
+
+  @@index([referredByHouseholdId])
+}
+
+// Tiers are data; read them through server/entitlements.ts, never directly.
+// A null limit means unlimited.
+model Plan {
+  id                 String  @id // "free" | "family"
+  name               String
+  priceCents         Int
+  stripePriceId      String? @unique
+  chapterAllowance   Int?
+  allowancePeriod    String  @default("month") // month (calendar, UTC) | lifetime
+  maxPagesPerChapter Int?
+  maxReadingStage    Int?
+  familySeats        Int?
+  maxChildren        Int?
+  active             Boolean @default(true)
+  subscriptions      Subscription[]
+}
+
+// Mirrors Stripe for the household; webhooks are the source of truth.
+model Subscription {
+  id                   String    @id @default(cuid())
+  householdId          String    @unique
+  household            Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  planId               String
+  plan                 Plan      @relation(fields: [planId], references: [id])
+  status               String    // trialing | active | past_due | canceled
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean   @default(false)
+  pastDueSince         DateTime?
+  paidAt               DateTime?
+  canceledAt           DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+}
+
+// Append-only, in chapters. Never update or delete a row: correct with a
+// reversing entry. `pool` says whether a spend used the plan's allowance or
+// the household's credits, so a refund goes back where it came from. Credits
+// that lapse are taken away with an `expiry` row, so the balance stays a sum.
+model CreditEntry {
+  id          String    @id @default(cuid())
+  householdId String
+  household   Household @relation(fields: [householdId], references: [id], onDelete: Cascade)
+  delta       Int
+  pool        String    // allowance | credits
+  reason      String    // chapter_spend | chapter_refund | admin_comp | topup | referral_reward | referred_welcome | expiry
+  refType     String?
+  refId       String?
+  note        String?
+  createdAt   DateTime  @default(now())
+
+  @@unique([householdId, reason, refType, refId])
+  @@index([householdId, createdAt])
 }
 
 model Contributor {
