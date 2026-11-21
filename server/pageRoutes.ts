@@ -1,5 +1,6 @@
 import express, { Request, Response, Router } from "express";
 import { prisma } from "./db";
+import { param } from "./params";
 import { getCurrentUser } from "./session";
 import {
   approvePages,
@@ -46,7 +47,7 @@ async function requireChapterAccess(req: Request, res: Response, chapterId: stri
 }
 
 async function pageForRequest(req: Request, res: Response) {
-  const page = await prisma.storyPage.findUnique({ where: { id: req.params.pageId } });
+  const page = await prisma.storyPage.findUnique({ where: { id: param(req, "pageId") } });
   if (!page) {
     res.status(404).json({ error: "Page not found" });
     return null;

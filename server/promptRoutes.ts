@@ -1,6 +1,7 @@
 import express, { Router } from "express";
 import multer from "multer";
 import { prisma } from "./db";
+import { param } from "./params";
 import { PICTURES_PER_CLICK, cardPoses, generatePromptArt, isLibraryPicture, madeForCards, savePromptArt } from "./promptArt";
 import { unknownPromptVariables } from "./promptVariables";
 
@@ -105,7 +106,7 @@ router.get("/admin/prompt-art", async (_req, res) => {
 
 // An uploaded picture joins the library; the card uses it once it's saved.
 router.post("/prompts/:id/artwork", upload.single("image"), async (req, res) => {
-  const prompt = await prisma.prompt.findUnique({ where: { id: req.params.id } });
+  const prompt = await prisma.prompt.findUnique({ where: { id: param(req, "id") } });
   if (!prompt) return res.status(404).json({ error: "Not found" });
   const ext = req.file ? IMAGE_TYPES[req.file.mimetype] : undefined;
   if (!req.file || !ext) return res.status(400).json({ error: "Upload a PNG, JPEG or WebP image." });

@@ -1,6 +1,7 @@
 import express, { Router } from "express";
 import multer from "multer";
 import { prisma } from "./db";
+import { param } from "./params";
 import { getCurrentUser } from "./session";
 import {
   CASTING_MODES,
@@ -112,7 +113,7 @@ router.put("/admin/characters/:id", async (req, res) => {
 
 // Upload official artwork. It becomes the reference if the character has none yet.
 router.post("/admin/characters/:id/art", upload.single("image"), async (req, res) => {
-  const character = await loadCharacter(req.params.id);
+  const character = await loadCharacter(param(req, "id"));
   if (!character) return res.status(404).json({ error: "Not found" });
   const extension = req.file ? IMAGE_TYPES[req.file.mimetype] : undefined;
   if (!req.file || !extension) return res.status(400).json({ error: "Upload a PNG, JPEG or WebP image (up to 10 MB)." });
